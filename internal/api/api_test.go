@@ -2,7 +2,6 @@ package api
 import(
  "context"
  "encoding/json"
- "net/http"
  "net/http/httptest"
  "testing"
  "github.com/docklantern/docklantern/internal/store"
