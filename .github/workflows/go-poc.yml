@@ -4,6 +4,7 @@ on:
     paths:
       - '**/*.go'
       - 'go.mod'
+      - 'go.sum'
       - 'Dockerfile.poc'
       - '.github/workflows/go-poc.yml'
       - 'tests/integration/**'
@@ -23,6 +24,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: go mod tidy
+      - run: git diff --exit-code -- go.mod go.sum
       - run: go test -race ./...
       - run: go vet ./...
 
@@ -34,6 +37,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: go mod tidy
       - name: Docker availability
         run: |
           docker info
@@ -51,6 +55,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - run: go mod tidy
       - name: Containerized executor using identical host paths
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
