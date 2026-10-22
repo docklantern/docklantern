@@ -74,8 +74,8 @@ func(s *Store) FinishMonitorCheck(ctx context.Context,p MonitorPolicy,finished t
  message:="";if checkErr!=nil{message=checkErr.Error();if len(message)>160{message=message[:160]}}
  next:=finished.UTC().Add(time.Duration(p.IntervalSeconds)*time.Second)
  _,err:=s.db.ExecContext(ctx,`UPDATE monitor_policies SET last_checked_at=?,last_error=?,next_check_at=?
- WHERE project=? AND service=? AND image=? AND platform=? AND paused=0 AND next_check_at=?`,
- finished.UTC().Format(time.RFC3339),message,next.Format(time.RFC3339),p.Project,p.Service,p.Image,p.Platform,p.NextCheckAt)
+ WHERE project=? AND service=? AND image=? AND platform=? AND interval_seconds=? AND paused=0 AND next_check_at=?`,
+ finished.UTC().Format(time.RFC3339),message,next.Format(time.RFC3339),p.Project,p.Service,p.Image,p.Platform,p.IntervalSeconds,p.NextCheckAt)
  return err
 }
 
