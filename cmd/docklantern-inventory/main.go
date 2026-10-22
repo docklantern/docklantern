@@ -4,6 +4,8 @@ package main
 
 import (
  "context"
+ "os/signal"
+ "syscall"
  "runtime"
  "encoding/json"
  "flag"
@@ -16,19 +18,23 @@ import (
  "github.com/docklantern/docklantern/internal/api"
  "github.com/docklantern/docklantern/internal/discovery"
  "github.com/docklantern/docklantern/internal/poc"
+ "github.com/docklantern/docklantern/internal/monitor"
  "github.com/docklantern/docklantern/internal/registry"
  "github.com/docklantern/docklantern/internal/store"
 )
 func main(){
- mode:=flag.String("mode","serve","serve, discover, scan, register, projects, check-image")
+ mode:=flag.String("mode","serve","serve, discover, scan, register, projects, check-image, set-policy, policies, check-due, monitor")
  dbPath:=flag.String("db","/data/docklantern.db","SQLite file")
  addr:=flag.String("listen","127.0.0.1:8787","local listener only")
  registration:=flag.String("registration","","JSON registration file")
  image:=flag.String("image","","tagged OCI image for manual registry check")
  platform:=flag.String("platform",runtime.GOOS+"/"+runtime.GOARCH,"target platform")
  roots:=flag.String("roots","","comma-separated allowlisted Compose source roots")
+ policyFile:=flag.String("policy-file","","monitoring-only policy JSON")
+ checkTimeout:=flag.Duration("check-timeout",20*time.Second,"timeout per manifest check")
+ pollEvery:=flag.Duration("poll-every",10*time.Second,"due job scan frequency")
  flag.Parse()
- ctx,cancel:=context.WithTimeout(context.Background(),30*time.Second);defer cancel()
+ ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer stop()
  if *mode=="discover"{x,e:=discovery.Scan(ctx,discovery.Shell{});must(e);must(json.NewEncoder(os.Stdout).Encode(x));return}
  s,e:=store.Open(*dbPath);must(e);defer s.Close()
  switch *mode{
@@ -52,6 +58,17 @@ func main(){
   resolution,e:=(registry.Client{Credentials:registry.Credentials{Username:user,Password:token}}).Check(ctx,*image,*platform);must(e)
   check,e:=s.RecordRegistryCheck(ctx,resolution.Image,resolution.Platform,resolution.IndexDigest,resolution.PlatformDigest);must(e)
   must(json.NewEncoder(os.Stdout).Encode(check))
+ case "set-policy":
+  if *policyFile==""{log.Fatal("set-policy requires -policy-file")}
+  b,e:=os.ReadFile(*policyFile);must(e)
+  var p store.MonitorPolicy;must(json.Unmarshal(b,&p));must(s.SetMonitorPolicy(ctx,p))
+  fmt.Printf("monitor-only policy saved: %s/%s\\n",p.Project,p.Service)
+ case "policies":
+  p,e:=s.MonitorPolicies(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(p))
+ case "check-due","monitor":
+  resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
+  scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20}
+  if *mode=="check-due"{n,e:=scheduler.RunOnce(ctx);if e!=nil{log.Printf("monitor checks failed: %v",e)};fmt.Printf("checked %d due policies\\n",n)}else{must(scheduler.Run(ctx))}
  case "projects":
   x,e:=s.Projects(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x))
  case "serve":
