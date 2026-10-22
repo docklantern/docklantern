@@ -30,6 +30,7 @@ func Parse(name string)(Reference,error) {
  if len(segments)>1&&(strings.ContainsAny(segments[0],".:")||segments[0]=="localhost") {
   ref.Registry=segments[0];segments=segments[1:]
  }
+ if ref.Registry!=strings.ToLower(ref.Registry){return Reference{},errors.New("registry hostname must be lowercase")}
  if ref.Registry=="docker.io"||ref.Registry=="index.docker.io" {ref.Registry="registry-1.docker.io"}
  if len(segments)==0{return Reference{},errors.New("missing repository")}
  last:=segments[len(segments)-1]
@@ -123,6 +124,11 @@ func (c Client) bearer(ctx context.Context,challenge string,r Reference)(string,
  attrs:=map[string]string{}
  for _,m:=range authParam.FindAllStringSubmatch(challenge,-1){attrs[strings.ToLower(m[1])]=m[2]}
  realm,e:=url.Parse(attrs["realm"]);if e!=nil||realm.Scheme!="https"||realm.Host==""||realm.User!=nil||realm.Fragment!=""{return "",errors.New("unsafe registry auth realm")}
+ // Do not forward private-registry credentials to arbitrary token servers.
+ // Docker Hub is the single documented cross-origin exception for this POC.
+ if realm.Hostname()!=r.Registry && !(r.Registry=="registry-1.docker.io"&&realm.Hostname()=="auth.docker.io") {
+  if realm.Host!=r.Registry{return "",errors.New("untrusted registry token host")}
+ }
  if attrs["service"]==""||attrs["scope"]=="" {return "",errors.New("incomplete registry auth challenge")}
  if attrs["scope"]!="repository:"+r.Repository+":pull"{return "",errors.New("unexpected registry authorization scope")}
  q:=realm.Query();q.Set("service",attrs["service"]);q.Set("scope",attrs["scope"]);realm.RawQuery=q.Encode()
