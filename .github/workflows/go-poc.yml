@@ -7,6 +7,7 @@ on:
       - 'Dockerfile.poc'
       - '.github/workflows/go-poc.yml'
       - 'tests/integration/**'
+      - 'tests/sdk/**'
   push:
     branches: [main]
 
@@ -54,3 +55,17 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-containerized.sh
+
+  compose-sdk-evaluation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.9'
+          cache: false
+      - name: Compare CLI and Go SDK project loading
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/sdk/compare.sh
