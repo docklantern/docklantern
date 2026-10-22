@@ -1,38 +1,52 @@
 # DockLantern Architecture Overview
 
-**Status:** Architectural direction established; implementation stack/executor unresolved.
+**Status:** Go runtime selected; single-container Compose execution preferred, pending integration validation.
 
 ## Logical components
 
-- **Dashboard/API:** Service discovery, policies, version state, update history, validated user actions.
-- **Controller:** Registry polling, bounded schedules, update policies, desired state, drift analysis.
-- **Compose executor:** Allowlisted registered project/service operations using the correct file order and host paths.
-- **Persistent store:** Desired image selection, service configuration, credential references, operation journal and history.
-- **Docker Engine:** Authoritative actual container/image/health state.
-- **OCI registries:** Source of remote image manifests and authenticated pulls.
+- **Dashboard/API (Go):** service discovery, policies, version state, update history and validated user actions.
+- **Controller (Go):** OCI registry polling, bounded schedules, update policies, desired state and drift analysis.
+- **Compose executor (Go module):** allowlisted project/service operations, merging original Compose files and generated image overrides.
+- **Persistent store:** desired images, policies, credential references, operation journal and history.
+- **Docker Engine:** authoritative running container/image/health state.
+- **OCI registries:** source of remote manifests and authenticated pulls.
 
-These are logical modules, not required microservices.
+These are logical modules, not required microservices. Prefer a single Go process and container for the first supported Linux host configuration.
 
 ## Source / desired / actual
 
-1. **Source:** User-controlled Compose definitions and interpolation context. Read-only to DockLantern.
-2. **Desired:** Stored deployment image references and live monitoring policies.
-3. **Actual:** Container/image IDs and health retrieved from the Docker Engine.
+1. **Source:** user-controlled, read-only Compose definitions and interpolation context.
+2. **Desired:** stored deployment image references and live polling/update policies.
+3. **Actual:** running image IDs, digests and container status from Docker Engine.
 
-A generated Compose override is derived from desired state, one per project, and applied after the original ordered Compose files. Ordinary Compose invocations that omit it can introduce drift; this should be reported, not automatically reversed.
+A generated image-only override is derived from desired state, one per project, and applied last after the original ordered Compose files. External Compose invocations omitting it may cause drift; show and optionally adopt that drift, do not auto-revert.
+
+## Compose execution: initial design
+
+Mount configured host Compose roots **read-only at identical absolute paths** in the DockLantern container (e.g. `/srv/deployments:/srv/deployments:ro`). Store DB/journal/overrides in a separate `/data` volume. The executor operates against an allowlist of registered project names, original file order, project directory, environment context and allowed services. Docker socket access is privileged and must be isolated from unauthenticated web operations.
+
+Use the official Docker Compose Go SDK if validation proves sufficient parity with expected CLI behavior; otherwise consider a pinned Compose CLI invoked through tightly controlled arguments. The executor backend is internal and replaceable, allowing a future host-side agent where path/security needs warrant it.
+
+**Never deploy** a project whose effective configuration cannot be faithfully reconstructed or whose paths/credentials are inaccessible. Such projects remain monitor-only.
+
+See [ADR 0005](decisions/0005-executor-boundary.md) for executor decision and [ADR 0006](decisions/0006-runtime-selection.md) for language choice.
 
 ## Discovery / onboarding
 
-Use Docker Compose labels as hints for project, service, working directory and config file paths. Find files within configured read-only roots. Register projects explicitly and validate the effective Compose model before allowing managed updates. Absent or invalid Compose sources stay monitor-only.
+Find running containers using Compose labels, then explicitly enroll each project. Validate host paths, file sequence, environment inputs, profiles, effective config and supported image references before enabling deployment. Discovery metadata is a hint, not an immutable record of original source.
 
 ## Update lifecycle
 
-Check remote image platform digest; resolve immutable identity; pull; journal old running image/effective configuration; stage and validate override; apply scoped Compose deployment; verify readiness with timeout; record success/failure. Serialize conflicting operations and rate-limit registry checks. Rollback is best-effort, never a guarantee for persistent application state.
+Poll OCI manifests by platform-specific digest. For authorized update: resolve candidate digest, pull, snapshot prior running identity/effective config, stage and validate image override, deploy targeted services, wait for readiness, and record success or failure. Lock by project, journal operations and reconcile unfinished state on restart. Recovery is best effort; external persistent changes cannot be rolled back automatically.
 
-## Adoption
+## Cooperative external updates
 
-Detect external deployment changes, including new digests under the same mutable tag. Offer Adopt / Restore / Ignore. Adoption changes desired configuration and history only—no pull, restart or container recreation.
+Docker events plus reconciliation identify source/desired/actual differences, including same-tag/new-digest externally deployed images. Offer Adopt, Restore or Ignore. Adoption is configuration-only, with no pull or service recreation.
 
-## File/privilege boundary
+## Initial deployment compatibility
 
-Candidate initial approach: configured read-only bind mounts of Compose roots and separate writable updater data. Correct host paths matter because Docker bind mounts refer to paths on the daemon host. Test this with real Compose fixtures. A small host-side executor remains a possible safer approach. An unrestricted Docker socket grants extensive host privileges even when Compose files are read-only.
+Linux VPS/cloud VM/home lab Docker Engine; Docker Compose projects with existing Traefik networks. No requirement to run Traefik, no automatic `docker compose down`, no multi-host or Swarm/Kubernetes support in the first milestone.
+
+## Security note
+
+Read-only Compose mounts protect against accidental writes **but not reading secrets**. Unrestricted Docker socket access carries high host privilege. Require authenticated dashboard, allowlisted project/service operations, redacted secrets and a hardened deployment review before broad public deployment.
