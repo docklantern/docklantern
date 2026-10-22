@@ -76,7 +76,7 @@ jq -e --arg project "$project" 'any(.[]; .project==$project and .service=="worke
   -output-dir "$override_dir" > "$work/prepared.txt"
 prepared="$(cat "$work/prepared.txt")"
 [[ "$prepared" == "$override_dir/"* && -s "$prepared" ]]
-jq -e '.services.web.image=="nginx:1.28-alpine" and (.services | length)==1' "$prepared" >/dev/null
+sudo jq -e '.services.web.image=="nginx:1.28-alpine" and (.services | length)==1' "$prepared" >/dev/null
 [[ "$("${compose[@]}" ps -q web)" == "$web_before" ]]
 [[ "$("${compose[@]}" config --format json | jq -r '.services.web.image')" == "nginx:1.27-alpine" ]]
 
