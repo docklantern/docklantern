@@ -17,7 +17,7 @@ import (
 )
 const accept = "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
 const maxManifest = 8 << 20
-var component = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
+var component = regexp.MustCompile(`^[a-z0-9]+([._-][a-z0-9]+)*$`)
 var tagRE = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
 var digestRE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 
