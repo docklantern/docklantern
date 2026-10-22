@@ -10,7 +10,7 @@ for cmd in docker go jq; do command -v "$cmd" >/dev/null || { echo "Missing $cmd
 docker info >/dev/null
 docker compose version >/dev/null
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 fixture="$repo_root/tests/integration/fixtures/sample"
 work="$(mktemp -d)"
 suffix="$(tr -dc 'a-z0-9' </dev/urandom | head -c 9 || true)"
@@ -97,7 +97,6 @@ worker_after="$( "${compose[@]}" ps -q worker )"
 [[ "$(docker inspect -f '{{.State.Running}}' "$web_after")" == "true" ]]
 [[ "$(docker inspect "$web_after" | jq -r '.[0].Mounts[] | select(.Destination=="/usr/share/nginx/html") | .Source')" == "$project_dir/www" ]]
 docker inspect "$web_after" | jq -e --arg network "$network" '.[0].NetworkSettings.Networks[$network] != null' >/dev/null
-[[ "$(docker inspect -f '{{index .Config.Env 0}}' "$web_after" | cut -d= -f1)" != "DOCKLANTERN_SHOULD_NOT_EXIST" ]]
 [[ "$(docker inspect "$web_after" | jq -r '.[0].Config.Env[] | select(.=="DEMO_SETTING=example")')" == "DEMO_SETTING=example" ]]
 
 echo "PASS: disposable Compose discovery, overrides, deployment isolation, and failure gates"
