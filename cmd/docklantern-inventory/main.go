@@ -4,6 +4,7 @@ package main
 
 import (
  "context"
+ "runtime"
  "encoding/json"
  "flag"
  "fmt"
@@ -15,13 +16,16 @@ import (
  "github.com/docklantern/docklantern/internal/api"
  "github.com/docklantern/docklantern/internal/discovery"
  "github.com/docklantern/docklantern/internal/poc"
+ "github.com/docklantern/docklantern/internal/registry"
  "github.com/docklantern/docklantern/internal/store"
 )
 func main(){
- mode:=flag.String("mode","serve","serve, discover, scan, register, projects")
+ mode:=flag.String("mode","serve","serve, discover, scan, register, projects, check-image")
  dbPath:=flag.String("db","/data/docklantern.db","SQLite file")
  addr:=flag.String("listen","127.0.0.1:8787","local listener only")
  registration:=flag.String("registration","","JSON registration file")
+ image:=flag.String("image","","tagged OCI image for manual registry check")
+ platform:=flag.String("platform",runtime.GOOS+"/"+runtime.GOARCH,"target platform")
  roots:=flag.String("roots","","comma-separated allowlisted Compose source roots")
  flag.Parse()
  ctx,cancel:=context.WithTimeout(context.Background(),30*time.Second);defer cancel()
@@ -40,6 +44,14 @@ func main(){
   items:=make([]store.Container,0,len(x))
   for _,c:=range x{items=append(items,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health})}
   must(s.Snapshot(ctx,items));fmt.Printf("recorded %d containers\n",len(items))
+ case "check-image":
+  if *image==""{log.Fatal("-image is required for check-image")}
+  user:=os.Getenv("DOCKLANTERN_REGISTRY_USERNAME")
+  token:=os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")
+  if token!=""&&user==""{log.Fatal("registry username required with token")}
+  resolution,e:=(registry.Client{Credentials:registry.Credentials{Username:user,Password:token}}).Check(ctx,*image,*platform);must(e)
+  check,e:=s.RecordRegistryCheck(ctx,resolution.Image,resolution.Platform,resolution.IndexDigest,resolution.PlatformDigest);must(e)
+  must(json.NewEncoder(os.Stdout).Encode(check))
  case "projects":
   x,e:=s.Projects(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x))
  case "serve":
