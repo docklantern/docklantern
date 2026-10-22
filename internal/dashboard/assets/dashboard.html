@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="DockLantern read-only Docker Compose monitoring overview">
+<title>Overview · DockLantern</title>
+<link rel="stylesheet" href="/assets/dashboard.css">
+</head>
+<body>
+<div class="shell">
+<aside class="sidebar">
+ <div class="brand"><span class="brand-icon" aria-hidden="true">◈</span><span>Dock<span class="brand-accent">Lantern</span><small>COMPOSE MONITOR</small></span></div>
+ <nav aria-label="Main navigation">
+ <a class="nav-link active" aria-current="page" href="/"><span aria-hidden="true">▦</span> Overview</a>
+ <a class="nav-link" href="#projects"><span aria-hidden="true">▤</span> Projects</a>
+ <a class="nav-link" href="#registry"><span aria-hidden="true">◎</span> Registry checks</a>
+ <a class="nav-link" href="#policies"><span aria-hidden="true">◷</span> Monitoring</a>
+ </nav>
+ <div class="sidebar-foot"><span class="status-dot"></span> Read-only dashboard<small>Local access only</small></div>
+</aside>
+<main id="main" class="main">
+ <header class="topbar"><div class="eyebrow">DOCKER COMPOSE / OVERVIEW</div><div class="top-actions"><span class="readonly">VIEW ONLY</span><a class="text-action" href="/">↻ Refresh page</a></div></header>
+ <section class="hero" aria-labelledby="hero-title">
+  <div><p class="eyebrow accent">MONITOR YOUR STACKS</p><h1 id="hero-title">Container overview</h1><p class="muted">Discover Compose services, review image checks, and inspect monitoring schedules in one place.</p></div>
+  <span class="hero-glyph" aria-hidden="true">◈</span>
+ </section>
+ <section class="stats" aria-label="Summary">
+  <article class="stat-card"><div class="stat-label">Registered projects</div><strong>{{.ProjectCount}}</strong><span class="stat-hint">Explicitly enrolled</span></article>
+  <article class="stat-card"><div class="stat-label">Discovered containers</div><strong>{{.ContainerCount}}</strong><span class="stat-hint">{{.RunningCount}} currently recorded as running</span></article>
+  <article class="stat-card"><div class="stat-label">Monitoring policies</div><strong>{{.MonitoredCount}}</strong><span class="stat-hint">Including paused policies</span></article>
+  <article class="stat-card"><div class="stat-label">Changed remote tags</div><strong>{{.ChangedCount}}</strong><span class="stat-hint">Since previous successful check</span></article>
+ </section>
+ <section class="section" id="projects">
+  <div class="section-head"><div><p class="eyebrow">PROJECT INVENTORY</p><h2>Compose projects</h2></div><span class="helper">Snapshot from SQLite · refresh with CLI scan</span></div>
+  {{if .Projects}}
+   <div class="project-grid">
+   {{range .Projects}}
+    <article class="project-card">
+     <div class="project-top"><div class="project-avatar" aria-hidden="true">▤</div><div><h3>{{.Registration.Name}}</h3><p class="path">{{.Registration.ProjectDir}}</p></div><span class="pill muted-pill">Monitoring only</span></div>
+     <div class="subhead"><strong>Discovered containers</strong><span>{{len .Containers}}</span></div>
+     {{if .Containers}}
+      <div class="table-scroll"><table><thead><tr><th>Service</th><th>Image</th><th>State</th></tr></thead><tbody>
+      {{range .Containers}}<tr><td><span class="mono strong">{{.Service}}</span><small class="subtext">{{.Name}}</small></td><td class="mono image-col" title="{{.Image}}">{{.Image}}</td><td><span class="pill {{badge .State}}">{{.State}}</span>{{if .Health}}<small class="subtext">{{.Health}}</small>{{end}}</td></tr>{{end}}
+      </tbody></table></div>
+     {{else}}<p class="empty-inline">No containers in the last inventory scan.</p>{{end}}
+     <div class="project-bottom"><span>{{len .Policies}} monitoring policies</span><span>Registered</span></div>
+    </article>
+   {{end}}
+   </div>
+  {{else}}
+   <div class="empty"><span aria-hidden="true">▤</span><h3>No registered projects yet</h3><p>Register a Compose project through the local CLI to see it here. Discovery does not automatically enroll projects.</p><code>docklantern-inventory -mode register -registration /path/registration.json -roots /allowed/root</code></div>
+  {{end}}
+  {{if .Unregistered}}
+   <details class="details"><summary>Discovered but not registered ({{len .Unregistered}} containers)</summary><div class="table-scroll"><table><thead><tr><th>Project</th><th>Service</th><th>Image</th><th>State</th></tr></thead><tbody>{{range .Unregistered}}<tr><td>{{.Project}}</td><td>{{.Service}}</td><td class="mono">{{.Image}}</td><td>{{.State}}</td></tr>{{end}}</tbody></table></div></details>
+  {{end}}
+ </section>
+ <section class="section" id="policies">
+  <div class="section-head"><div><p class="eyebrow">REGISTRY MONITORING</p><h2>Service schedules</h2></div><span class="helper">Configured via local CLI</span></div>
+  <div class="panel table-scroll">
+  <table><thead><tr><th>Project / service</th><th>Watched image</th><th>Interval</th><th>Status</th><th>Next check (UTC)</th><th>Last error</th></tr></thead><tbody>
+  {{range .Policies}}<tr><td><strong>{{.Project}}</strong><small class="subtext">{{.Service}}</small></td><td class="mono image-col" title="{{.Image}}">{{.Image}}<small class="subtext">{{.Platform}}</small></td><td>{{.IntervalSeconds}}s</td><td>{{if .Paused}}<span class="pill muted">Paused</span>{{else}}<span class="pill ok">Scheduled</span>{{end}}</td><td>{{when .NextCheckAt}}</td><td class="error-cell">{{if .LastError}}{{.LastError}}{{else}}—{{end}}</td></tr>
+  {{else}}<tr><td colspan="6" class="table-empty">No monitoring policies configured.</td></tr>{{end}}
+  </tbody></table></div>
+ </section>
+ <section class="section" id="registry">
+  <div class="section-head"><div><p class="eyebrow">OCI DIGEST HISTORY</p><h2>Latest registry checks</h2></div><span class="helper">Remote tag changes ≠ confirmed container updates</span></div>
+  <div class="panel table-scroll">
+  <table><thead><tr><th>Image</th><th>Platform</th><th>Remote digest</th><th>Result</th><th>Checked (UTC)</th></tr></thead><tbody>
+  {{range .Checks}}<tr><td class="mono image-col" title="{{.Image}}">{{.Image}}</td><td>{{.Platform}}</td><td class="mono" title="{{.PlatformDigest}}">{{short .PlatformDigest}}</td><td><span class="pill {{badge .Status}}">{{.Status}}</span></td><td>{{when .CheckedAt}}</td></tr>
+  {{else}}<tr><td colspan="5" class="table-empty">No successful registry checks recorded yet.</td></tr>{{end}}
+  </tbody></table></div>
+ </section>
+ <footer><span>DockLantern · experimental monitoring dashboard</span><span>No automatic deployments or image pulls</span></footer>
+</main></div>
+</body></html>
