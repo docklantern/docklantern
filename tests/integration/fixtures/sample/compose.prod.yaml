@@ -1,0 +1,4 @@
+services:
+  web:
+    environment:
+      DEMO_SETTING: ${DEMO_SETTING:-example}
