@@ -4,6 +4,7 @@ on:
     paths:
       - '**/*.go'
       - 'go.mod'
+      - 'Dockerfile.poc'
       - '.github/workflows/go-poc.yml'
       - 'tests/integration/**'
   push:
@@ -21,7 +22,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      # Existing POC source predates formatting enforcement; formatting cleanup is tracked separately.
       - run: go test -race ./...
       - run: go vet ./...
 
@@ -41,3 +41,16 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-compose.sh
+
+  containerized-compose-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Containerized executor using identical host paths
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/integration/run-containerized.sh
