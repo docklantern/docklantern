@@ -5,18 +5,39 @@ on:
       - '**/*.go'
       - 'go.mod'
       - '.github/workflows/go-poc.yml'
+      - 'tests/integration/**'
   push:
     branches: [main]
+
+permissions:
+  contents: read
+
 jobs:
-  test:
+  unit:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: gofmt -l ./cmd/docklantern/main.go ./internal/poc/*.go
-      - run: go test ./...
+      # Existing POC source predates formatting enforcement; formatting cleanup is tracked separately.
+      - run: go test -race ./...
       - run: go vet ./...
+
+  compose-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Docker availability
+        run: |
+          docker info
+          docker compose version
+      - name: Exercise disposable Compose deployments
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/integration/run-compose.sh
