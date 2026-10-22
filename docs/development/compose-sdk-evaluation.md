@@ -21,6 +21,14 @@ This evaluation uses the **v5.0.0 SDK** in a separate `tests/sdk` module because
 
 The test **does not** call SDK `Pull` or `Up`. Successful project loading is not proof of lifecycle parity.
 
+## Initial CI results (2026-10-22)
+
+- All four GitHub Actions jobs passed, including the new SDK model comparison.
+- SDK probe built with Compose v5.0.0 and Go 1.24.9: **39,056,846 bytes** (39.1 MB decimal).
+- Host Docker CLI executable measured **43,134,496 bytes**, **excluding** its separately installed Compose plugin; these are not comparable deployed-image totals.
+- Compared fields and scoped-load check passed. **SDK Pull and Up were not executed**, and no RSS/startup benchmarks were collected.
+- Newer Compose v5.6.0 declares Go **1.26.8** in its module; toolchain version is a real upgrade constraint.
+
 ## Architectural recommendation
 
 Keep **CLI executor** as the default while evaluating SDK. A production choice requires a gated SDK pull/recreate path against the same disposable fixtures, preservation of unrelated services, readiness handling, private registry credentials, and full image-size and RSS benchmarks. Avoid replacing a tested executor merely to eliminate a subprocess.
