@@ -6,6 +6,7 @@ import (
  "encoding/json"
  "net/http"
  "github.com/docklantern/docklantern/internal/store"
+ "github.com/docklantern/docklantern/internal/dashboard"
 )
 type Reader interface{
  Projects(context.Context)([]store.Registration,error)
@@ -15,6 +16,7 @@ type Reader interface{
 }
 func Handler(s Reader)http.Handler{
  mux:=http.NewServeMux()
+ mux.Handle("/",dashboard.Handler(s))
  mux.HandleFunc("GET /healthz",func(w http.ResponseWriter,r *http.Request){w.Header().Set("Content-Type","application/json");_,_=w.Write([]byte("{\"status\":\"ok\"}"))})
  mux.HandleFunc("GET /api/v1/projects",func(w http.ResponseWriter,r *http.Request){v,e:=s.Projects(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/containers",func(w http.ResponseWriter,r *http.Request){v,e:=s.Containers(r.Context());respond(w,v,e)})
