@@ -11,6 +11,7 @@ type Reader interface{
  Projects(context.Context)([]store.Registration,error)
  Containers(context.Context)([]store.Container,error)
  RegistryChecks(context.Context)([]store.RegistryCheck,error)
+ MonitorPolicies(context.Context)([]store.MonitorPolicy,error)
 }
 func Handler(s Reader)http.Handler{
  mux:=http.NewServeMux()
@@ -18,6 +19,7 @@ func Handler(s Reader)http.Handler{
  mux.HandleFunc("GET /api/v1/projects",func(w http.ResponseWriter,r *http.Request){v,e:=s.Projects(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/containers",func(w http.ResponseWriter,r *http.Request){v,e:=s.Containers(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/registry-checks",func(w http.ResponseWriter,r *http.Request){v,e:=s.RegistryChecks(r.Context());respond(w,v,e)})
+ mux.HandleFunc("GET /api/v1/monitor-policies",func(w http.ResponseWriter,r *http.Request){v,e:=s.MonitorPolicies(r.Context());respond(w,v,e)})
  return mux
 }
 func respond(w http.ResponseWriter,v any,err error){

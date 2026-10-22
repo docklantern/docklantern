@@ -10,9 +10,10 @@ type fake struct{}
 func(fake)Projects(context.Context)([]store.Registration,error){return []store.Registration{{Name:"demo"}},nil}
 func(fake)Containers(context.Context)([]store.Container,error){return []store.Container{},nil}
 func(fake)RegistryChecks(context.Context)([]store.RegistryCheck,error){return []store.RegistryCheck{},nil}
+func(fake)MonitorPolicies(context.Context)([]store.MonitorPolicy,error){return []store.MonitorPolicy{},nil}
 func TestReadOnlyAPI(t *testing.T){
  h:=Handler(fake{})
- for _,path:=range []string{"/healthz","/api/v1/projects","/api/v1/containers","/api/v1/registry-checks"}{
+ for _,path:=range []string{"/healthz","/api/v1/projects","/api/v1/containers","/api/v1/registry-checks","/api/v1/monitor-policies"}{
   r:=httptest.NewRequest("GET",path,nil);w:=httptest.NewRecorder();h.ServeHTTP(w,r)
   if w.Code!=200||!json.Valid(w.Body.Bytes()){t.Fatalf("%s: %d %s",path,w.Code,w.Body.String())}
  }
