@@ -1,0 +1,17 @@
+services:
+  web:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./www:/usr/share/nginx/html:ro
+    networks:
+      - front
+    labels:
+      traefik.enable: "true"
+      traefik.http.services.web.loadbalancer.server.port: "80"
+  worker:
+    image: busybox:1.36
+    command: ["sh", "-c", "sleep 3600"]
+networks:
+  front:
+    external: true
+    name: docklantern-test-front
