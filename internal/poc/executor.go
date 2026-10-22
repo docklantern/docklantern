@@ -116,7 +116,7 @@ type Found struct {Project string `json:"project"`;Service string `json:"service
 func Discover(ctx context.Context,r Runner)([]Found,error){
  ids,e:=r.Run(ctx,"docker","ps","-aq");if e!=nil{return nil,e};if len(strings.Fields(string(ids)))==0{return []Found{},nil}
  result,e:=r.Run(ctx,"docker",append([]string{"inspect","--type=container"},strings.Fields(string(ids))...)...);if e!=nil{return nil,e}
- var raw []struct{Name string `json:"Name"`;Image string `json:"Image"`;Config struct{Image string `json:"Image"`;Labels map[string]string `json:"Labels"`}`}
+ var raw []struct{Name string `json:"Name"`;Image string `json:"Image"`;Config struct{Image string `json:"Image"`;Labels map[string]string `json:"Labels"`}}
  if e=json.Unmarshal(result,&raw);e!=nil{return nil,e}
  found:=[]Found{}
  for _,c:=range raw{pr,s:=c.Config.Labels["com.docker.compose.project"],c.Config.Labels["com.docker.compose.service"];if identifier.MatchString(pr)&&identifier.MatchString(s){found=append(found,Found{pr,s,strings.TrimPrefix(c.Name,"/"),c.Config.Image,c.Image})}}
