@@ -31,6 +31,10 @@ jobs:
           base64 -w0 go.sum
           echo
           echo 'DOCKLANTERN_SUM_END'
+          echo 'DOCKLANTERN_MOD_BEGIN'
+          base64 -w0 go.mod
+          echo
+          echo 'DOCKLANTERN_MOD_END'
       - run: go test -race ./...
       - run: go vet ./...
 
