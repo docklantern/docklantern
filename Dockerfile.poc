@@ -1,0 +1,12 @@
+# Experimental Compose execution image. Not a production DockLantern release.
+FROM golang:1.23-alpine AS builder
+WORKDIR /src
+COPY go.mod ./
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
+RUN CGO_ENABLED=0 go build -trimpath -o /out/docklantern ./cmd/docklantern
+
+# Docker CLI and the Compose v2 plugin are supplied by the official CLI image.
+FROM docker:28-cli
+COPY --from=builder /out/docklantern /usr/local/bin/docklantern
+ENTRYPOINT ["/usr/local/bin/docklantern"]
