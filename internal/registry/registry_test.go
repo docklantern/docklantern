@@ -89,3 +89,10 @@ func TestRejectedRealm(t *testing.T){
  _,e:=c.bearer(context.Background(),`Bearer realm="http://example.org/auth",service="registry",scope="repository:library/nginx:pull"`,r)
  if e==nil{t.Fatal("insecure token realm accepted")}
 }
+
+func TestRejectCrossHostTokenRealm(t *testing.T){
+ c:=Client{Credentials:Credentials{Username:"bot",Password:"do-not-forward"}}
+ r:=Reference{Registry:"ghcr.io",Repository:"org/private"}
+ _,e:=c.bearer(context.Background(),`Bearer realm="https://untrusted.example/token",service="ghcr.io",scope="repository:org/private:pull"`,r)
+ if e==nil||!strings.Contains(e.Error(),"untrusted"){t.Fatalf("accepted unrelated token endpoint: %v",e)}
+}
