@@ -20,8 +20,7 @@ func(r HostScopedResolver) Check(ctx context.Context,image,platform string)(regi
  if r.Username!=""||r.Token!=""{
   if r.Username==""||r.Token==""||r.RegistryHost=="" {return registry.Result{},errors.New("registry credential host, username and token required together")}
   host:=strings.ToLower(r.RegistryHost)
-  if host!=ref.Registry {return registry.Result{},errors.New("registry credential host does not match watched image")}
-  client.Credentials=registry.Credentials{Username:r.Username,Password:r.Token}
+  if host==ref.Registry {client.Credentials=registry.Credentials{Username:r.Username,Password:r.Token}}
  }
  return client.Check(ctx,image,platform)
 }
