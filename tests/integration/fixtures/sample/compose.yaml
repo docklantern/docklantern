@@ -14,4 +14,4 @@ services:
 networks:
   front:
     external: true
-    name: docklantern-test-front
+    name: ${DOCKLANTERN_TEST_NETWORK:?test network must be set}

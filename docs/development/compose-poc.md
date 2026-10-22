@@ -1,6 +1,6 @@
 # Compose Execution Proof of Concept
 
-**Status: experimental.** Not a production updater. Go standard library + constrained Docker Compose CLI backend, pending evaluation of Compose Go SDK parity. No actual Docker daemon execution has been performed in the authoring environment.
+**Status: experimental.** Not a production updater. Go standard library + constrained Docker Compose CLI backend, pending evaluation of Compose Go SDK parity. The authoring environment lacks Docker, but GitHub Actions now runs disposable Docker Engine integration tests (see [integration suite](compose-integration.md)).
 
 ## Scope
 - Discover running Compose services via Docker inspect labels.
@@ -17,7 +17,7 @@ No arbitrary commands/paths from an HTTP dashboard; no dashboard exists in this 
 go test ./...
 go vet ./...
 ```
-The unit tests fake Docker operations. For a live test use **only disposable Compose fixtures** on a machine with Docker Engine and the Compose plugin.
+Unit tests fake Docker operations. The [live integration suite](compose-integration.md) runs on isolated GitHub Actions runners and may also be run on a disposable local Docker host.
 
 ## Local disposable fixture workflow
 From the repository root:
@@ -36,6 +36,6 @@ go run ./cmd/docklantern -mode prepare -registration /tmp/docklantern-poc.json -
 If desired, test the gated `-mode apply -confirm-unsafe-poc-deploy` operation **only on a disposable fixture**, with a verified available replacement image. Cleanup containers and the test network afterward.
 
 ## Known gaps before production
-No durable transaction journal or crash recovery; no image-digest pinning, complete provenance or rollback; no per-project lock; no private registry secret management; no HTTP auth/security model; no host-socket mediation; no testing on live Docker Engine yet. Compose original source and container-internal paths must map to **identical host absolute paths**. Additional Compose features (profiles, includes, env files and bind mounts) need integration checks. Read-only mounts do not eliminate privilege from Docker socket access.
+No durable transaction journal or crash recovery; no image-digest pinning, complete provenance or rollback; no per-project lock; no private registry secret management; no HTTP auth/security model; no host-socket mediation; live Docker tests now cover a limited disposable fixture, but host/container path-parity testing is still pending. Compose original source and container-internal paths must map to **identical host absolute paths**. Additional Compose features (profiles, includes, env files and bind mounts) need integration checks. Read-only mounts do not eliminate privilege from Docker socket access.
 
 This branch is meant to validate executor behavior, not to ship automatic updates.
