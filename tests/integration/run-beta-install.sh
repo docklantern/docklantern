@@ -13,6 +13,12 @@ export DOCKLANTERN_BETA_TEST_IMAGE="docklantern-beta-ci:$RANDOM"
 export DOCKLANTERN_BETA_TEST_FIXTURE_DIR="$scratch/fixtures"
 export DOCKLANTERN_BETA_TEST_PASSWORD_FILE="$scratch/admin_password"
 cleanup(){
+  status=$?
+  if ((status != 0));then
+    echo "=== Disposable DockLantern container diagnostics ===" >&2
+    docker compose -f "$compose" ps -a >&2 || true
+    docker compose -f "$compose" logs --no-color --tail 100 >&2 || true
+  fi
   docker compose -f "$compose" down -v --remove-orphans >/dev/null 2>&1 || true
   docker image rm "$DOCKLANTERN_BETA_TEST_IMAGE" >/dev/null 2>&1 || true
   rm -rf "$scratch"
