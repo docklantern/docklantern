@@ -1,4 +1,4 @@
 # Docker Hub OCI manifest-list digests resolved on 2026-10-23.
 # Review and update both this file and Dockerfile to upgrade base images.
 golang:1.26-alpine@sha256:27f2d3b83cfc5803c8078f8e730af0f7c431bf067afaec8f60a36fb763187cba
-docker:28-cli@sha256:625d9431a9f54c5a2bc90f24f0e1c3d55b1349fd857dd85035f98c2c9acbdd4d
+alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a

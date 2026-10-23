@@ -61,7 +61,7 @@ jobs:
       - name: Build the actual patched Docker proxy from deployment Compose
         run: |
           set -euo pipefail
-          docker compose -f deploy/traefik/compose.discovery.yaml build docker-socket-proxy
+          docker build -f deploy/docker-socket-proxy/Dockerfile -t docklantern-socket-proxy:patched .
       - name: Scan OS and library vulnerabilities in optional Docker socket proxy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
