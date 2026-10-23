@@ -7,6 +7,7 @@ on:
       - 'go.sum'
       - 'Dockerfile.poc'
       - 'Dockerfile'
+      - 'deploy/docker-socket-proxy/**'
       - 'deploy/traefik/**'
       - 'docs/deployment/**'
       - '.github/workflows/go-poc.yml'
@@ -133,3 +134,16 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-beta-install.sh
+
+  resolve-alpine-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Resolve immutable Alpine runtime manifest digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull alpine:3.24
+          pinned="$(docker image inspect alpine:3.24 --format '{{index .RepoDigests 0}}')"
+          [[ "$pinned" =~ ^alpine@sha256:[a-f0-9]{64}$ ]] || exit 1
+          echo "RUNTIME_LOCK $pinned"
