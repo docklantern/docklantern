@@ -16,7 +16,7 @@
  <a class="nav-link active" aria-current="page" href="/"><span aria-hidden="true">▦</span> Overview</a>
  <a class="nav-link" href="#projects"><span aria-hidden="true">▤</span> Projects</a>
  <a class="nav-link" href="#assessments"><span aria-hidden="true">◇</span> Image status</a>
- <a class="nav-link" href="#events"><span aria-hidden="true">♧</span> Event history</a>
+ <a class="nav-link" href="/events"><span aria-hidden="true">♧</span> Event history</a>
  <a class="nav-link" href="#registry"><span aria-hidden="true">◎</span> Registry checks</a>
  <a class="nav-link" href="#policies"><span aria-hidden="true">◷</span> Monitoring</a>
  <a class="nav-link" href="/settings"><span aria-hidden="true">⚙</span> Settings</a>
@@ -75,7 +75,7 @@
   </tbody></table></div>
  </section>
  <section class="section" id="events">
-  <div class="section-head"><div><p class="eyebrow">AUDITABLE MONITORING CHANGES</p><h2>Recent events</h2></div><span class="helper">Webhook delivery is opt-in · digest changes are not verified newer releases</span></div>
+  <div class="section-head"><div><p class="eyebrow">AUDITABLE MONITORING CHANGES</p><h2>Recent events</h2></div><a href="/events" class="text-action">Search all events →</a></div>
   <div class="panel table-scroll"><table><thead><tr><th>Time (UTC)</th><th>Event</th><th>Service / image</th><th>Notification</th></tr></thead><tbody>
   {{range .Events}}<tr><td>{{when .OccurredAt}}</td><td><span class="pill {{badge .Kind}}">{{.Kind}}</span></td><td>{{if .Project}}{{.Project}} / {{.Service}}{{else}}{{.Image}}{{end}}<small class="subtext">{{.Platform}}</small></td><td><span class="pill {{badge .DeliveryState}}">{{.DeliveryState}}</span> {{if .DeliveryAttempts}}<small class="subtext">{{.DeliveryAttempts}} attempt(s)</small>{{end}}</td></tr>
   {{else}}<tr><td colspan="4" class="table-empty">No monitoring events have been recorded yet.</td></tr>{{end}}

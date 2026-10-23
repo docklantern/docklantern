@@ -39,6 +39,7 @@ func main(){
  inProcessMonitor:=flag.Bool("run-monitor",false,"run monitoring scheduler in the web server process")
  scanEvery:=flag.Duration("scan-every",0,"periodic Docker inventory scan; zero disables Docker access")
  runNotifier:=flag.Bool("run-notifier",false,"deliver opt-in monitoring event webhooks")
+ pruneEvents:=flag.Bool("prune-events",false,"explicitly remove delivered events older than configured retention")
  flag.Parse()
  scanDocker:=func(ctx context.Context)([]discovery.Container,error){
   if endpoint:=os.Getenv("DOCKLANTERN_DOCKER_PROXY_URL");endpoint!=""{
@@ -50,6 +51,7 @@ func main(){
  ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer stop()
  if *mode=="discover"{x,e:=scanDocker(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x));return}
  s,e:=store.Open(*dbPath);must(e);defer s.Close()
+ if *pruneEvents{n,e:=s.PruneDeliveredEvents(ctx,time.Now().UTC());must(e);fmt.Printf("pruned %d old delivered events\\n",n);return}
  setupNotifier:=func()notify.Worker{
   endpoint:=os.Getenv("DOCKLANTERN_WEBHOOK_URL")
   secretFile:=os.Getenv("DOCKLANTERN_WEBHOOK_HMAC_KEY_FILE")

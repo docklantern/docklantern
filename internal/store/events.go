@@ -52,7 +52,14 @@ func(s *Store)Events(ctx context.Context,limit int)([]Event,error){
 // single notifier instance per SQLite database; multi-host leases are not yet supported.
 func(s *Store)DueEvents(ctx context.Context,now time.Time,limit int)([]Event,error){
  if limit<1||limit>100{return nil,errors.New("invalid delivery limit")}
- rows,err:=s.db.QueryContext(ctx,"SELECT "+eventColumns+" FROM monitor_events WHERE delivery_state='pending' AND next_delivery_at<=? ORDER BY id LIMIT ?",now.UTC().Format(time.RFC3339Nano),limit)
+ rows,err:=s.db.QueryContext(ctx,`SELECT `+eventColumns+` FROM monitor_events WHERE delivery_state='pending' AND next_delivery_at<=?
+ AND CASE kind
+ WHEN 'remote_digest_changed' THEN (SELECT digest_changes FROM notification_settings WHERE id=1)
+ WHEN 'registry_failure' THEN (SELECT registry_failures FROM notification_settings WHERE id=1)
+ WHEN 'registry_recovered' THEN (SELECT registry_recovery FROM notification_settings WHERE id=1)
+ WHEN 'registry_outage_prolonged' THEN (SELECT prolonged_outage FROM notification_settings WHERE id=1)
+ ELSE 0 END = 1
+ ORDER BY id LIMIT ?`,now.UTC().Format(time.RFC3339Nano),limit)
  if err!=nil{return nil,err};defer rows.Close()
  out:=[]Event{}
  for rows.Next(){e,err:=scanEvent(rows);if err!=nil{return nil,err};out=append(out,e)}

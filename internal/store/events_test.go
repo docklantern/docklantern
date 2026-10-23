@@ -44,7 +44,7 @@ func TestFailureAndRecoveryEventsOnlyOnce(t *testing.T){
  due,err:=s.DueMonitorPolicies(ctx,now.Add(time.Second),10);if err!=nil||len(due)!=1{t.Fatal(err)}
  if err=s.FinishMonitorCheck(ctx,due[0],now,nil);err!=nil{t.Fatal(err)}
  events,err:=s.Events(ctx,20)
- if err!=nil||len(events)!=2||events[0].Kind!="registry_recovered"||events[1].Kind!="registry_failure"{t.Fatalf("%+v %v",events,err)}
+ if err!=nil||len(events)!=3||events[0].Kind!="registry_recovered"||events[1].Kind!="registry_outage_prolonged"||events[2].Kind!="registry_failure"{t.Fatalf("%+v %v",events,err)}
 }
 type errTransient struct{}
 func(errTransient)Error()string{return "secret in upstream response must never be stored as event content"}

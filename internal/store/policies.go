@@ -97,6 +97,11 @@ func(s *Store) FinishMonitorCheck(ctx context.Context,p MonitorPolicy,finished t
  var kind string
  if checkErr!=nil && p.ConsecutiveFailures==0 {kind="registry_failure"}
  if checkErr==nil && p.ConsecutiveFailures>0 {kind="registry_recovered"}
+ if checkErr!=nil {
+  var threshold int
+  if err=tx.QueryRowContext(ctx,"SELECT outage_failures FROM notification_settings WHERE id=1").Scan(&threshold);err!=nil{return err}
+  if failures==threshold {kind="registry_outage_prolonged"}
+ }
  if kind!=""{
   if err=insertEvent(ctx,tx,Event{Kind:kind,Project:p.Project,Service:p.Service,Image:p.Image,Platform:p.Platform},finished);err!=nil{return err}
  }
