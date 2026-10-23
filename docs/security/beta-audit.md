@@ -18,7 +18,7 @@ The scanners consume contemporary public vulnerability feeds during GitHub Actio
 
 ## Audit results — October 23, 2026
 
-**Release recommendation: NO-GO pending remediation.** The first security workflow run [#40008555155](https://github.com/docklantern/docklantern/actions/runs/40008555155) found blocking known vulnerabilities. The failures are findings, not CI infrastructure breakages; **do not suppress or bypass these gates**.
+**Original PR #22 release recommendation: NO-GO pending remediation.** The first security workflow run [#40008555155](https://github.com/docklantern/docklantern/actions/runs/40008555155) found blocking known vulnerabilities. The failures are findings, not CI infrastructure breakages; **do not suppress or bypass these gates**.
 
 | Surface | Findings in first run | Decision |
 |---|---|---|
@@ -27,6 +27,8 @@ The scanners consume contemporary public vulnerability feeds during GitHub Actio
 | Optional Docker socket proxy v0.5.0 | 6 fixable HIGH Alpine findings, affecting OpenSSL and PCRE2 libraries | **Blocked.** Rebuild on up-to-date patched packages (or change to a verified maintained alternative) and rerun the proxy mutation-denial/inventory integration tests. No upstream v0.5.1 release was identified during review. |
 
 **Scope nuance:** The *first* Go source job inadvertently scanned a Go 1.23 toolchain selected from the module directive. A follow-up commit corrected the security workflow to scan from the **digest-pinned Go builder**, matching the release compilation environment; that job **passed**. The Docker CLI runtime still bundles binaries built with different Go versions, and its Trivy findings remain independent blockers. These are distinct scan targets. The first report should **not** be interpreted as 44 confirmed vulnerabilities in the shipping DockLantern application binary. Use the toolchain/version and binary evidence for each artifact during remediation.
+
+The original PR #22 scanner exit codes were intentionally nonzero. **PR #23** reduces runtime attack surface by removing Docker/Compose/Buildx binaries, upgrades Alpine packages, pins the runtime base, and rebuilds the optional proxy with patched Alpine packages. A green rerun of all three scanner jobs is required; this document retains the original audit evidence for traceability.
 
 The scanner exit codes are intentionally nonzero. Green functional CI cannot override these security gates, and **no `v0.1.0-beta.1` tag should be created** until the findings have been assessed and addressed. The initial report is not a full manual penetration test or audit of the Compose/TLS/network trust model.
 
