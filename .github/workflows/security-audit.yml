@@ -1,0 +1,75 @@
+name: Beta security audit
+on:
+  workflow_call:
+  pull_request:
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+      - 'deploy/traefik/compose.discovery.yaml'
+      - '.github/workflows/security-audit.yml'
+      - '.github/workflows/release.yml'
+      - 'security/**'
+      - 'scripts/security-*.sh'
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  go-vulnerabilities:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Go vulnerability analysis with the exact pinned release builder
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Avoid scanning the historical Go 1.23 module directive's stdlib
+          # instead of the Go toolchain that compiles the shipping binary.
+          builder="$(sed -n 's/^FROM \(golang:[^ ]*\) AS build$/\1/p' Dockerfile)"
+          [[ "$builder" == golang:*@sha256:* ]] || exit 1
+          docker run --rm --mount "type=bind,source=$PWD,target=/src" -w /src "$builder" sh -ec '
+            go install golang.org/x/vuln/cmd/govulncheck@latest
+            "$(go env GOPATH)/bin/govulncheck" ./...
+          '
+
+  monitoring-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build exact beta monitoring image (no publish)
+        run: docker build --build-arg VERSION=security-audit -t docklantern-audit:ci .
+      - name: Scan OS and library vulnerabilities in release image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: docklantern-audit:ci
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+  docker-proxy-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve optional socket proxy from Compose source
+        id: proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$(sed -n 's/^[[:space:]]*image:[[:space:]]*\(tecnativa\/docker-socket-proxy:[^[:space:]]*\).*/\1/p' deploy/traefik/compose.discovery.yaml)"
+          [[ "$image" =~ ^tecnativa/docker-socket-proxy:v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+      - name: Scan OS and library vulnerabilities in optional Docker socket proxy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.proxy.outputs.image }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
