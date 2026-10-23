@@ -21,6 +21,7 @@ import (
  "github.com/docklantern/docklantern/internal/discovery"
  "github.com/docklantern/docklantern/internal/poc"
  "github.com/docklantern/docklantern/internal/monitor"
+ "github.com/docklantern/docklantern/internal/notify"
  "github.com/docklantern/docklantern/internal/registry"
  "github.com/docklantern/docklantern/internal/store"
 )
@@ -37,6 +38,7 @@ func main(){
  pollEvery:=flag.Duration("poll-every",10*time.Second,"due job scan frequency")
  inProcessMonitor:=flag.Bool("run-monitor",false,"run monitoring scheduler in the web server process")
  scanEvery:=flag.Duration("scan-every",0,"periodic Docker inventory scan; zero disables Docker access")
+ runNotifier:=flag.Bool("run-notifier",false,"deliver opt-in monitoring event webhooks")
  flag.Parse()
  scanDocker:=func(ctx context.Context)([]discovery.Container,error){
   if endpoint:=os.Getenv("DOCKLANTERN_DOCKER_PROXY_URL");endpoint!=""{
@@ -48,6 +50,15 @@ func main(){
  ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer stop()
  if *mode=="discover"{x,e:=scanDocker(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x));return}
  s,e:=store.Open(*dbPath);must(e);defer s.Close()
+ setupNotifier:=func()notify.Worker{
+  endpoint:=os.Getenv("DOCKLANTERN_WEBHOOK_URL")
+  secretFile:=os.Getenv("DOCKLANTERN_WEBHOOK_HMAC_KEY_FILE")
+  if endpoint==""||secretFile==""{log.Fatal("notifications require DOCKLANTERN_WEBHOOK_URL and DOCKLANTERN_WEBHOOK_HMAC_KEY_FILE")}
+  secret,e:=os.ReadFile(filepath.Clean(secretFile));must(e)
+  sender,e:=notify.New(endpoint,strings.TrimSpace(string(secret)));must(e)
+  return notify.Worker{Store:s,Sender:sender,Interval:10*time.Second,Limit:20}
+ }
+
  switch *mode{
  case "register":
   b,e:=os.ReadFile(*registration);must(e);var p store.Registration;must(json.Unmarshal(b,&p))
@@ -80,6 +91,10 @@ func main(){
   resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
   scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20}
   if *mode=="check-due"{n,e:=scheduler.RunOnce(ctx);if e!=nil{log.Printf("monitor checks failed: %v",e)};fmt.Printf("checked %d due policies\\n",n)}else{must(scheduler.Run(ctx))}
+ case "events":
+  records,e:=s.Events(ctx,100);must(e);must(json.NewEncoder(os.Stdout).Encode(records))
+ case "notify":
+  must(setupNotifier().Run(ctx))
  case "projects":
   x,e:=s.Projects(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x))
  case "serve":
@@ -108,6 +123,10 @@ func main(){
 
   var sourceRoots []string
   if *roots!=""{sourceRoots=strings.Split(*roots,",")}
+  if *runNotifier {
+   worker:=setupNotifier()
+   go func(){if err:=worker.Run(ctx);err!=nil{log.Printf("notification worker stopped: %v",err)}}()
+  }
   if *inProcessMonitor {
    resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
    scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20}

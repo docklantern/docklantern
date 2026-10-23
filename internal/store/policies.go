@@ -87,10 +87,20 @@ func(s *Store) FinishMonitorCheck(ctx context.Context,p MonitorPolicy,finished t
   if delay>24*time.Hour{delay=24*time.Hour}
  }
  next:=finished.UTC().Add(delay)
- _,err:=s.db.ExecContext(ctx,`UPDATE monitor_policies SET last_checked_at=?,last_error=?,next_check_at=?,consecutive_failures=?
+ tx,err:=s.db.BeginTx(ctx,nil);if err!=nil{return err};defer tx.Rollback()
+ result,err:=tx.ExecContext(ctx,`UPDATE monitor_policies SET last_checked_at=?,last_error=?,next_check_at=?,consecutive_failures=?
  WHERE project=? AND service=? AND image=? AND platform=? AND interval_seconds=? AND paused=0 AND next_check_at=?`,
  finished.UTC().Format(time.RFC3339),message,next.Format(time.RFC3339),failures,p.Project,p.Service,p.Image,p.Platform,p.IntervalSeconds,p.NextCheckAt)
- return err
+ if err!=nil{return err}
+ changed,err:=result.RowsAffected();if err!=nil{return err}
+ if changed==0{return tx.Commit()} // changed/paused policy; do not emit stale events.
+ var kind string
+ if checkErr!=nil && p.ConsecutiveFailures==0 {kind="registry_failure"}
+ if checkErr==nil && p.ConsecutiveFailures>0 {kind="registry_recovered"}
+ if kind!=""{
+  if err=insertEvent(ctx,tx,Event{Kind:kind,Project:p.Project,Service:p.Service,Image:p.Image,Platform:p.Platform},finished);err!=nil{return err}
+ }
+ return tx.Commit()
 }
 
 func validPlatform(v string)bool{

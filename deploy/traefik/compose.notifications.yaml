@@ -1,0 +1,22 @@
+# Optional outbound notifications, combined with base compose.yaml.
+# Never place the webhook signing secret in .env or in a Compose label.
+services:
+  docklantern:
+    environment:
+      DOCKLANTERN_WEBHOOK_URL: ${DOCKLANTERN_WEBHOOK_URL:?set a trusted public HTTPS webhook URL}
+      DOCKLANTERN_WEBHOOK_HMAC_KEY_FILE: /run/secrets/webhook_hmac_key
+    secrets:
+      - admin_password
+      - webhook_hmac_key
+    command:
+      - -mode
+      - serve
+      - -db
+      - /data/docklantern.db
+      - -listen
+      - 0.0.0.0:8787
+      - -run-monitor
+      - -run-notifier
+secrets:
+  webhook_hmac_key:
+    file: ./secrets/webhook_hmac_key.txt
