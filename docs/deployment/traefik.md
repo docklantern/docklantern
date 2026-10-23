@@ -20,7 +20,8 @@ mkdir -p secrets
 chmod 700 secrets
 # Supply a unique randomly generated admin password (20+ chars) as a file.
 openssl rand -base64 48 > secrets/admin_password.txt
-chmod 600 secrets/admin_password.txt
+sudo chown root:root secrets/admin_password.txt
+sudo chmod 600 secrets/admin_password.txt
 
 docker compose config
 docker compose up -d --build
@@ -28,7 +29,7 @@ docker compose up -d --build
 
 The dashboard is available at `https://<your-domain>/` **only after** Traefik has issued or loaded a valid TLS certificate. Verify HTTPS is working before supplying Basic credentials in a browser.
 
-The generated admin password is mounted as a Compose secret and is **not committed to Git**. `/data` is a persistent named volume containing SQLite and its journal. The image embeds the dashboard HTML/CSS and includes the optional Docker CLI.
+The generated admin password is mounted as a Compose secret and is **not committed to Git**. With `cap_drop: [ALL]`, rootful Docker needs a host bind-mounted secret accessible to container UID 0 without `CAP_DAC_OVERRIDE`. On standard rootful Docker, use a root-owned `0600` file as shown; on rootless/user-namespace deployments, verify the mapped UID/GID and secret accessibility before exposing the app. Never make the secret world-readable. `/data` is a persistent named volume containing SQLite and its journal. The image embeds the dashboard HTML/CSS and includes the optional Docker CLI.
 
 ## Authentication and reverse-proxy trust
 
@@ -49,4 +50,4 @@ For a local, non-public dashboard, use the default loopback mode and omit public
 
 ## Limitations
 
-The example should be tested against your specific Traefik deployment before use. No managed Docker updates, restart actions, credential vault, audit trail, user roles, host-socket isolation, distributed scheduler or deployed-digest verification is implemented. The built image uses a pinned Docker CLI major version, not a full immutable digest; pin and audit exact upstream image digests for production releases.
+The example should be tested against your specific Traefik deployment before use. No managed Docker updates, restart actions, credential vault, audit trail, user roles, host-socket isolation, distributed scheduler or deployed-digest verification is implemented. The beta candidate pins its Docker CLI and Go build base manifests to OCI digests; still audit runtime packages, container dependencies, and optional discovery proxy for vulnerabilities before release.
