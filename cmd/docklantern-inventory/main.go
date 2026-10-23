@@ -5,6 +5,7 @@ package main
 import (
  "context"
  "os/signal"
+ "path/filepath"
  "syscall"
  "runtime"
  "encoding/json"
@@ -34,6 +35,8 @@ func main(){
  policyFile:=flag.String("policy-file","","monitoring-only policy JSON")
  checkTimeout:=flag.Duration("check-timeout",20*time.Second,"timeout per manifest check")
  pollEvery:=flag.Duration("poll-every",10*time.Second,"due job scan frequency")
+ inProcessMonitor:=flag.Bool("run-monitor",false,"run monitoring scheduler in the web server process")
+ scanEvery:=flag.Duration("scan-every",0,"periodic Docker inventory scan; zero disables Docker access")
  flag.Parse()
  ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer stop()
  if *mode=="discover"{x,e:=discovery.Scan(ctx,discovery.Shell{});must(e);must(json.NewEncoder(os.Stdout).Encode(x));return}
@@ -73,16 +76,50 @@ func main(){
  case "projects":
   x,e:=s.Projects(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x))
  case "serve":
-  // Authentication is required and the initial server remains loopback-only.
-  if !strings.HasPrefix(*addr,"127.0.0.1:")&&!strings.HasPrefix(*addr,"localhost:"){log.Fatal("POC HTTP API must bind loopback")}
+  // Non-loopback binding requires explicit HTTPS reverse-proxy configuration.
+  proxyMode:=os.Getenv("DOCKLANTERN_ALLOW_PROXY")=="1"
+  origin:=os.Getenv("DOCKLANTERN_PUBLIC_ORIGIN")
+  local:=strings.HasPrefix(*addr,"127.0.0.1:")||strings.HasPrefix(*addr,"localhost:")
+  if !local && (!proxyMode||origin==""||*addr!="0.0.0.0:8787") {
+   log.Fatal("non-loopback requires DOCKLANTERN_ALLOW_PROXY=1, explicit HTTPS origin and -listen 0.0.0.0:8787")
+  }
+  if proxyMode!=(!local){log.Fatal("proxy mode and bind address must agree")}
+  if *scanEvery!=0 && *scanEvery<time.Minute {log.Fatal("-scan-every must be zero or at least one minute")}
   log.Printf("inventory API on %s",*addr)
   username:=os.Getenv("DOCKLANTERN_ADMIN_USERNAME")
   password:=os.Getenv("DOCKLANTERN_ADMIN_PASSWORD")
+  passwordFile:=os.Getenv("DOCKLANTERN_ADMIN_PASSWORD_FILE")
+  if passwordFile!=""{
+   if password!=""{log.Fatal("choose only one of DOCKLANTERN_ADMIN_PASSWORD and DOCKLANTERN_ADMIN_PASSWORD_FILE")}
+   // File-based Docker secrets avoid putting passwords in Compose env values.
+   secret,e:=os.ReadFile(filepath.Clean(passwordFile));must(e)
+   password=strings.TrimSuffix(string(secret),"\\n")
+   password=strings.TrimSuffix(password,"\\r")
+  }
   guard,e:=auth.New(username,password);must(e)
+  if proxyMode{must(guard.SetPublicOrigin(origin))}else if origin!=""{log.Fatal("public origin requires reverse-proxy mode")}
+
   var sourceRoots []string
   if *roots!=""{sourceRoots=strings.Split(*roots,",")}
+  if *inProcessMonitor {
+   resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
+   scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20}
+   go func(){if err:=scheduler.Run(ctx);err!=nil{log.Printf("registry monitoring stopped: %v",err)}}()
+  }
+  if *scanEvery>0 {
+   scan:=func(){
+    scanCtx,cancel:=context.WithTimeout(ctx,40*time.Second);defer cancel()
+    items,err:=discovery.Scan(scanCtx,discovery.Shell{})
+    if err!=nil{log.Printf("Docker scan failed: %v",err);return}
+    records:=make([]store.Container,0,len(items))
+    for _,c:=range items{records=append(records,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health})}
+    if err=s.Snapshot(scanCtx,records);err!=nil{log.Printf("Docker snapshot failed: %v",err)}
+   }
+   go func(){scan();ticker:=time.NewTicker(*scanEvery);defer ticker.Stop();for{select{case <-ctx.Done():return;case <-ticker.C:scan()}}}()
+  }
   server:=&http.Server{Addr:*addr,Handler:management.Handler(s,guard,sourceRoots),ReadHeaderTimeout:5*time.Second,ReadTimeout:10*time.Second,WriteTimeout:15*time.Second,IdleTimeout:60*time.Second}
-  log.Fatal(server.ListenAndServe())
+  go func(){<-ctx.Done();shutdownCtx,cancel:=context.WithTimeout(context.Background(),10*time.Second);defer cancel();_ = server.Shutdown(shutdownCtx)}()
+  if err=server.ListenAndServe();err!=nil&&err!=http.ErrServerClosed{log.Fatal(err)}
  default:log.Fatal("unknown mode")
  }
 }
