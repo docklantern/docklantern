@@ -1,0 +1,31 @@
+# Disposable CI installation fixture: private network, no host ports,
+# no Docker socket, no automatic image updates.
+services:
+  docklantern:
+    image: ${DOCKLANTERN_BETA_TEST_IMAGE:?build the local test image first}
+    restart: "no"
+    command: ["-mode","serve","-db","/data/docklantern.db","-listen","0.0.0.0:8787","-run-monitor"]
+    environment:
+      DOCKLANTERN_ADMIN_USERNAME: admin
+      DOCKLANTERN_ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+      DOCKLANTERN_ALLOW_PROXY: "1"
+      DOCKLANTERN_PUBLIC_ORIGIN: https://docklantern.example.test
+    secrets:
+      - admin_password
+    volumes:
+      - db:/data
+      - ${DOCKLANTERN_BETA_TEST_FIXTURE_DIR:?}:/fixtures:ro
+    networks: [isolated]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+networks:
+  isolated:
+    internal: true
+volumes:
+  db:
+secrets:
+  admin_password:
+    file: ${DOCKLANTERN_BETA_TEST_PASSWORD_FILE:?}
