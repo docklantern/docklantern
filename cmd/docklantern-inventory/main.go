@@ -93,8 +93,8 @@ func main(){
    if password!=""{log.Fatal("choose only one of DOCKLANTERN_ADMIN_PASSWORD and DOCKLANTERN_ADMIN_PASSWORD_FILE")}
    // File-based Docker secrets avoid putting passwords in Compose env values.
    secret,e:=os.ReadFile(filepath.Clean(passwordFile));must(e)
-   password=strings.TrimSuffix(string(secret),"\\n")
-   password=strings.TrimSuffix(password,"\\r")
+   password=strings.TrimSuffix(string(secret),"\n")
+   password=strings.TrimSuffix(password,"\r")
   }
   guard,e:=auth.New(username,password);must(e)
   if proxyMode{must(guard.SetPublicOrigin(origin))}else if origin!=""{log.Fatal("public origin requires reverse-proxy mode")}
