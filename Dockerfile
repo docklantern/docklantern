@@ -6,7 +6,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/docklantern-inventory ./cmd/docklantern-inventory
+ARG VERSION=dev
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false -ldflags="-s -w -X main.version=${VERSION}" -o /out/docklantern-inventory ./cmd/docklantern-inventory
 
 # Docker CLI is used for optional read-only inventory scanning.
 # A mounted Docker socket remains highly privileged; omit it by default.
