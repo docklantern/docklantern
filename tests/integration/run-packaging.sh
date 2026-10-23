@@ -23,6 +23,14 @@ chmod 600 "$tmp/secrets/admin_password"
 
 docker build --build-arg VERSION=v0.0.0-ci --tag "$image" --file "$repo/Dockerfile" "$repo"
 [[ "$(docker run --rm "$image" -version)" == "DockLantern v0.0.0-ci" ]] || { echo "release version missing from image" >&2; exit 1; }
+# Regression: the publicly exposed monitoring service never needs the powerful
+# docker, docker compose or docker buildx clients (including their dependencies).
+docker run --rm --entrypoint /bin/sh "$image" -ec '
+  if command -v docker >/dev/null 2>&1;then
+    echo "Docker CLI unexpectedly packaged in monitoring runtime" >&2
+    exit 1
+  fi
+'
 docker run -d --name "$name" --publish "127.0.0.1:$port:8787" \
  --mount "type=bind,src=$tmp/data,dst=/data" \
  --mount "type=bind,src=$tmp/secrets/admin_password,dst=/run/secrets/admin_password,readonly" \
