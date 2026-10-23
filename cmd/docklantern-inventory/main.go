@@ -25,7 +25,9 @@ import (
  "github.com/docklantern/docklantern/internal/registry"
  "github.com/docklantern/docklantern/internal/store"
 )
+var version = "dev"
 func main(){
+ showVersion:=flag.Bool("version",false,"print the build version and exit")
  mode:=flag.String("mode","serve","serve, discover, scan, register, projects, check-image, set-policy, policies, check-due, monitor")
  dbPath:=flag.String("db","/data/docklantern.db","SQLite file")
  addr:=flag.String("listen","127.0.0.1:8787","local listener only")
@@ -41,6 +43,7 @@ func main(){
  runNotifier:=flag.Bool("run-notifier",false,"deliver opt-in monitoring event webhooks")
  pruneEvents:=flag.Bool("prune-events",false,"explicitly remove delivered events older than configured retention")
  flag.Parse()
+ if *showVersion{fmt.Println("DockLantern",version);return}
  scanDocker:=func(ctx context.Context)([]discovery.Container,error){
   if endpoint:=os.Getenv("DOCKLANTERN_DOCKER_PROXY_URL");endpoint!=""{
    proxy,err:=discovery.NewProxy(endpoint);if err!=nil{return nil,err}
