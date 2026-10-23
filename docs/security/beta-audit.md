@@ -16,6 +16,34 @@ The scanners consume contemporary public vulnerability feeds during GitHub Actio
 
 **Policy:** No automatic suppression of known findings, no externally sourced image deployment, and no release publishing if a blocking job is red. If remediation is impossible, document the CVE, package/version, exploitability reasoning and time-bound release exception in a separate reviewed PR. The scanner version and advisory database change over time, so subsequent scans may disagree with earlier ones.
 
+## Initial audit results — October 23, 2026
+
+**Release recommendation: NO-GO pending remediation.** The first security workflow run [#40008555155](https://github.com/docklantern/docklantern/actions/runs/40008555155) found blocking known vulnerabilities. The failures are findings, not CI infrastructure breakages; **do not suppress or bypass these gates**.
+
+| Surface | Findings in first run | Decision |
+|---|---|---|
+| Go source check using the module's declared Go 1.23 toolchain | 44 reachable Go standard-library vulnerability advisories, with additional imported/required package advisories not evidently reached | **Blocked.** The PR scan used Go 1.23.12 because `go.mod` still declares `go 1.23`; this is not necessarily the version of the compiled release binary. Align the supported Go module/toolchain policy with the actual builder and repeat both source and binary scans. Some advisories identify fixes as late as Go 1.26.10 or 1.27.3. |
+| Built monitoring image | 40 OS package findings (38 HIGH, 2 CRITICAL). The bundled `docker` Go binary showed 26 findings; `docker-buildx` 63 and `docker-compose` 64. The compiled `docklantern-inventory` binary showed **zero Trivy findings** in this scan. Counts may overlap across packages/artifacts. | **Blocked.** Move away from the stale Docker 28 CLI image or upgrade/rebuild runtime packages; consider shipping a minimal default runtime and keeping the CLI in an explicit operator-only variant, preserving any required local discovery capability. |
+| Optional Docker socket proxy v0.5.0 | 6 fixable HIGH Alpine findings, affecting OpenSSL and PCRE2 libraries | **Blocked.** Rebuild on up-to-date patched packages (or change to a verified maintained alternative) and rerun the proxy mutation-denial/inventory integration tests. No upstream v0.5.1 release was identified during review. |
+
+**Scope nuance:** The Go source job scans a Go 1.23 toolchain from the module directive, while the build image uses a pinned Go 1.26 builder and the Docker CLI runtime bundles binaries compiled with other Go versions. These are distinct scan targets. The first report should **not** be interpreted as 44 confirmed vulnerabilities in the shipping DockLantern application binary. Use the toolchain/version and binary evidence for each artifact during remediation.
+
+The scanner exit codes are intentionally nonzero. Green functional CI cannot override these security gates, and **no `v0.1.0-beta.1` tag should be created** until the findings have been assessed and addressed. The initial report is not a full manual penetration test or audit of the Compose/TLS/network trust model.
+
+### Proposed remediation order
+
+1. Update the Go toolchain policy and pinned builder to a patched version, then rescan the actual binary and source; verify compatibility with the Compose SDK evaluation job.
+2. Reduce the main runtime image's Alpine/CLI footprint or upgrade it; check whether bundling the Docker Compose and Buildx CLI plugins is necessary for the monitoring-only service.
+3. Replace or rebuild the optional privileged Docker socket proxy with patched Alpine packages and verify **POST rejection** and private-network isolation against a disposable Docker daemon.
+4. Rerun all three audit jobs, existing Go tests, deployment package, Docker discovery proxy, and full monitoring flow. Review **unfixed** findings manually and record a release approval decision.
+5. Only after a green scan, reviewed vulnerability exceptions if any, and explicit operator approval, proceed with creating a release tag and publishing GHCR.
+
+### Evidence links
+
+- [Go source scan](https://github.com/docklantern/docklantern/actions/runs/40008555155)
+- [Built container image and optional socket proxy Trivy scans](https://github.com/docklantern/docklantern/actions/runs/40008555155)
+- [Original beta packaging/security regression suite](https://github.com/docklantern/docklantern/actions/runs/40008555014)
+
 ## Human review before tagging
 
 1. Review Trivy scan output **including unfixed findings**; scan defaults suppress them from the blocking view. Consider re-running `trivy image --ignore-unfixed=false --severity HIGH,CRITICAL ...` in a disposable audit environment for a fuller list.
