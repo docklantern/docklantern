@@ -8,7 +8,6 @@ import(
 
  "github.com/docklantern/docklantern/internal/auth"
  appRuntime "github.com/docklantern/docklantern/internal/runtime"
- "github.com/docklantern/docklantern/internal/store"
 )
 func TestReadinessUnauthenticatedAndDistinctFromLiveness(t *testing.T){
  _,db,_,_:=setup(t)
