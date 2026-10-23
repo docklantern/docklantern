@@ -68,3 +68,16 @@ func TestRejectPathEscapeAndCrossOrigin(t *testing.T){
  if w.Code!=403{t.Fatalf("cross-origin post accepted: %d",w.Code)}
  projects,e:=db.Projects(context.Background());if e!=nil||len(projects)!=0{t.Fatal("unexpected registration")}
 }
+
+func TestDiscoveredServicePrefillOnlyUsesInventory(t *testing.T){
+ h,db,_,_:=setup(t)
+ discovered:=[]store.Container{{ID:"abc",Project:"real",Service:"web",Image:"ghcr.io/example/web:v1",State:"running"}}
+ if err:=db.Snapshot(context.Background(),discovered);err!=nil{t.Fatal(err)}
+ valid:=request(h,"GET","/settings?project=real&service=web","",true)
+ if valid.Code!=200||!strings.Contains(valid.Body.String(),"value=\"ghcr.io/example/web:v1\""){t.Fatalf("missing prefill: %d",valid.Code)}
+ malicious:=request(h,"GET","/settings?project=forged&service=web","",true)
+ if malicious.Code!=200{t.Fatalf("unexpected status %d",malicious.Code)}
+ if strings.Contains(malicious.Body.String(),"value=\"forged\""){t.Fatal("unverified project was accepted as prefill")}
+ projects,err:=db.Projects(context.Background())
+ if err!=nil||len(projects)!=0{t.Fatal("GET created registration")}
+}
