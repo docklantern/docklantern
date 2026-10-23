@@ -21,15 +21,18 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Go vulnerability analysis of reachable call paths
+      - name: Go vulnerability analysis with the exact pinned release builder
         shell: bash
         run: |
           set -euo pipefail
-          go install golang.org/x/vuln/cmd/govulncheck@latest
-          "$(go env GOPATH)/bin/govulncheck" ./...
+          # Avoid scanning the historical Go 1.23 module directive's stdlib
+          # instead of the Go toolchain that compiles the shipping binary.
+          builder="$(sed -n 's/^FROM \(golang:[^ ]*\) AS build$/\1/p' Dockerfile)"
+          [[ "$builder" == golang:*@sha256:* ]] || exit 1
+          docker run --rm --mount "type=bind,source=$PWD,target=/src" -w /src "$builder" sh -ec '
+            go install golang.org/x/vuln/cmd/govulncheck@latest
+            "$(go env GOPATH)/bin/govulncheck" ./...
+          '
 
   monitoring-image:
     runs-on: ubuntu-latest
