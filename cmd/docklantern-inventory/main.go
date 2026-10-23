@@ -38,8 +38,15 @@ func main(){
  inProcessMonitor:=flag.Bool("run-monitor",false,"run monitoring scheduler in the web server process")
  scanEvery:=flag.Duration("scan-every",0,"periodic Docker inventory scan; zero disables Docker access")
  flag.Parse()
+ scanDocker:=func(ctx context.Context)([]discovery.Container,error){
+  if endpoint:=os.Getenv("DOCKLANTERN_DOCKER_PROXY_URL");endpoint!=""{
+   proxy,err:=discovery.NewProxy(endpoint);if err!=nil{return nil,err}
+   return proxy.Scan(ctx)
+  }
+  return discovery.Scan(ctx,discovery.Shell{})
+ }
  ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer stop()
- if *mode=="discover"{x,e:=discovery.Scan(ctx,discovery.Shell{});must(e);must(json.NewEncoder(os.Stdout).Encode(x));return}
+ if *mode=="discover"{x,e:=scanDocker(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x));return}
  s,e:=store.Open(*dbPath);must(e);defer s.Close()
  switch *mode{
  case "register":
@@ -50,7 +57,7 @@ func main(){
   p.Enabled=false // Monitoring registration never authorizes updates.
   must(s.Register(ctx,p));fmt.Println("registered for monitoring:",p.Name)
  case "scan":
-  x,e:=discovery.Scan(ctx,discovery.Shell{});must(e)
+  x,e:=scanDocker(ctx);must(e)
   items:=make([]store.Container,0,len(x))
   for _,c:=range x{items=append(items,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health})}
   must(s.Snapshot(ctx,items));fmt.Printf("recorded %d containers\n",len(items))
@@ -109,7 +116,7 @@ func main(){
   if *scanEvery>0 {
    scan:=func(){
     scanCtx,cancel:=context.WithTimeout(ctx,40*time.Second);defer cancel()
-    items,err:=discovery.Scan(scanCtx,discovery.Shell{})
+    items,err:=scanDocker(scanCtx)
     if err!=nil{log.Printf("Docker scan failed: %v",err);return}
     records:=make([]store.Container,0,len(items))
     for _,c:=range items{records=append(records,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health})}
