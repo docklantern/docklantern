@@ -7,6 +7,7 @@ on:
       - 'go.sum'
       - 'Dockerfile.poc'
       - 'Dockerfile'
+      - 'deploy/docker-socket-proxy/**'
       - 'deploy/traefik/**'
       - 'docs/deployment/**'
       - '.github/workflows/go-poc.yml'
@@ -133,3 +134,4 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-beta-install.sh
+

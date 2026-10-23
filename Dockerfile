@@ -9,10 +9,10 @@ COPY internal/ ./internal/
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false -ldflags="-s -w -X main.version=${VERSION}" -o /out/docklantern-inventory ./cmd/docklantern-inventory
 
-# Docker CLI is used for optional read-only inventory scanning.
-# A mounted Docker socket remains highly privileged; omit it by default.
-FROM docker:28-cli@sha256:625d9431a9f54c5a2bc90f24f0e1c3d55b1349fd857dd85035f98c2c9acbdd4d
-RUN apk add --no-cache ca-certificates && mkdir -p /data && chmod 0700 /data
+# Monitoring-only runtime: no Docker CLI, Compose or Buildx binaries.
+# Optional discovery uses the constrained read-only HTTP socket proxy.
+FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates && mkdir -p /data && chmod 0700 /data
 COPY --from=build /out/docklantern-inventory /usr/local/bin/docklantern-inventory
 WORKDIR /data
 EXPOSE 8787
