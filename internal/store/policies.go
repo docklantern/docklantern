@@ -67,7 +67,7 @@ func(s *Store) DueMonitorPolicies(ctx context.Context,now time.Time,limit int)([
  FROM monitor_policies WHERE paused=0 AND next_check_at<=? ORDER BY next_check_at,project,service LIMIT ?`,now.UTC().Format(time.RFC3339),limit)
  if err!=nil{return nil,err};defer rows.Close()
  out:=[]MonitorPolicy{}
- for rows.Next(){var p MonitorPolicy;if err=rows.Scan(&p.Project,&p.Service,&p.Image,&p.Platform,&p.IntervalSeconds,&p.Paused,&p.NextCheckAt,&p.LastCheckedAt,&p.LastError);err!=nil{return nil,err};out=append(out,p)}
+ for rows.Next(){var p MonitorPolicy;if err=rows.Scan(&p.Project,&p.Service,&p.Image,&p.Platform,&p.IntervalSeconds,&p.Paused,&p.NextCheckAt,&p.LastCheckedAt,&p.LastError,&p.ConsecutiveFailures);err!=nil{return nil,err};out=append(out,p)}
  return out,rows.Err()
 }
 
