@@ -24,10 +24,10 @@ func TestDigestTransitionEventsAndPersistence(t *testing.T){
  if err!=nil||len(pending)!=2{t.Fatalf("pending %+v %v",pending,err)}
  if err=s.CompleteDelivery(ctx,pending[0],time.Now().UTC(),false);err!=nil{t.Fatal(err)}
  if err=s.CompleteDelivery(ctx,pending[0],time.Now().UTC(),true);err==nil{t.Fatal("stale event receipt accepted")}
- events,err=s.Events(ctx,20);if err!=nil||events[0].DeliveryAttempts!=1||events[0].LastDeliveryError==""{t.Fatalf("%+v %v",events,err)}
+ events,err=s.Events(ctx,20);if err!=nil||events[1].DeliveryAttempts!=1||events[1].LastDeliveryError==""{t.Fatalf("%+v %v",events,err)}
  later,_:=s.DueEvents(ctx,time.Now().Add(2*time.Minute),10)
  if err=s.CompleteDelivery(ctx,later[0],time.Now().UTC(),true);err!=nil{t.Fatal(err)}
- events,err=s.Events(ctx,20);if err!=nil||events[0].DeliveryState!="delivered"{t.Fatalf("%+v %v",events,err)}
+ events,err=s.Events(ctx,20);if err!=nil||events[1].DeliveryState!="delivered"{t.Fatalf("%+v %v",events,err)}
 }
 func TestFailureAndRecoveryEventsOnlyOnce(t *testing.T){
  ctx:=context.Background();s,err:=Open(filepath.Join(t.TempDir(),"events.db"));if err!=nil{t.Fatal(err)};defer s.Close()
