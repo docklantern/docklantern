@@ -16,7 +16,6 @@ import (
  "net/http"
  "net/netip"
  "net/url"
- "strings"
  "time"
 
  "github.com/docklantern/docklantern/internal/store"
@@ -54,7 +53,21 @@ func New(raw,secret string)(*Sender,error){
  return &Sender{endpoint:u.String(),secret:[]byte(secret),client:client},nil
 }
 func allowed(a netip.Addr)bool{
- return a.IsGlobalUnicast()&&!a.IsPrivate()&&!a.IsLoopback()&&!a.IsLinkLocalUnicast()&&!a.IsLinkLocalMulticast()&&!a.Is4In6()||a.Is4In6()&&allowed(a.Unmap())
+ if a.Is4In6(){return allowed(a.Unmap())}
+ if !a.IsGlobalUnicast()||a.IsPrivate()||a.IsLoopback()||a.IsLinkLocalUnicast()||a.IsLinkLocalMulticast(){return false}
+ // Netip.IsGlobalUnicast alone includes non-public special allocations.
+ for _,block:=range []netip.Prefix{
+  netip.MustParsePrefix("100.64.0.0/10"), // carrier-grade NAT
+  netip.MustParsePrefix("192.0.0.0/24"), // IETF protocol assignments
+  netip.MustParsePrefix("198.18.0.0/15"), // benchmarking/private labs
+  netip.MustParsePrefix("192.0.2.0/24"), // documentation ranges
+  netip.MustParsePrefix("198.51.100.0/24"),
+  netip.MustParsePrefix("203.0.113.0/24"),
+  netip.MustParsePrefix("2001:db8::/32"),
+ }{
+  if block.Contains(a){return false}
+ }
+ return true
 }
 func(s *Sender)Send(ctx context.Context,e store.Event)error{
  data,err:=json.Marshal(struct{
@@ -105,6 +118,3 @@ func(w Worker)Run(ctx context.Context)error{
   select{case <-ctx.Done():return nil;case <-ticker.C:}
  }
 }
-// Redact helper used in configuration errors. Webhook URLs may contain secret
-// paths; the URL is intentionally never included in returned network errors.
-func invalidConfiguration(raw string)bool{return strings.TrimSpace(raw)==""}
