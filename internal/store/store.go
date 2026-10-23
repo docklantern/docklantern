@@ -67,6 +67,21 @@ func Open(path string)(*Store,error){
   if columns[column]{continue}
   if _,err=db.ExecContext(ctx,"ALTER TABLE inventory ADD COLUMN "+column+" TEXT NOT NULL DEFAULT ''");err!=nil{db.Close();return nil,err}
  }
+ // Persist the backoff counter across restarts (older databases lack this column).
+ policyRows,err:=db.QueryContext(ctx,"PRAGMA table_info(monitor_policies)")
+ if err!=nil{db.Close();return nil,err}
+ hasFailures:=false
+ for policyRows.Next(){
+  var id,required,pk int;var name,kind string;var def sql.NullString
+  if err=policyRows.Scan(&id,&name,&kind,&required,&def,&pk);err!=nil{break}
+  if name=="consecutive_failures"{hasFailures=true}
+ }
+ if err==nil{err=policyRows.Err()}
+ policyRows.Close()
+ if err!=nil{db.Close();return nil,err}
+ if !hasFailures{
+  if _,err=db.ExecContext(ctx,"ALTER TABLE monitor_policies ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0");err!=nil{db.Close();return nil,err}
+ }
  return &Store{db:db},nil
 }
 func(s *Store)Close()error{return s.db.Close()}
