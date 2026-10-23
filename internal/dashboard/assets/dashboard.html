@@ -67,14 +67,14 @@
   </tbody></table></div>
  </section>
  <section class="section" id="assessments">
-  <div class="section-head"><div><p class="eyebrow">DEPLOYED IMAGE EVIDENCE</p><h2>Image status assessments</h2></div><span class="helper">Conservative: unknown is not an update</span></div>
+  <div class="section-head"><div><p class="eyebrow">DEPLOYED IMAGE EVIDENCE</p><h2>Image status assessments</h2></div><span class="helper">Only digest identity is verified; a newer release is not inferred</span></div>
   <div class="panel table-scroll"><table><thead><tr><th>Project / service</th><th>Watched image</th><th>Assessment</th><th>Evidence</th></tr></thead><tbody>
-  {{range .Assessments}}<tr><td>{{.Project}} / {{.Service}}</td><td class="mono image-col">{{.Image}}<small class="subtext">{{.Platform}}</small></td><td><span class="pill {{badge .State}}">{{.State}}</span></td><td>{{.Reason}}{{if .DeployedDigest}}<small class="subtext">Pinned: {{short .DeployedDigest}}</small>{{end}}</td></tr>
+  {{range .Assessments}}<tr><td>{{.Project}} / {{.Service}}</td><td class="mono image-col">{{.Image}}<small class="subtext">{{.Platform}}</small></td><td><span class="pill {{badge .State}}">{{.State}}</span></td><td>{{.Reason}}{{if .RegistryCheckedAt}}<small class="subtext">Registry: {{when .RegistryCheckedAt}}</small>{{end}}{{if .InventoryObservedAt}}<small class="subtext">Inventory: {{when .InventoryObservedAt}}</small>{{end}}{{if .DeployedDigest}}<small class="subtext">Deployed: {{short .DeployedDigest}}</small>{{end}}</td></tr>
   {{else}}<tr><td colspan="4" class="table-empty">Configure monitoring policies to see image assessments.</td></tr>{{end}}
   </tbody></table></div>
  </section>
  <section class="section" id="registry">
-  <div class="section-head"><div><p class="eyebrow">OCI DIGEST HISTORY</p><h2>Latest registry checks</h2></div><span class="helper">Remote tag changes ≠ confirmed container updates</span></div>
+  <div class="section-head"><div><p class="eyebrow">OCI DIGEST HISTORY</p><h2>Latest registry checks</h2></div><span class="helper">Remote tag changes ≠ verified newer releases</span></div>
   <div class="panel table-scroll">
   <table><thead><tr><th>Image</th><th>Platform</th><th>Remote digest</th><th>Result</th><th>Checked (UTC)</th></tr></thead><tbody>
   {{range .Checks}}<tr><td class="mono image-col" title="{{.Image}}">{{.Image}}</td><td>{{.Platform}}</td><td class="mono" title="{{.PlatformDigest}}">{{short .PlatformDigest}}</td><td><span class="pill {{badge .Status}}">{{.Status}}</span></td><td>{{when .CheckedAt}}</td></tr>

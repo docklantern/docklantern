@@ -37,6 +37,7 @@ type Container struct{
  ImageOS string `json:"image_os,omitempty"`
  ImageArchitecture string `json:"image_architecture,omitempty"`
  ImageVariant string `json:"image_variant,omitempty"`
+ ObservedAt string `json:"observed_at,omitempty"`
 }
 func Open(path string)(*Store,error){
  if path==""{return nil,errors.New("database path required")}
@@ -119,9 +120,9 @@ func(s *Store)Snapshot(ctx context.Context,items []Container)error{
  return tx.Commit()
 }
 func(s *Store)Containers(ctx context.Context)([]Container,error){
- rows,err:=s.db.QueryContext(ctx,"SELECT container_id,name,project,service,image,image_id,state,health,repo_digests_json,image_os,image_architecture,image_variant FROM inventory ORDER BY project,service,name")
+ rows,err:=s.db.QueryContext(ctx,"SELECT container_id,name,project,service,image,image_id,state,health,repo_digests_json,image_os,image_architecture,image_variant,observed_at FROM inventory ORDER BY project,service,name")
  if err!=nil{return nil,err};defer rows.Close()
  out:=[]Container{}
- for rows.Next(){var c Container;var digests string;if err=rows.Scan(&c.ID,&c.Name,&c.Project,&c.Service,&c.Image,&c.ImageID,&c.State,&c.Health,&digests,&c.ImageOS,&c.ImageArchitecture,&c.ImageVariant);err!=nil{return nil,err};if digests!=""{if err=json.Unmarshal([]byte(digests),&c.RepoDigests);err!=nil{return nil,err}};out=append(out,c)}
+ for rows.Next(){var c Container;var digests string;if err=rows.Scan(&c.ID,&c.Name,&c.Project,&c.Service,&c.Image,&c.ImageID,&c.State,&c.Health,&digests,&c.ImageOS,&c.ImageArchitecture,&c.ImageVariant,&c.ObservedAt);err!=nil{return nil,err};if digests!=""{if err=json.Unmarshal([]byte(digests),&c.RepoDigests);err!=nil{return nil,err}};out=append(out,c)}
  return out,rows.Err()
 }

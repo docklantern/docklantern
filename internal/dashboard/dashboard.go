@@ -18,7 +18,7 @@ var assets embed.FS
 
 var page = template.Must(template.New("dashboard.html").Funcs(template.FuncMap{
  "short": func(s string) string { if len(s)>28 {return s[:28]+"…"};return s },
- "badge": func(s string) string { switch strings.ToLower(s) {case "running","healthy","unchanged":return "ok";case "changed","unhealthy","exited":return "warn";case "paused","first_seen":return "muted";default:return "neutral"} },
+ "badge": func(s string) string { switch strings.ToLower(s) {case "running","healthy","unchanged":return "ok";case "changed","unhealthy","exited":return "warn";case "paused","first_seen","stale_inventory","stale_registry","unknown","not_checked":return "muted";default:return "neutral"} },
  "when": func(s string) string {if s==""{return "Not yet"};t,e:=time.Parse(time.RFC3339,s);if e!=nil{return s};return t.UTC().Format("2006-01-02 15:04 UTC")},
 }).ParseFS(assets,"assets/dashboard.html"))
 
@@ -52,7 +52,7 @@ func collect(ctx context.Context,s Reader)(view,error){
  containers,e:=s.Containers(ctx);if e!=nil{return view{},e}
  checks,e:=s.RegistryChecks(ctx);if e!=nil{return view{},e}
  policies,e:=s.MonitorPolicies(ctx);if e!=nil{return view{},e}
- v:=view{Checks:checks,Policies:policies,Assessments:updates.Assess(registrations,containers,policies,checks),ProjectCount:len(registrations),ContainerCount:len(containers),MonitoredCount:len(policies)}
+ v:=view{Checks:checks,Policies:policies,Assessments:updates.AssessFresh(registrations,containers,policies,checks,time.Now().UTC()),ProjectCount:len(registrations),ContainerCount:len(containers),MonitoredCount:len(policies)}
  idx:=make(map[string]int,len(registrations))
  for _,r:=range registrations{idx[r.Name]=len(v.Projects);v.Projects=append(v.Projects,project{Registration:r})}
  for _,c:=range containers{
