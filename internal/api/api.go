@@ -40,6 +40,11 @@ func Handler(s Reader)http.Handler{
   if e!=nil{http.Error(w,"invalid event filter",400);return}
   respond(w,data,nil)
  })
+ mux.HandleFunc("GET /api/v1/workers",func(w http.ResponseWriter,r *http.Request){
+  reader,ok:=s.(interface{WorkerStatuses(context.Context)([]store.WorkerStatus,error)})
+  if !ok{respond(w,[]store.WorkerStatus{},nil);return}
+  states,err:=reader.WorkerStatuses(r.Context());respond(w,states,err)
+ })
  mux.HandleFunc("GET /api/v1/registry-checks",func(w http.ResponseWriter,r *http.Request){v,e:=s.RegistryChecks(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/monitor-policies",func(w http.ResponseWriter,r *http.Request){v,e:=s.MonitorPolicies(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/image-assessments",func(w http.ResponseWriter,r *http.Request){

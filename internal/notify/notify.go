@@ -96,6 +96,7 @@ type Worker struct {
  Sender *Sender
  Interval time.Duration
  Limit int
+ Reporter interface{RecordWorkerRun(context.Context,string,time.Time,int,error)error}
 }
 func(w Worker)RunOnce(ctx context.Context)(int,error){
  if w.Store==nil||w.Sender==nil||w.Limit<1||w.Limit>50{return 0,errors.New("invalid webhook worker configuration")}
@@ -114,7 +115,12 @@ func(w Worker)Run(ctx context.Context)error{
  if w.Interval<time.Second{return errors.New("webhook interval must be at least one second")}
  ticker:=time.NewTicker(w.Interval);defer ticker.Stop()
  for{
-  if _,err:=w.RunOnce(ctx);err!=nil&&ctx.Err()==nil{return err}
+  count,err:=w.RunOnce(ctx)
+  if ctx.Err()!=nil{return nil}
+  if w.Reporter!=nil {
+   if e:=w.Reporter.RecordWorkerRun(ctx,"webhook_notifier",time.Now().UTC(),count,err);e!=nil{return e}
+  }
+  if err!=nil{return err}
   select{case <-ctx.Done():return nil;case <-ticker.C:}
  }
 }
