@@ -2,7 +2,6 @@ package updates
 
 import (
  "testing"
- "github.com/docklantern/docklantern/internal/store"
 )
 func TestRepositoryIdentity(t *testing.T){
  // Matching a pinned digest from another image must never establish evidence.
