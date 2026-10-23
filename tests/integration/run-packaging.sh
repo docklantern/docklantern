@@ -21,7 +21,8 @@ mkdir -p "$tmp/data" "$tmp/secrets"
 printf 'a-unique-long-test-password-123456789\n' > "$tmp/secrets/admin_password"
 chmod 600 "$tmp/secrets/admin_password"
 
-docker build --tag "$image" --file "$repo/Dockerfile" "$repo"
+docker build --build-arg VERSION=v0.0.0-ci --tag "$image" --file "$repo/Dockerfile" "$repo"
+[[ "$(docker run --rm "$image" -version)" == "DockLantern v0.0.0-ci" ]] || { echo "release version missing from image" >&2; exit 1; }
 docker run -d --name "$name" --publish "127.0.0.1:$port:8787" \
  --mount "type=bind,src=$tmp/data,dst=/data" \
  --mount "type=bind,src=$tmp/secrets/admin_password,dst=/run/secrets/admin_password,readonly" \
@@ -36,6 +37,11 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 curl -fsS "http://127.0.0.1:$port/healthz" >/dev/null
+for _ in $(seq 1 20); do
+ if curl -fsS "http://127.0.0.1:$port/readyz" >/dev/null 2>&1; then break; fi
+ sleep 1
+done
+curl -fsS "http://127.0.0.1:$port/readyz" >/dev/null
 
 status="$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: docklantern.example.test' -H 'X-Forwarded-Proto: https' "http://127.0.0.1:$port/")"
 [[ "$status" == 401 ]] || { echo "expected 401, got $status" >&2; exit 1; }
