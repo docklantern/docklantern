@@ -6,6 +6,9 @@ on:
       - 'go.mod'
       - 'go.sum'
       - 'Dockerfile.poc'
+      - 'Dockerfile'
+      - 'deploy/traefik/**'
+      - 'docs/deployment/**'
       - '.github/workflows/go-poc.yml'
       - 'tests/integration/**'
       - 'tests/sdk/**'
@@ -74,3 +77,13 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/sdk/compare.sh
+
+  packaging-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check packaging and reverse-proxy security on disposable containers
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/integration/run-packaging.sh
