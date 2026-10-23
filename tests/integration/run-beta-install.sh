@@ -27,6 +27,9 @@ trap cleanup EXIT
 mkdir -p "$DOCKLANTERN_BETA_TEST_FIXTURE_DIR/project"
 printf 'beta-disposable-test-strong-secret-123456789\n' > "$DOCKLANTERN_BETA_TEST_PASSWORD_FILE"
 chmod 600 "$DOCKLANTERN_BETA_TEST_PASSWORD_FILE"
+# With all Linux capabilities dropped, container root can read only root-owned
+# 0600 secret binds. GitHub-hosted runners provide passwordless sudo.
+sudo chown 0:0 "$DOCKLANTERN_BETA_TEST_PASSWORD_FILE"
 cat > "$DOCKLANTERN_BETA_TEST_FIXTURE_DIR/project/compose.yaml" <<'YAML'
 services:
   web:
