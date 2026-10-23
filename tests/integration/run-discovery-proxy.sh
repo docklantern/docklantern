@@ -13,12 +13,12 @@ image="docklantern-test-discovery:$suffix"
 cleanup(){
  docker rm -f "$fixture" "$proxy" >/dev/null 2>&1 || true
  docker network rm "$network" >/dev/null 2>&1 || true
- docker image rm "$image" >/dev/null 2>&1 || true
+ docker image rm "$image" "docklantern-proxy-patched:$suffix" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 docker network create --internal "$network" >/dev/null
 # Pull images before creating the isolated network. Only the proxy has the socket.
-docker pull tecnativa/docker-socket-proxy:v0.5.0 >/dev/null
+docker build -f "$repo/deploy/docker-socket-proxy/Dockerfile" -t "docklantern-proxy-patched:$suffix" "$repo" >/dev/null
 docker pull busybox:1.36 >/dev/null
 docker build -f "$repo/Dockerfile" -t "$image" "$repo" >/dev/null
 docker run -d --name "$fixture" \
@@ -29,7 +29,7 @@ docker run -d --name "$proxy" --network "$network" --network-alias docker-socket
  --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock,readonly \
  -e CONTAINERS=1 -e POST=0 -e EVENTS=0 -e IMAGES=1 \
  -e NETWORKS=0 -e INFO=0 -e SERVICES=0 -e VOLUMES=0 \
- tecnativa/docker-socket-proxy:v0.5.0 >/dev/null
+ "docklantern-proxy-patched:$suffix" >/dev/null
 
 for i in $(seq 1 20);do
  if docker run --rm --network "$network" \
