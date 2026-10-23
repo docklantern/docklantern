@@ -1,0 +1,53 @@
+# Optional Docker discovery. Combine with compose.yaml:
+# docker compose -f compose.yaml -f compose.discovery.yaml up -d --build
+# DockLantern never gets the Unix socket. Only this isolated helper does.
+services:
+  docklantern:
+    environment:
+      DOCKLANTERN_DOCKER_PROXY_URL: http://docker-socket-proxy:2375
+    command:
+      - -mode
+      - serve
+      - -db
+      - /data/docklantern.db
+      - -listen
+      - 0.0.0.0:8787
+      - -run-monitor
+      - -scan-every
+      - 60s
+    networks:
+      - web
+      - docker-discovery
+    depends_on:
+      - docker-socket-proxy
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    restart: unless-stopped
+    environment:
+      CONTAINERS: "1"
+      POST: "0"
+      EVENTS: "0"
+      IMAGES: "0"
+      NETWORKS: "0"
+      INFO: "0"
+      SERVICES: "0"
+      VOLUMES: "0"
+      EXEC: "0"
+      SYSTEM: "0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - docker-discovery
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /run
+      - /tmp
+    # Never publish Docker proxy port 2375 to the host or the public network.
+    # This container retains privileged host Docker API access via its socket.
+
+networks:
+  docker-discovery:
+    internal: true

@@ -87,3 +87,13 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-packaging.sh
+
+  discovery-proxy-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise restricted Docker API discovery
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/integration/run-discovery-proxy.sh
