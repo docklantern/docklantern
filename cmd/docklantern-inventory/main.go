@@ -24,10 +24,9 @@ import (
  "github.com/docklantern/docklantern/internal/notify"
  "github.com/docklantern/docklantern/internal/registry"
  "github.com/docklantern/docklantern/internal/store"
+ appRuntime "github.com/docklantern/docklantern/internal/runtime"
 )
-var version = "dev"
 func main(){
- showVersion:=flag.Bool("version",false,"print the build version and exit")
  mode:=flag.String("mode","serve","serve, discover, scan, register, projects, check-image, set-policy, policies, check-due, monitor")
  dbPath:=flag.String("db","/data/docklantern.db","SQLite file")
  addr:=flag.String("listen","127.0.0.1:8787","local listener only")
@@ -41,9 +40,9 @@ func main(){
  inProcessMonitor:=flag.Bool("run-monitor",false,"run monitoring scheduler in the web server process")
  scanEvery:=flag.Duration("scan-every",0,"periodic Docker inventory scan; zero disables Docker access")
  runNotifier:=flag.Bool("run-notifier",false,"deliver opt-in monitoring event webhooks")
+ backupPath:=flag.String("backup","","create a consistent SQLite backup at a new path, then exit")
  pruneEvents:=flag.Bool("prune-events",false,"explicitly remove delivered events older than configured retention")
  flag.Parse()
- if *showVersion{fmt.Println("DockLantern",version);return}
  scanDocker:=func(ctx context.Context)([]discovery.Container,error){
   if endpoint:=os.Getenv("DOCKLANTERN_DOCKER_PROXY_URL");endpoint!=""{
    proxy,err:=discovery.NewProxy(endpoint);if err!=nil{return nil,err}
@@ -54,6 +53,7 @@ func main(){
  ctx,stop:=signal.NotifyContext(context.Background(),os.Interrupt,syscall.SIGTERM);defer stop()
  if *mode=="discover"{x,e:=scanDocker(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x));return}
  s,e:=store.Open(*dbPath);must(e);defer s.Close()
+ if *backupPath!=""{must(s.Backup(ctx,*backupPath));fmt.Println("backup created");return}
  if *pruneEvents{n,e:=s.PruneDeliveredEvents(ctx,time.Now().UTC());must(e);fmt.Printf("pruned %d old delivered events\\n",n);return}
  setupNotifier:=func()notify.Worker{
   endpoint:=os.Getenv("DOCKLANTERN_WEBHOOK_URL")
@@ -128,33 +128,63 @@ func main(){
 
   var sourceRoots []string
   if *roots!=""{sourceRoots=strings.Split(*roots,",")}
+  supervisor:=appRuntime.NewSupervisor()
+  requirements:=[]appRuntime.Requirement{}
   if *runNotifier {
-   must(s.RecordWorkerStart(ctx,"webhook_notifier",time.Now().UTC()))
    worker:=setupNotifier()
-   go func(){if err:=worker.Run(ctx);err!=nil{log.Printf("notification worker stopped: %v",err)}}()
+   must(s.RecordWorkerStart(ctx,"webhook_notifier",time.Now().UTC()))
+   requirements=append(requirements,appRuntime.Requirement{Name:"webhook_notifier",MaxAge:2*time.Minute})
+   supervisor.Start(ctx,"webhook_notifier",worker.Run)
   }
   if *inProcessMonitor {
-   must(s.RecordWorkerStart(ctx,"registry_monitor",time.Now().UTC()))
    resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
-   scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20}
-   go func(){if err:=scheduler.Run(ctx);err!=nil{log.Printf("registry monitoring stopped: %v",err)}}()
+   scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20,Reporter:s}
+   must(s.RecordWorkerStart(ctx,"registry_monitor",time.Now().UTC()))
+   maxAge:=3**pollEvery
+   if maxAge<2*time.Minute{maxAge=2*time.Minute}
+   // Long batches may legitimately take time; use the worst-case bounded
+   // runtime as a conservative heartbeat freshness window.
+   if batchWindow:=20**checkTimeout+*pollEvery;batchWindow>maxAge{maxAge=batchWindow}
+   requirements=append(requirements,appRuntime.Requirement{Name:"registry_monitor",MaxAge:maxAge})
+   supervisor.Start(ctx,"registry_monitor",scheduler.Run)
   }
   if *scanEvery>0 {
    must(s.RecordWorkerStart(ctx,"docker_discovery",time.Now().UTC()))
-   scan:=func(){
-    scanCtx,cancel:=context.WithTimeout(ctx,40*time.Second);defer cancel()
-    items,err:=scanDocker(scanCtx)
-    if err!=nil{log.Printf("Docker scan failed: %v",err);_ =s.RecordWorkerRun(ctx,"docker_discovery",time.Now().UTC(),0,err);return}
-    records:=make([]store.Container,0,len(items))
-    for _,c:=range items{records=append(records,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health,RepoDigests:c.RepoDigests,ImageOS:c.ImageOS,ImageArchitecture:c.ImageArchitecture,ImageVariant:c.ImageVariant})}
-    if err=s.Snapshot(scanCtx,records);err!=nil{log.Printf("Docker snapshot failed: %v",err)}
-    if err=s.RecordWorkerRun(ctx,"docker_discovery",time.Now().UTC(),len(records),err);err!=nil{log.Printf("Docker health record failed: %v",err)}
-   }
-   go func(){scan();ticker:=time.NewTicker(*scanEvery);defer ticker.Stop();for{select{case <-ctx.Done():return;case <-ticker.C:scan()}}}()
+   requirements=append(requirements,appRuntime.Requirement{Name:"docker_discovery",MaxAge:3**scanEvery+40*time.Second})
+   supervisor.Start(ctx,"docker_discovery",func(workerCtx context.Context)error{
+    scan:=func()error{
+     scanCtx,cancel:=context.WithTimeout(workerCtx,40*time.Second);defer cancel()
+     items,err:=scanDocker(scanCtx)
+     if err==nil{
+      records:=make([]store.Container,0,len(items))
+      for _,c:=range items{records=append(records,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health,RepoDigests:c.RepoDigests,ImageOS:c.ImageOS,ImageArchitecture:c.ImageArchitecture,ImageVariant:c.ImageVariant})}
+      err=s.Snapshot(scanCtx,records)
+     }
+     if recordErr:=s.RecordWorkerRun(workerCtx,"docker_discovery",time.Now().UTC(),len(items),err);recordErr!=nil{return recordErr}
+     // Docker outages are reflected in readiness; continue to recover.
+     return nil
+    }
+    if err:=scan();err!=nil{return err}
+    ticker:=time.NewTicker(*scanEvery);defer ticker.Stop()
+    for{select{case <-workerCtx.Done():return nil;case <-ticker.C:if err:=scan();err!=nil{return err}}}
+   })
   }
-  server:=&http.Server{Addr:*addr,Handler:management.Handler(s,guard,sourceRoots),ReadHeaderTimeout:5*time.Second,ReadTimeout:10*time.Second,WriteTimeout:15*time.Second,IdleTimeout:60*time.Second}
+  readiness:=appRuntime.Checker{Reader:s,Required:requirements}
+  server:=&http.Server{Addr:*addr,Handler:management.Handler(s,guard,sourceRoots,readiness),ReadHeaderTimeout:5*time.Second,ReadTimeout:10*time.Second,WriteTimeout:15*time.Second,IdleTimeout:60*time.Second}
   go func(){<-ctx.Done();shutdownCtx,cancel:=context.WithTimeout(context.Background(),10*time.Second);defer cancel();_ = server.Shutdown(shutdownCtx)}()
-  if err:=server.ListenAndServe();err!=nil&&err!=http.ErrServerClosed{log.Fatal(err)}
+  serveErrors:=make(chan error,1)
+  go func(){err:=server.ListenAndServe();if err!=http.ErrServerClosed{serveErrors<-err}else{serveErrors<-nil}}()
+  select{
+  case err:=<-supervisor.Failures():
+   log.Printf("critical background worker exited: %v",err)
+   stop()
+   shutdownCtx,cancel:=context.WithTimeout(context.Background(),10*time.Second);_ =server.Shutdown(shutdownCtx);cancel()
+   os.Exit(1) // Let the container restart policy recover the whole service.
+  case err:=<-serveErrors:
+   if err!=nil{log.Fatal(err)}
+  case <-ctx.Done():
+   shutdownCtx,cancel:=context.WithTimeout(context.Background(),10*time.Second);_ =server.Shutdown(shutdownCtx);cancel()
+  }
  default:log.Fatal("unknown mode")
  }
 }
