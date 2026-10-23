@@ -36,24 +36,24 @@ func Assess(projects []store.Registration,containers []store.Container,policies 
   if !ok{a.State="not_checked";a.Reason="No successful remote registry check";result=append(result,a);continue}
   a.RemoteDigest=c.PlatformDigest
   if p.Paused{a.State="paused";a.Reason="Monitoring policy is paused";result=append(result,a);continue}
-  var images []string
+  var replicas []store.Container
   for _,item:=range containers {
-   if item.Project==p.Project&&item.Service==p.Service {images=append(images,item.Image)}
+   if item.Project==p.Project&&item.Service==p.Service {replicas=append(replicas,item)}
   }
-  a.ContainerCount=len(images)
-  if len(images)==0{a.State="not_running";a.Reason="No container recorded in last inventory scan";result=append(result,a);continue}
+  a.ContainerCount=len(replicas)
+  if len(replicas)==0{a.State="not_running";a.Reason="No container recorded in last inventory scan";result=append(result,a);continue}
   // A multi-replica service can only have a definite state when all replicas
   // supply identical, verifiable pinned manifest references.
   common:=""
   valid:=true
-  for _,image:=range images{
-   digest,good:=pinnedDigest(image,p.Image)
+  for _,replica:=range replicas{
+   digest,good:=deployedManifestDigest(replica,p.Image,p.Platform)
    if !good|| (common!=""&&common!=digest){valid=false;break}
    common=digest
   }
   if !valid{
    a.State="unknown"
-   a.Reason="Deployed tag or replicas lack matching immutable image references; image config IDs are not manifest digests"
+   a.Reason="Missing, platform-mismatched, or ambiguous image provenance; image configuration IDs are not manifest digests"
    result=append(result,a);continue
   }
   a.DeployedDigest=common
@@ -76,4 +76,33 @@ func pinnedDigest(containerImage,watchedImage string)(string,bool){
  watchedRef,err:=registry.Parse(watchedImage);if err!=nil{return "",false}
  if containerRef.Registry!=watchedRef.Registry||containerRef.Repository!=watchedRef.Repository{return "",false}
  return after,true
+}
+
+// deployedManifestDigest requires either a pinned original container reference
+// or local image inspect RepoDigests bound to the exact running config ID during
+// the discovery scan. Multiple digests for the same repository are ambiguous.
+func deployedManifestDigest(c store.Container,watched,platform string)(string,bool){
+ pinned,pinnedOK:=pinnedDigest(c.Image,watched)
+ // If metadata exists, its platform must match the monitored platform.
+ if len(c.RepoDigests)>0 {
+  actual:=c.ImageOS+"/"+c.ImageArchitecture
+  if c.ImageVariant!=""{actual+="/"+c.ImageVariant}
+  if actual!=platform||c.ImageOS==""||c.ImageArchitecture==""{return "",false}
+  unique:=""
+  for _,ref:=range c.RepoDigests{
+   digest,ok:=pinnedDigest(ref,watched)
+   if !ok{continue}
+   if unique!=""&&unique!=digest{return "",false}
+   unique=digest
+  }
+  if unique!=""{
+   if pinnedOK&&pinned!=unique{return "",false}
+   return unique,true
+  }
+  // Metadata cannot establish manifest identity for the watched repository.
+  // A pinned original reference is still direct evidence, subject to platform.
+  if pinnedOK{return pinned,true}
+  return "",false
+ }
+ return pinned,pinnedOK
 }

@@ -33,6 +33,10 @@ type Container struct{
  ImageID string `json:"image_id"`
  State string `json:"state"`
  Health string `json:"health,omitempty"`
+ RepoDigests []string `json:"repo_digests,omitempty"`
+ ImageOS string `json:"image_os,omitempty"`
+ ImageArchitecture string `json:"image_architecture,omitempty"`
+ ImageVariant string `json:"image_variant,omitempty"`
 }
 func Open(path string)(*Store,error){
  if path==""{return nil,errors.New("database path required")}
@@ -48,6 +52,21 @@ func Open(path string)(*Store,error){
   "CREATE TABLE IF NOT EXISTS registry_checks(image TEXT NOT NULL,platform TEXT NOT NULL,index_digest TEXT NOT NULL,platform_digest TEXT NOT NULL,previous_digest TEXT NOT NULL,status TEXT NOT NULL,checked_at TEXT NOT NULL,PRIMARY KEY(image,platform))",
    "CREATE TABLE IF NOT EXISTS monitor_policies(project TEXT NOT NULL,service TEXT NOT NULL,image TEXT NOT NULL,platform TEXT NOT NULL,interval_seconds INTEGER NOT NULL,paused INTEGER NOT NULL DEFAULT 0,next_check_at TEXT NOT NULL,last_checked_at TEXT NOT NULL DEFAULT '',last_error TEXT NOT NULL DEFAULT '',PRIMARY KEY(project,service),FOREIGN KEY(project) REFERENCES registrations(name))",
  }{if _,err=db.ExecContext(ctx,q);err!=nil{db.Close();return nil,fmt.Errorf("sqlite init: %w",err)}}
+ // Safe additive migration of older persisted inventory databases.
+ rows,err:=db.QueryContext(ctx,"PRAGMA table_info(inventory)")
+ if err!=nil{db.Close();return nil,err}
+ columns:=make(map[string]bool)
+ for rows.Next(){var id int;var name,typ string;var notnull,pk int;var def sql.NullString
+  if err=rows.Scan(&id,&name,&typ,&notnull,&def,&pk);err!=nil{break}
+  columns[name]=true
+ }
+ if scanErr:=rows.Err();err==nil{err=scanErr}
+ rows.Close()
+ if err!=nil{db.Close();return nil,err}
+ for _,column:=range []string{"repo_digests_json","image_os","image_architecture","image_variant"}{
+  if columns[column]{continue}
+  if _,err=db.ExecContext(ctx,"ALTER TABLE inventory ADD COLUMN "+column+" TEXT NOT NULL DEFAULT ''");err!=nil{db.Close();return nil,err}
+ }
  return &Store{db:db},nil
 }
 func(s *Store)Close()error{return s.db.Close()}
@@ -75,18 +94,19 @@ func(s *Store)Projects(ctx context.Context)([]Registration,error){
 func(s *Store)Snapshot(ctx context.Context,items []Container)error{
  tx,err:=s.db.BeginTx(ctx,nil);if err!=nil{return err};defer tx.Rollback()
  if _,err=tx.ExecContext(ctx,"DELETE FROM inventory");err!=nil{return err}
- stmt,err:=tx.PrepareContext(ctx,"INSERT INTO inventory(container_id,name,project,service,image,image_id,state,health,observed_at) VALUES(?,?,?,?,?,?,?,?,?)")
+ stmt,err:=tx.PrepareContext(ctx,"INSERT INTO inventory(container_id,name,project,service,image,image_id,state,health,observed_at,repo_digests_json,image_os,image_architecture,image_variant) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)")
  if err!=nil{return err};defer stmt.Close()
  now:=time.Now().UTC().Format(time.RFC3339)
  for _,c:=range items{
-  if _,err=stmt.ExecContext(ctx,c.ID,c.Name,c.Project,c.Service,c.Image,c.ImageID,c.State,c.Health,now);err!=nil{return err}
+  digests,err:=json.Marshal(c.RepoDigests);if err!=nil{return err}
+  if _,err=stmt.ExecContext(ctx,c.ID,c.Name,c.Project,c.Service,c.Image,c.ImageID,c.State,c.Health,now,string(digests),c.ImageOS,c.ImageArchitecture,c.ImageVariant);err!=nil{return err}
  }
  return tx.Commit()
 }
 func(s *Store)Containers(ctx context.Context)([]Container,error){
- rows,err:=s.db.QueryContext(ctx,"SELECT container_id,name,project,service,image,image_id,state,health FROM inventory ORDER BY project,service,name")
+ rows,err:=s.db.QueryContext(ctx,"SELECT container_id,name,project,service,image,image_id,state,health,repo_digests_json,image_os,image_architecture,image_variant FROM inventory ORDER BY project,service,name")
  if err!=nil{return nil,err};defer rows.Close()
  out:=[]Container{}
- for rows.Next(){var c Container;if err=rows.Scan(&c.ID,&c.Name,&c.Project,&c.Service,&c.Image,&c.ImageID,&c.State,&c.Health);err!=nil{return nil,err};out=append(out,c)}
+ for rows.Next(){var c Container;var digests string;if err=rows.Scan(&c.ID,&c.Name,&c.Project,&c.Service,&c.Image,&c.ImageID,&c.State,&c.Health,&digests,&c.ImageOS,&c.ImageArchitecture,&c.ImageVariant);err!=nil{return nil,err};if digests!=""{if err=json.Unmarshal([]byte(digests),&c.RepoDigests);err!=nil{return nil,err}};out=append(out,c)}
  return out,rows.Err()
 }

@@ -55,6 +55,7 @@ func (p *Proxy) Scan(ctx context.Context)([]Container,error){
  if err:=p.get(ctx,"/containers/json?all=1&filters=%7B%22label%22%3A%5B%22com.docker.compose.project%22%2C%22com.docker.compose.service%22%5D%7D",&summaries);err!=nil{return nil,err}
  if len(summaries)>maxContainers{return nil,errors.New("Docker inventory exceeds safe container limit")}
  found:=make([]Container,0,len(summaries))
+ imageCache:=make(map[string]ImageMetadata)
  for _,item:=range summaries{
   if item.Labels["com.docker.compose.project"]==""||item.Labels["com.docker.compose.service"]==""{continue}
   // Engine IDs are strictly hex. Never pass labels or names into URL paths.
@@ -74,6 +75,23 @@ func (p *Proxy) Scan(ctx context.Context)([]Container,error){
   if project==""||service==""{continue}
   out:=Container{ID:detail.ID,Name:strings.TrimPrefix(detail.Name,"/"),Project:project,Service:service,Image:detail.Config.Image,ImageID:detail.Image,State:detail.State.Status}
   if detail.State.Health!=nil{out.Health=detail.State.Health.Status}
+  // Optional read-only image inspection, cached by local immutable config ID.
+  // A denied IMAGES endpoint means provenance remains unknown, not a scan failure.
+  if validID(detail.Image){
+   image,ok:=imageCache[detail.Image]
+   if !ok{
+    if err:=p.get(ctx,"/images/"+detail.Image+"/json",&image);err==nil{
+     if verified,err:=verifiedImageMetadata(detail.Image,image);err==nil{
+      image=verified
+      imageCache[detail.Image]=image
+     }
+    }
+   }
+   if image.ID==detail.Image{
+    out.RepoDigests=image.RepoDigests
+    out.ImageOS=image.OS;out.ImageArchitecture=image.Architecture;out.ImageVariant=image.Variant
+   }
+  }
   found=append(found,out)
  }
  sort.Slice(found,func(i,j int)bool{
