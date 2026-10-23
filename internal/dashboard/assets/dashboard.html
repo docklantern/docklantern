@@ -15,6 +15,7 @@
  <nav aria-label="Main navigation">
  <a class="nav-link active" aria-current="page" href="/"><span aria-hidden="true">▦</span> Overview</a>
  <a class="nav-link" href="#projects"><span aria-hidden="true">▤</span> Projects</a>
+ <a class="nav-link" href="#assessments"><span aria-hidden="true">◇</span> Image status</a>
  <a class="nav-link" href="#registry"><span aria-hidden="true">◎</span> Registry checks</a>
  <a class="nav-link" href="#policies"><span aria-hidden="true">◷</span> Monitoring</a>
  <a class="nav-link" href="/settings"><span aria-hidden="true">⚙</span> Settings</a>
@@ -63,6 +64,13 @@
   <table><thead><tr><th>Project / service</th><th>Watched image</th><th>Interval</th><th>Status</th><th>Next check (UTC)</th><th>Last error</th></tr></thead><tbody>
   {{range .Policies}}<tr><td><strong>{{.Project}}</strong><small class="subtext">{{.Service}}</small></td><td class="mono image-col" title="{{.Image}}">{{.Image}}<small class="subtext">{{.Platform}}</small></td><td>{{.IntervalSeconds}}s</td><td>{{if .Paused}}<span class="pill muted">Paused</span>{{else}}<span class="pill ok">Scheduled</span>{{end}}</td><td>{{when .NextCheckAt}}</td><td class="error-cell">{{if .LastError}}{{.LastError}}{{else}}—{{end}}</td></tr>
   {{else}}<tr><td colspan="6" class="table-empty">No monitoring policies configured.</td></tr>{{end}}
+  </tbody></table></div>
+ </section>
+ <section class="section" id="assessments">
+  <div class="section-head"><div><p class="eyebrow">DEPLOYED IMAGE EVIDENCE</p><h2>Image status assessments</h2></div><span class="helper">Conservative: unknown is not an update</span></div>
+  <div class="panel table-scroll"><table><thead><tr><th>Project / service</th><th>Watched image</th><th>Assessment</th><th>Evidence</th></tr></thead><tbody>
+  {{range .Assessments}}<tr><td>{{.Project}} / {{.Service}}</td><td class="mono image-col">{{.Image}}<small class="subtext">{{.Platform}}</small></td><td><span class="pill {{badge .State}}">{{.State}}</span></td><td>{{.Reason}}{{if .DeployedDigest}}<small class="subtext">Pinned: {{short .DeployedDigest}}</small>{{end}}</td></tr>
+  {{else}}<tr><td colspan="4" class="table-empty">Configure monitoring policies to see image assessments.</td></tr>{{end}}
   </tbody></table></div>
  </section>
  <section class="section" id="registry">

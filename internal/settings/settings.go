@@ -16,6 +16,7 @@ import (
 type Backend interface {
  Projects(context.Context)([]store.Registration,error)
  MonitorPolicies(context.Context)([]store.MonitorPolicy,error)
+ Containers(context.Context)([]store.Container,error)
  Register(context.Context,store.Registration)error
  SetMonitorPolicy(context.Context,store.MonitorPolicy)error
 }
@@ -29,25 +30,34 @@ type pageData struct {
  Projects []store.Registration
  Policies []store.MonitorPolicy
  Notice string
+ Discovered []store.Container
+ SuggestedProject string
+ SuggestedService string
+ SuggestedImage string
 }
 var tmpl=template.Must(template.New("settings").Parse(pageHTML))
 const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Settings · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head>
 <body><main class="main settings-page"><header class="topbar"><div><p class="eyebrow">DOCKER COMPOSE / ADMINISTRATION</p><h1>Monitoring settings</h1><p class="muted">Register Compose projects and configure read-only registry checks.</p></div><a class="text-action" href="/">← Overview</a></header>
 {{if .Notice}}<p role="status" class="notice">{{.Notice}}</p>{{end}}
+<section class="section panel settings-panel"><h2>Discovered services</h2><p class="muted">Choose a discovered service to prefill registration and monitoring fields. You must still supply and validate your original Compose project directory and files; selecting a service does not enroll or enable updates.</p>
+<div class="table-scroll"><table><thead><tr><th>Project</th><th>Service</th><th>Image</th><th>Choose</th></tr></thead><tbody>
+{{range .Discovered}}<tr><td>{{.Project}}</td><td>{{.Service}}</td><td class="mono">{{.Image}}</td><td><form method="get" action="/settings"><input type="hidden" name="project" value="{{.Project}}"><input type="hidden" name="service" value="{{.Service}}"><button type="submit">Prefill</button></form></td></tr>
+{{else}}<tr><td colspan="4" class="table-empty">No services discovered. Enable the optional discovery proxy and inventory scanning to populate this list.</td></tr>{{end}}
+</tbody></table></div></section>
 <section class="section panel settings-panel"><h2>Register project</h2><p class="muted">All paths must be absolute and inside an operator-approved source root. Registration never enables deployments.</p>
 <form method="post" action="/settings/projects"><input type="hidden" name="csrf_token" value="{{.CSRF}}">
-<label>Compose project name<input name="name" required maxlength="128" placeholder="example"></label>
+<label>Compose project name<input name="name" required maxlength="128" value="{{.SuggestedProject}}" placeholder="example"></label>
 <label>Project directory<input name="project_dir" required placeholder="/srv/apps/example"></label>
 <label>Compose files (one absolute path per line)<textarea name="files" rows="3" required placeholder="/srv/apps/example/compose.yaml"></textarea></label>
-<label>Services (comma-separated)<input name="services" required placeholder="web, worker"></label>
+<label>Services (comma-separated)<input name="services" required value="{{.SuggestedService}}" placeholder="web, worker"></label>
 <label>Environment files (one absolute path per line; optional)<textarea name="env_files" rows="2"></textarea></label>
 <label>Profiles (comma-separated; optional)<input name="profiles"></label>
 <button type="submit">Register for monitoring</button></form></section>
 <section class="section panel settings-panel"><h2>Configure watched service</h2><p class="muted">Only explicitly registered services are eligible. Select pause to stop registry checks.</p>
 <form method="post" action="/settings/policies"><input type="hidden" name="csrf_token" value="{{.CSRF}}">
-<label>Project<input name="project" required placeholder="example"></label>
-<label>Service<input name="service" required placeholder="web"></label>
-<label>Tagged image<input name="image" required placeholder="ghcr.io/org/app:latest"></label>
+<label>Project<input name="project" required value="{{.SuggestedProject}}" placeholder="example"></label>
+<label>Service<input name="service" required value="{{.SuggestedService}}" placeholder="web"></label>
+<label>Tagged image<input name="image" required value="{{.SuggestedImage}}" placeholder="ghcr.io/org/app:latest"></label>
 <label>Platform<input name="platform" required value="linux/amd64"></label>
 <label>Interval (seconds, 60–86400)<input name="interval_seconds" type="number" min="60" max="86400" value="300" required></label>
 <label class="checkline"><input name="paused" type="checkbox" value="true"> Pause monitoring</label>
@@ -64,12 +74,24 @@ func (h Handler) Routes(mux *http.ServeMux){
 func (h Handler) index(w http.ResponseWriter,r *http.Request){
  projects,e:=h.Backend.Projects(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
  policies,e:=h.Backend.MonitorPolicies(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
+ discovered,e:=h.Backend.Containers(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
+ draft:=pageData{CSRF:h.Guard.Token(),Projects:projects,Policies:policies,Discovered:discovered,Notice:notice(r.URL.Query().Get("saved"))}
+ selectedProject:=r.URL.Query().Get("project")
+ selectedService:=r.URL.Query().Get("service")
+ for _,c:=range discovered{
+  if c.Project==selectedProject&&c.Service==selectedService {
+   draft.SuggestedProject=c.Project
+   draft.SuggestedService=c.Service
+   draft.SuggestedImage=c.Image
+   break
+  }
+ }
  w.Header().Set("Content-Type","text/html; charset=utf-8")
  w.Header().Set("Cache-Control","no-store")
  w.Header().Set("X-Content-Type-Options","nosniff")
  w.Header().Set("Referrer-Policy","no-referrer")
  w.Header().Set("Content-Security-Policy","default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
- _=tmpl.Execute(w,pageData{CSRF:h.Guard.Token(),Projects:projects,Policies:policies,Notice:notice(r.URL.Query().Get("saved"))})
+ _=tmpl.Execute(w,draft)
 }
 func notice(code string)string{switch code{case "project":return "Project registered for monitoring.";case "policy":return "Monitoring policy saved.";default:return ""}}
 func (h Handler) prepare(w http.ResponseWriter,r *http.Request)bool{
