@@ -65,7 +65,7 @@ func(g *Guard) sameOrigin(r *http.Request)bool{
 }
 func(g *Guard) Wrap(next http.Handler)http.Handler{
  return http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
-  if r.URL.Path=="/healthz" && r.Method==http.MethodGet {next.ServeHTTP(w,r);return}
+  if (r.URL.Path=="/healthz"||r.URL.Path=="/readyz") && r.Method==http.MethodGet {next.ServeHTTP(w,r);return}
   if g.publicOrigin!=""{
    // Exact Host and proxy protocol expectations; do not trust arbitrary
    // X-Forwarded-Host values to grant access to another origin.
