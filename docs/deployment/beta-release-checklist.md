@@ -12,12 +12,13 @@ Review digest updates as code changes. A tag alone is insufficient to guarantee 
 
 1. **Merge reviewed PR #21 and verify all CI jobs pass**, including Go unit/race/vet, Docker discovery proxy, and the complete monitoring flow.
 2. Audit dependency and container vulnerabilities (Go module versions, Docker Engine CLI runtime packages and optional socket proxy). Triage or remediate high/critical findings before a public beta. This is a manual release gate; the PR does not claim a completed vulnerability audit.
-3. Review unauthenticated `/healthz` and `/readyz` exposure, single-admin Basic-auth access, TLS trusted-origin settings, restricted Docker network membership, and secrets mounted from files.
-4. Confirm update execution is **not wired into the monitoring binary** and the deployed stack mounts no Docker socket unless the opt-in proxy overlay is explicitly approved.
-5. Test the disposable installation script using a clean CI runner. Verify readiness, monitoring-only registration, SQLite persistence across restart, online `VACUUM INTO` backup, and offline restore.
-6. Inspect `.github/workflows/release.yml` to ensure publishing is triggered only by an explicitly pushed, reviewed semver tag. Restrict who can create release tags, using protected tag rules if available.
-7. Only after approval: tag the reviewed main-branch commit as `v0.1.0-beta.1`, observe the test and signed provenance build, note the resulting image digest, and install it on an **isolated disposable** VPS or lab host.
-8. Evaluate a realistic monitoring scenario against private GHCR and Docker Hub images, registry rate limits, event/webhook failures, database recovery, and operator documentation. Document any beta blockers before public availability.
+3. Verify bind-mounted Compose secret ownership with `cap_drop: [ALL]`: on rootful Docker, the admin password and webhook HMAC key should be owned by root with mode `0600`. Check rootless/user namespace mappings separately; never chmod secrets world-readable.
+4. Review unauthenticated `/healthz` and `/readyz` exposure, single-admin Basic-auth access, TLS trusted-origin settings, restricted Docker network membership, and secrets mounted from files.
+5. Confirm update execution is **not wired into the monitoring binary** and the deployed stack mounts no Docker socket unless the opt-in proxy overlay is explicitly approved.
+6. Test the disposable installation script using a clean CI runner. Verify readiness, monitoring-only registration, SQLite persistence across restart, online `VACUUM INTO` backup, and offline restore.
+7. Inspect `.github/workflows/release.yml` to ensure publishing is triggered only by an explicitly pushed, reviewed semver tag. Restrict who can create release tags, using protected tag rules if available.
+8. Only after approval: tag the reviewed main-branch commit as `v0.1.0-beta.1`, observe the test and signed provenance build, note the resulting image digest, and install it on an **isolated disposable** VPS or lab host.
+9. Evaluate a realistic monitoring scenario against private GHCR and Docker Hub images, registry rate limits, event/webhook failures, database recovery, and operator documentation. Document any beta blockers before public availability.
 
 ## Disposable local validation
 
