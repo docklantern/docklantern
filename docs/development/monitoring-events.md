@@ -25,11 +25,14 @@ For Traefik Compose deployments, from `deploy/traefik`:
 
 ```sh
 openssl rand -hex 32 > secrets/webhook_hmac_key.txt
-chmod 600 secrets/webhook_hmac_key.txt
+sudo chown root:root secrets/webhook_hmac_key.txt
+sudo chmod 600 secrets/webhook_hmac_key.txt
 # Add DOCKLANTERN_WEBHOOK_URL=https://hooks.example.org/docklantern to .env
 docker compose -f compose.yaml -f compose.notifications.yaml config
 docker compose -f compose.yaml -f compose.notifications.yaml up -d --build
 ```
+
+With `cap_drop: [ALL]`, the file-backed secret must be readable by container UID 0 without bypassing file permissions; for rootful Docker, use root-owned `0600` as shown (verify any rootless/user-namespace mapping).
 
 If using Docker discovery too, be aware that Compose overlays override `command`. The example notifier overlay runs registry monitoring but not periodic discovery; specify the required flags together when combining overlays.
 
