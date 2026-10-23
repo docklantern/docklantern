@@ -32,6 +32,7 @@ type Reader interface {
 type view struct {
  Projects []project
  Unregistered []store.Container
+ Events []store.Event
  Checks []store.RegistryCheck
  Policies []store.MonitorPolicy
  Assessments []updates.Assessment
@@ -52,7 +53,11 @@ func collect(ctx context.Context,s Reader)(view,error){
  containers,e:=s.Containers(ctx);if e!=nil{return view{},e}
  checks,e:=s.RegistryChecks(ctx);if e!=nil{return view{},e}
  policies,e:=s.MonitorPolicies(ctx);if e!=nil{return view{},e}
- v:=view{Checks:checks,Policies:policies,Assessments:updates.AssessFresh(registrations,containers,policies,checks,time.Now().UTC()),ProjectCount:len(registrations),ContainerCount:len(containers),MonitoredCount:len(policies)}
+ var events []store.Event
+ if reader,ok:=s.(interface{Events(context.Context,int)([]store.Event,error)});ok{
+  events,e=reader.Events(ctx,50);if e!=nil{return view{},e}
+ }
+ v:=view{Events:events,Checks:checks,Policies:policies,Assessments:updates.AssessFresh(registrations,containers,policies,checks,time.Now().UTC()),ProjectCount:len(registrations),ContainerCount:len(containers),MonitoredCount:len(policies)}
  idx:=make(map[string]int,len(registrations))
  for _,r:=range registrations{idx[r.Name]=len(v.Projects);v.Projects=append(v.Projects,project{Registration:r})}
  for _,c:=range containers{

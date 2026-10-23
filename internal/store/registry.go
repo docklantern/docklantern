@@ -32,6 +32,10 @@ func(s *Store) RecordRegistryCheck(ctx context.Context,image,platform,indexDiges
  previous_digest=excluded.previous_digest,status=excluded.status,checked_at=excluded.checked_at`,
  image,platform,indexDigest,platformDigest,prev,status,now)
  if e!=nil{return RegistryCheck{},e}
+ if status=="changed"{
+  e=insertEvent(ctx,tx,Event{Kind:"remote_digest_changed",Image:image,Platform:platform,PreviousDigest:prev,Digest:platformDigest},time.Now().UTC())
+  if e!=nil{return RegistryCheck{},e}
+ }
  if e=tx.Commit();e!=nil{return RegistryCheck{},e}
  return RegistryCheck{Image:image,Platform:platform,IndexDigest:indexDigest,PlatformDigest:platformDigest,PreviousDigest:prev,Status:status,CheckedAt:now},nil
 }

@@ -22,6 +22,11 @@ func Handler(s Reader)http.Handler{
  mux.HandleFunc("GET /healthz",func(w http.ResponseWriter,r *http.Request){w.Header().Set("Content-Type","application/json");_,_=w.Write([]byte("{\"status\":\"ok\"}"))})
  mux.HandleFunc("GET /api/v1/projects",func(w http.ResponseWriter,r *http.Request){v,e:=s.Projects(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/containers",func(w http.ResponseWriter,r *http.Request){v,e:=s.Containers(r.Context());respond(w,v,e)})
+ mux.HandleFunc("GET /api/v1/events",func(w http.ResponseWriter,r *http.Request){
+  reader,ok:=s.(interface{Events(context.Context,int)([]store.Event,error)})
+  if !ok{respond(w,[]store.Event{},nil);return}
+  events,e:=reader.Events(r.Context(),100);respond(w,events,e)
+ })
  mux.HandleFunc("GET /api/v1/registry-checks",func(w http.ResponseWriter,r *http.Request){v,e:=s.RegistryChecks(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/monitor-policies",func(w http.ResponseWriter,r *http.Request){v,e:=s.MonitorPolicies(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/image-assessments",func(w http.ResponseWriter,r *http.Request){
