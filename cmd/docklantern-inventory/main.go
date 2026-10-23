@@ -58,7 +58,7 @@ func main(){
   if endpoint==""||secretFile==""{log.Fatal("notifications require DOCKLANTERN_WEBHOOK_URL and DOCKLANTERN_WEBHOOK_HMAC_KEY_FILE")}
   secret,e:=os.ReadFile(filepath.Clean(secretFile));must(e)
   sender,e:=notify.New(endpoint,strings.TrimSpace(string(secret)));must(e)
-  return notify.Worker{Store:s,Sender:sender,Interval:10*time.Second,Limit:20}
+  return notify.Worker{Store:s,Sender:sender,Reporter:s,Interval:10*time.Second,Limit:20}
  }
 
  switch *mode{
@@ -91,7 +91,7 @@ func main(){
   p,e:=s.MonitorPolicies(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(p))
  case "check-due","monitor":
   resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
-  scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20}
+  scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20,Reporter:s}
   if *mode=="check-due"{n,e:=scheduler.RunOnce(ctx);if e!=nil{log.Printf("monitor checks failed: %v",e)};fmt.Printf("checked %d due policies\\n",n)}else{must(scheduler.Run(ctx))}
  case "events":
   records,e:=s.Events(ctx,100);must(e);must(json.NewEncoder(os.Stdout).Encode(records))
@@ -126,22 +126,26 @@ func main(){
   var sourceRoots []string
   if *roots!=""{sourceRoots=strings.Split(*roots,",")}
   if *runNotifier {
+   must(s.RecordWorkerStart(ctx,"webhook_notifier",time.Now().UTC()))
    worker:=setupNotifier()
    go func(){if err:=worker.Run(ctx);err!=nil{log.Printf("notification worker stopped: %v",err)}}()
   }
   if *inProcessMonitor {
+   must(s.RecordWorkerStart(ctx,"registry_monitor",time.Now().UTC()))
    resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
    scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20}
    go func(){if err:=scheduler.Run(ctx);err!=nil{log.Printf("registry monitoring stopped: %v",err)}}()
   }
   if *scanEvery>0 {
+   must(s.RecordWorkerStart(ctx,"docker_discovery",time.Now().UTC()))
    scan:=func(){
     scanCtx,cancel:=context.WithTimeout(ctx,40*time.Second);defer cancel()
     items,err:=scanDocker(scanCtx)
-    if err!=nil{log.Printf("Docker scan failed: %v",err);return}
+    if err!=nil{log.Printf("Docker scan failed: %v",err);_ =s.RecordWorkerRun(ctx,"docker_discovery",time.Now().UTC(),0,err);return}
     records:=make([]store.Container,0,len(items))
     for _,c:=range items{records=append(records,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health,RepoDigests:c.RepoDigests,ImageOS:c.ImageOS,ImageArchitecture:c.ImageArchitecture,ImageVariant:c.ImageVariant})}
     if err=s.Snapshot(scanCtx,records);err!=nil{log.Printf("Docker snapshot failed: %v",err)}
+    if err=s.RecordWorkerRun(ctx,"docker_discovery",time.Now().UTC(),len(records),err);err!=nil{log.Printf("Docker health record failed: %v",err)}
    }
    go func(){scan();ticker:=time.NewTicker(*scanEvery);defer ticker.Stop();for{select{case <-ctx.Done():return;case <-ticker.C:scan()}}}()
   }

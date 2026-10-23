@@ -24,6 +24,7 @@ type Scheduler struct{
  CheckTimeout time.Duration
  BatchSize int
  Now func()time.Time
+ Reporter interface{RecordWorkerRun(context.Context,string,time.Time,int,error)error}
 }
 func(s Scheduler) validate()error{
  if s.Storage==nil||s.Resolver==nil{return errors.New("monitor requires storage and resolver")}
@@ -59,7 +60,14 @@ func(s Scheduler) Run(ctx context.Context)error{
  if err:=s.validate();err!=nil{return err}
  ticker:=time.NewTicker(s.PollEvery);defer ticker.Stop()
  // Check due jobs immediately on startup. Failures are recorded; continue polling.
- for {_,_ =s.RunOnce(ctx)
+ for {
+  count,err:=s.RunOnce(ctx)
+  if ctx.Err()!=nil{return nil}
+  if s.Reporter!=nil{
+   if e:=s.Reporter.RecordWorkerRun(ctx,"registry_monitor",s.now(),count,err);e!=nil{return fmt.Errorf("monitor heartbeat: %w",e)}
+  }
+  // Individual registry errors have already been recorded and backed off.
+  // Infrastructure errors stop the worker so the supervisor can report failure.
   select{case <-ctx.Done():return nil;case <-ticker.C:}
  }
 }
