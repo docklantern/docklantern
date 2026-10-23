@@ -43,7 +43,7 @@ services:
       - traefik.http.middlewares.docklantern-security.headers.contentTypeNosniff=true
       - traefik.http.middlewares.docklantern-security.headers.referrerPolicy=no-referrer
     healthcheck:
-      test: ["CMD", "docker", "version", "--format", "{{.Client.Version}}"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8787/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
