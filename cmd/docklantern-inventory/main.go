@@ -119,7 +119,7 @@ func main(){
   }
   server:=&http.Server{Addr:*addr,Handler:management.Handler(s,guard,sourceRoots),ReadHeaderTimeout:5*time.Second,ReadTimeout:10*time.Second,WriteTimeout:15*time.Second,IdleTimeout:60*time.Second}
   go func(){<-ctx.Done();shutdownCtx,cancel:=context.WithTimeout(context.Background(),10*time.Second);defer cancel();_ = server.Shutdown(shutdownCtx)}()
-  if err=server.ListenAndServe();err!=nil&&err!=http.ErrServerClosed{log.Fatal(err)}
+  if err:=server.ListenAndServe();err!=nil&&err!=http.ErrServerClosed{log.Fatal(err)}
  default:log.Fatal("unknown mode")
  }
 }
