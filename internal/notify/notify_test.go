@@ -18,7 +18,7 @@ func TestRejectUnsafeWebhookDestinations(t *testing.T){
  for _,raw:=range []string{"http://example.com/hook","https://user:pass@example.com","https://example.com/hook?token=hidden","https://example.com/#secret","ftp://example.com"}{
   if _,err:=New(raw,strings.Repeat("s",40));err==nil{t.Errorf("accepted %q",raw)}
  }
- for _,raw:=range []string{"127.0.0.1","10.0.0.2","192.168.1.1","169.254.169.254","::1","fd00::1"}{
+ for _,raw:=range []string{"127.0.0.1","10.0.0.2","192.168.1.1","169.254.169.254","100.64.0.1","198.18.0.1","192.0.0.9","::1","fd00::1","2001:db8::1"}{
   ip:=netip.MustParseAddr(raw);if allowed(ip){t.Errorf("allowed private IP %s",ip)}
  }
  for _,raw:=range []string{"8.8.8.8","2606:4700:4700::1111"}{
