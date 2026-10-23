@@ -28,7 +28,7 @@ services:
       CONTAINERS: "1"
       POST: "0"
       EVENTS: "0"
-      IMAGES: "0"
+      IMAGES: "1"
       NETWORKS: "0"
       INFO: "0"
       SERVICES: "0"
