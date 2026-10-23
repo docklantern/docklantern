@@ -12,6 +12,9 @@ on:
       - '.github/workflows/go-poc.yml'
       - 'tests/integration/**'
       - 'tests/sdk/**'
+      - 'scripts/**'
+      - 'build/**'
+      - '.github/workflows/release.yml'
   push:
     branches: [main]
 
@@ -110,3 +113,21 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-monitoring-flow.sh
+
+  beta-release-inputs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify approved immutable base-image digests
+        run: bash scripts/verify-release-inputs.sh
+
+  beta-install-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise disposable beta installation, backup and restore
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/integration/run-beta-install.sh
