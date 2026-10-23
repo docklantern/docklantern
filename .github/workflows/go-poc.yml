@@ -12,6 +12,9 @@ on:
       - '.github/workflows/go-poc.yml'
       - 'tests/integration/**'
       - 'tests/sdk/**'
+      - 'scripts/**'
+      - 'build/**'
+      - '.github/workflows/release.yml'
   push:
     branches: [main]
 
@@ -111,21 +114,13 @@ jobs:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-monitoring-flow.sh
 
-  base-image-resolution:
+  beta-release-inputs:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     steps:
-      - name: Resolve immutable base-image digests
-        shell: bash
-        run: |
-          set -euo pipefail
-          for image in golang:1.26-alpine docker:28-cli; do
-            docker pull "$image"
-            pinned="$(docker image inspect "$image" --format '{{index .RepoDigests 0}}')"
-            digest="$(printf '%s' "$pinned" | cut -d@ -f2)"
-            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
-            echo "LOCK $image@$digest"
-          done
+      - uses: actions/checkout@v4
+      - name: Verify approved immutable base-image digests
+        run: bash scripts/verify-release-inputs.sh
 
   beta-install-smoke:
     runs-on: ubuntu-latest
