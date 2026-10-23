@@ -23,7 +23,7 @@ func TestExistingInventoryMigrationAndProvenance(t *testing.T){
  if err!=nil||len(got)!=1||got[0].ID!="old"{t.Fatalf("migration: %+v %v",got,err)}
  expected:=Container{ID:"new",Name:"app-web",Project:"app",Service:"web",Image:"nginx:latest",ImageID:"sha256:abc",ImageOS:"linux",ImageArchitecture:"amd64",RepoDigests:[]string{"docker.io/library/nginx@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
  if err=s.Snapshot(ctx,[]Container{expected});err!=nil{t.Fatal(err)}
- got,err=s.Containers(ctx);if err!=nil||len(got)!=1||!reflect.DeepEqual(got[0],expected){t.Fatalf("stored: %+v expected %+v error %v",got,expected,err)}
+ got,err=s.Containers(ctx);if len(got)==1{expected.ObservedAt=got[0].ObservedAt};if err!=nil||len(got)!=1||!reflect.DeepEqual(got[0],expected){t.Fatalf("stored: %+v expected %+v error %v",got,expected,err)}
  _=s.Close()
  reopened,err:=Open(path);if err!=nil{t.Fatal(err)};defer reopened.Close()
  got,err=reopened.Containers(ctx);if err!=nil||len(got)!=1||!reflect.DeepEqual(got[0],expected){t.Fatalf("reopened %+v %v",got,err)}

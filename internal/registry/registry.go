@@ -12,11 +12,25 @@ import (
  "net/http"
  "net/url"
  "regexp"
+ "strconv"
  "strings"
  "time"
 )
 const accept = "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"
 const maxManifest = 8 << 20
+// RetryableError represents transient rate limits/outages without leaking secrets.
+type RetryableError struct {Status int;RetryAfter time.Duration}
+func(e *RetryableError) Error()string{return fmt.Sprintf("registry temporarily unavailable (HTTP %d)",e.Status)}
+func retryDelay(value string,now time.Time) time.Duration{
+ if seconds,err:=strconv.Atoi(strings.TrimSpace(value));err==nil&&seconds>=0 {
+  if seconds>86400{seconds=86400};return time.Duration(seconds)*time.Second
+ }
+ if timestamp,err:=http.ParseTime(value);err==nil {
+  d:=timestamp.Sub(now)
+  if d<0{return 0};if d>24*time.Hour{return 24*time.Hour};return d
+ }
+ return 0
+}
 var component = regexp.MustCompile(`^[a-z0-9]+([._-][a-z0-9]+)*$`)
 var tagRE = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$`)
 var digestRE = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
@@ -109,6 +123,9 @@ func (c Client) manifest(ctx context.Context,r Reference,ref string)([]byte,stri
   resp,e=fetch(token);if e!=nil{return nil,"","",errors.New("registry request failed")}
  }
  defer resp.Body.Close()
+ if resp.StatusCode==429||resp.StatusCode==503{
+  return nil,"","",&RetryableError{Status:resp.StatusCode,RetryAfter:retryDelay(resp.Header.Get("Retry-After"),time.Now())}
+ }
  if resp.StatusCode!=http.StatusOK{return nil,"","",fmt.Errorf("registry returned HTTP %d",resp.StatusCode)}
  body,e:=io.ReadAll(io.LimitReader(resp.Body,maxManifest+1));if e!=nil||len(body)>maxManifest{return nil,"","",errors.New("manifest exceeds limit or failed to read")}
  sum:=sha256.Sum256(body);actual:="sha256:"+hex.EncodeToString(sum[:])
@@ -135,6 +152,7 @@ func (c Client) bearer(ctx context.Context,challenge string,r Reference)(string,
  req,e:=http.NewRequestWithContext(ctx,http.MethodGet,realm.String(),nil);if e!=nil{return "",e}
  if c.Credentials.Username!=""{req.SetBasicAuth(c.Credentials.Username,c.Credentials.Password)}
  resp,e:=c.client().Do(req);if e!=nil{return "",errors.New("registry token request failed")};defer resp.Body.Close()
+ if resp.StatusCode==429||resp.StatusCode==503{return "",&RetryableError{Status:resp.StatusCode,RetryAfter:retryDelay(resp.Header.Get("Retry-After"),time.Now())}}
  if resp.StatusCode!=http.StatusOK{return "",fmt.Errorf("registry token endpoint returned HTTP %d",resp.StatusCode)}
  var payload struct{Token string `json:"token"`;AccessToken string `json:"access_token"`}
  if e=json.NewDecoder(io.LimitReader(resp.Body,64<<10)).Decode(&payload);e!=nil{return "",errors.New("invalid registry token response")}

@@ -5,6 +5,7 @@ import (
  "context"
  "encoding/json"
  "net/http"
+ "time"
  "github.com/docklantern/docklantern/internal/store"
  "github.com/docklantern/docklantern/internal/dashboard"
  "github.com/docklantern/docklantern/internal/updates"
@@ -28,7 +29,7 @@ func Handler(s Reader)http.Handler{
   containers,e:=s.Containers(ctx);if e!=nil{respond(w,nil,e);return}
   policies,e:=s.MonitorPolicies(ctx);if e!=nil{respond(w,nil,e);return}
   checks,e:=s.RegistryChecks(ctx);if e!=nil{respond(w,nil,e);return}
-  respond(w,updates.Assess(projects,containers,policies,checks),nil)
+  respond(w,updates.AssessFresh(projects,containers,policies,checks,time.Now().UTC()),nil)
  })
  return mux
 }

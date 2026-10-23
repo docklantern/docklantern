@@ -4,6 +4,7 @@ package updates
 
 import (
  "strings"
+ "time"
 
  "github.com/docklantern/docklantern/internal/registry"
  "github.com/docklantern/docklantern/internal/store"
@@ -18,8 +19,21 @@ type Assessment struct {
  RemoteDigest string `json:"remote_digest,omitempty"`
  DeployedDigest string `json:"deployed_digest,omitempty"`
  ContainerCount int `json:"container_count"`
+ InventoryObservedAt string `json:"inventory_observed_at,omitempty"`
+ RegistryCheckedAt string `json:"registry_checked_at,omitempty"`
+ ReleaseClassification string `json:"release_classification"`
 }
+// Assess preserves the legacy digest-only calculation for existing callers and tests.
+// The authenticated HTTP API and dashboard use AssessFresh, which requires timestamps.
 func Assess(projects []store.Registration,containers []store.Container,policies []store.MonitorPolicy,checks []store.RegistryCheck)[]Assessment{
+ return assess(projects,containers,policies,checks,time.Time{},0,0)
+}
+// AssessFresh refuses to claim current/different when either independent observation
+// is missing, from the future, or exceeds its allowed age.
+func AssessFresh(projects []store.Registration,containers []store.Container,policies []store.MonitorPolicy,checks []store.RegistryCheck,now time.Time)[]Assessment{
+ return assess(projects,containers,policies,checks,now,5*time.Minute,2*time.Hour)
+}
+func assess(projects []store.Registration,containers []store.Container,policies []store.MonitorPolicy,checks []store.RegistryCheck,now time.Time,maxInventoryAge,maxRegistryAge time.Duration)[]Assessment{
  registered:=make(map[string]map[string]bool)
  for _,p:=range projects{
   services:=make(map[string]bool)
@@ -30,18 +44,29 @@ func Assess(projects []store.Registration,containers []store.Container,policies 
  for _,c:=range checks{remote[c.Image+"|"+c.Platform]=c}
  result:=make([]Assessment,0,len(policies))
  for _,p:=range policies{
-  a:=Assessment{Project:p.Project,Service:p.Service,Image:p.Image,Platform:p.Platform,State:"unknown",Reason:"No matching immutable deployed manifest reference available"}
+  a:=Assessment{Project:p.Project,Service:p.Service,Image:p.Image,Platform:p.Platform,State:"unknown",Reason:"No matching immutable deployed manifest reference available",ReleaseClassification:"not_verified"}
   if !registered[p.Project][p.Service]{a.State="unregistered";a.Reason="Service is not currently registered";result=append(result,a);continue}
   c,ok:=remote[p.Image+"|"+p.Platform]
   if !ok{a.State="not_checked";a.Reason="No successful remote registry check";result=append(result,a);continue}
   a.RemoteDigest=c.PlatformDigest
+  a.RegistryCheckedAt=c.CheckedAt
   if p.Paused{a.State="paused";a.Reason="Monitoring policy is paused";result=append(result,a);continue}
+  if maxRegistryAge>0 && !fresh(c.CheckedAt,now,maxRegistryAge){a.State="stale_registry";a.Reason="Last successful registry observation is missing, expired, or in the future";result=append(result,a);continue}
   var replicas []store.Container
   for _,item:=range containers {
    if item.Project==p.Project&&item.Service==p.Service {replicas=append(replicas,item)}
   }
   a.ContainerCount=len(replicas)
   if len(replicas)==0{a.State="not_running";a.Reason="No container recorded in last inventory scan";result=append(result,a);continue}
+  // Every replica must have a sufficiently recent inventory observation.
+  if maxInventoryAge>0{
+   stale:=false
+   for _,r:=range replicas{
+    if !fresh(r.ObservedAt,now,maxInventoryAge){stale=true;break}
+   }
+   if stale{a.State="stale_inventory";a.Reason="Docker inventory snapshot is missing, expired, or in the future";result=append(result,a);continue}
+  }
+  a.InventoryObservedAt=replicas[0].ObservedAt
   // A multi-replica service can only have a definite state when all replicas
   // supply identical, verifiable pinned manifest references.
   common:=""
@@ -105,4 +130,11 @@ func deployedManifestDigest(c store.Container,watched,platform string)(string,bo
   return "",false
  }
  return pinned,pinnedOK
+}
+
+func fresh(raw string,now time.Time,maxAge time.Duration)bool{
+ t,err:=time.Parse(time.RFC3339,raw)
+ if err!=nil{return false}
+ age:=now.Sub(t)
+ return age>=-5*time.Second && age<=maxAge
 }
