@@ -36,8 +36,11 @@ jobs:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-beta-install.sh
 
+  security-audit:
+    uses: ./.github/workflows/security-audit.yml
+
   release:
-    needs: verify-release
+    needs: [verify-release, security-audit]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

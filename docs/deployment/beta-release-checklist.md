@@ -11,7 +11,7 @@ Review digest updates as code changes. A tag alone is insufficient to guarantee 
 ## Required beta review gates
 
 1. **Merge reviewed PR #21 and verify all CI jobs pass**, including Go unit/race/vet, Docker discovery proxy, and the complete monitoring flow.
-2. Audit dependency and container vulnerabilities (Go module versions, Docker Engine CLI runtime packages and optional socket proxy). Triage or remediate high/critical findings before a public beta. This is a manual release gate; the PR does not claim a completed vulnerability audit.
+2. Require all three jobs in `.github/workflows/security-audit.yml`: reachable Go vulnerabilities, fixable HIGH/CRITICAL vulnerabilities in the built monitoring image, and the optional Docker socket proxy. The tag release workflow now depends on this reusable audit. Review **unfixed** Trivy findings separately and document remediation or explicit beta blockers in `docs/security/beta-audit.md`. Automated scanning does not replace a manual security review.
 3. Verify bind-mounted Compose secret ownership with `cap_drop: [ALL]`: on rootful Docker, the admin password and webhook HMAC key should be owned by root with mode `0600`. Check rootless/user namespace mappings separately; never chmod secrets world-readable.
 4. Review unauthenticated `/healthz` and `/readyz` exposure, single-admin Basic-auth access, TLS trusted-origin settings, restricted Docker network membership, and secrets mounted from files.
 5. Confirm update execution is **not wired into the monitoring binary** and the deployed stack mounts no Docker socket unless the opt-in proxy overlay is explicitly approved.
