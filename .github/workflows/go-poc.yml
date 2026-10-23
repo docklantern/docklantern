@@ -126,3 +126,13 @@ jobs:
             [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || exit 1
             echo "LOCK $image@$digest"
           done
+
+  beta-install-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise disposable beta installation, backup and restore
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/integration/run-beta-install.sh
