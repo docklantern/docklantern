@@ -1,0 +1,60 @@
+# Example HTTPS-only deployment on a pre-existing, trusted Traefik 'web' network.
+# No Docker socket mount by default: registry monitoring works, Docker discovery does not.
+services:
+  docklantern:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: docklantern:local
+    restart: unless-stopped
+    init: true
+    environment:
+      DOCKLANTERN_ADMIN_USERNAME: ${DOCKLANTERN_ADMIN_USERNAME:?set admin username}
+      DOCKLANTERN_ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+      DOCKLANTERN_ALLOW_PROXY: "1"
+      DOCKLANTERN_PUBLIC_ORIGIN: https://${DOCKLANTERN_DOMAIN:?set dashboard domain}
+    secrets:
+      - admin_password
+    volumes:
+      - docklantern_data:/data
+    networks:
+      - web
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=web
+      - traefik.http.routers.docklantern.rule=Host(`${DOCKLANTERN_DOMAIN:?set domain}`)
+      - traefik.http.routers.docklantern.entrypoints=websecure
+      - traefik.http.routers.docklantern.tls=true
+      - traefik.http.routers.docklantern.tls.certresolver=${TRAEFIK_CERTRESOLVER:?set TLS resolver}
+      - traefik.http.routers.docklantern.service=docklantern
+      - traefik.http.services.docklantern.loadbalancer.server.port=8787
+      - traefik.http.routers.docklantern.middlewares=docklantern-rate-limit,docklantern-security
+      - traefik.http.middlewares.docklantern-rate-limit.ratelimit.average=2
+      - traefik.http.middlewares.docklantern-rate-limit.ratelimit.burst=10
+      - traefik.http.middlewares.docklantern-security.headers.stsSeconds=31536000
+      - traefik.http.middlewares.docklantern-security.headers.stsIncludeSubdomains=false
+      - traefik.http.middlewares.docklantern-security.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.docklantern-security.headers.referrerPolicy=no-referrer
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8787/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  docklantern_data:
+
+secrets:
+  admin_password:
+    file: ./secrets/admin_password.txt
+
+networks:
+  web:
+    external: true
