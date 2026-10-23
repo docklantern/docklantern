@@ -1,5 +1,5 @@
 // docklantern-inventory is a monitoring-only CLI/HTTP prototype.
-// Do not expose its unauthenticated HTTP listener to the public internet.
+// The HTTP interface requires credentials, and remains loopback-only.
 package main
 
 import (
@@ -15,7 +15,8 @@ import (
  "os"
  "strings"
  "time"
- "github.com/docklantern/docklantern/internal/api"
+ "github.com/docklantern/docklantern/internal/auth"
+ "github.com/docklantern/docklantern/internal/management"
  "github.com/docklantern/docklantern/internal/discovery"
  "github.com/docklantern/docklantern/internal/poc"
  "github.com/docklantern/docklantern/internal/monitor"
@@ -72,10 +73,15 @@ func main(){
  case "projects":
   x,e:=s.Projects(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x))
  case "serve":
-  // The API is unauthenticated and intentionally read-only. Bind loopback only.
+  // Authentication is required and the initial server remains loopback-only.
   if !strings.HasPrefix(*addr,"127.0.0.1:")&&!strings.HasPrefix(*addr,"localhost:"){log.Fatal("POC HTTP API must bind loopback")}
   log.Printf("inventory API on %s",*addr)
-  server:=&http.Server{Addr:*addr,Handler:api.Handler(s),ReadHeaderTimeout:5*time.Second}
+  username:=os.Getenv("DOCKLANTERN_ADMIN_USERNAME")
+  password:=os.Getenv("DOCKLANTERN_ADMIN_PASSWORD")
+  guard,e:=auth.New(username,password);must(e)
+  var sourceRoots []string
+  if *roots!=""{sourceRoots=strings.Split(*roots,",")}
+  server:=&http.Server{Addr:*addr,Handler:management.Handler(s,guard,sourceRoots),ReadHeaderTimeout:5*time.Second,ReadTimeout:10*time.Second,WriteTimeout:15*time.Second,IdleTimeout:60*time.Second}
   log.Fatal(server.ListenAndServe())
  default:log.Fatal("unknown mode")
  }
