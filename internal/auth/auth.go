@@ -65,6 +65,7 @@ func(g *Guard) sameOrigin(r *http.Request)bool{
 }
 func(g *Guard) Wrap(next http.Handler)http.Handler{
  return http.HandlerFunc(func(w http.ResponseWriter,r *http.Request){
+  if r.URL.Path=="/healthz" && r.Method==http.MethodGet {next.ServeHTTP(w,r);return}
   if g.publicOrigin!=""{
    // Exact Host and proxy protocol expectations; do not trust arbitrary
    // X-Forwarded-Host values to grant access to another origin.
@@ -74,8 +75,6 @@ func(g *Guard) Wrap(next http.Handler)http.Handler{
     return
    }
   }
-  // Readiness contains no private data and is accessible without credentials.
-  if r.URL.Path=="/healthz" && r.Method==http.MethodGet {next.ServeHTTP(w,r);return}
   user,pass,ok:=r.BasicAuth()
   sum:=sha256.Sum256([]byte(pass))
   valid:=ok&&subtle.ConstantTimeCompare([]byte(user),[]byte(g.username))==1&&subtle.ConstantTimeCompare(sum[:],g.password[:])==1
