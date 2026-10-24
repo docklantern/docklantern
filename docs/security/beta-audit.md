@@ -11,8 +11,8 @@ The scanners consume contemporary public vulnerability feeds during GitHub Actio
 - `go-vulnerabilities`: fails if `govulncheck ./...` reports a detected reachable vulnerability. The tool prioritizes reachable Go call paths and is not an exhaustive audit of every transitive dependency. It runs inside the **exact pinned Go builder image** used by the Dockerfile, not the older language-version directive.
 - `monitoring-image`: builds the pinned-base Dockerfile locally and fails for **fixable** HIGH/CRITICAL OS or library vulnerabilities. Unfixed findings remain outside the blocking policy and must still be reviewed.
 - `docker-proxy-image`: scans the **optional, privileged** socket-proxy image configured in `deploy/traefik/compose.discovery.yaml`, and applies the same HIGH/CRITICAL fixable-vulnerability gate.
-- `security-audit.yml` runs on dependency, Dockerfile, proxy-overlay or workflow changes, on main, and as a reusable workflow required by version-tag publishing.
-- The tagged release workflow does not publish the GHCR image unless these security jobs pass, in addition to existing tests and disposable installation verification.
+- `security-audit.yaml` runs on dependency, Dockerfile, proxy-overlay or workflow changes, on main, and as a reusable workflow required by version-tag publishing.
+- The tagged release workflow does not publish images to GHCR or Docker Hub unless these security jobs pass, in addition to existing tests and disposable installation verification.
 
 **Policy:** No automatic suppression of known findings, no externally sourced image deployment, and no release publishing if a blocking job is red. If remediation is impossible, document the CVE, package/version, exploitability reasoning and time-bound release exception in a separate reviewed PR. The scanner version and advisory database change over time, so subsequent scans may disagree with earlier ones.
 
