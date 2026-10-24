@@ -9,8 +9,8 @@ on:
       - 'deploy/docker-socket-proxy/**'
       - 'build/**'
       - 'deploy/traefik/compose.discovery.yaml'
-      - '.github/workflows/security-audit.yml'
-      - '.github/workflows/release.yml'
+      - '.github/workflows/security-audit.yaml'
+      - '.github/workflows/release.yaml'
       - 'security/**'
       - 'scripts/security-*.sh'
   push:

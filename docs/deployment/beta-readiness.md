@@ -36,7 +36,9 @@ Never restore over a live SQLite connection. Test this procedure with disposable
 
 ## Versioned release workflow
 
-A version tag `vMAJOR.MINOR.PATCH` (optional strict alphanumeric pre-release suffix) triggers `.github/workflows/release.yml`. The workflow validates semver, checks the module graph, runs `go test -race ./...` and `go vet ./...`, then builds a multi-platform `linux/amd64` and `linux/arm64` OCI image with provenance and publishes the **version-only** tag to `ghcr.io/docklantern/docklantern:vX.Y.Z`.
+A version tag `vMAJOR.MINOR.PATCH` (optional strict alphanumeric pre-release suffix) triggers `.github/workflows/release.yaml`. The workflow validates semver, checks the module graph, runs `go test -race ./...` and `go vet ./...`, then builds a multi-platform `linux/amd64` and `linux/arm64` OCI image with provenance and publishes the **version-only** tag to `ghcr.io/docklantern/docklantern:vX.Y.Z` and `davidslusser/docklantern:vX.Y.Z`.
+
+Before releasing, configure repository Actions secrets `DOCKERHUB_USERNAME` (an account with push access to `davidslusser/docklantern`) and `DOCKERHUB_TOKEN` (a Docker Hub access token with write permission for that repository). GHCR authentication uses the existing `GITHUB_TOKEN`.
 
 The Go binary embeds its version; use `docklantern-inventory -version`. The release workflow never mutates Docker on a production host and never pushes an unreviewed `latest` tag. Build from immutable release commits, record the resulting image digest and deploy by digest for stronger reproducibility. Base images should be pinned and audited by digest as part of the formal beta release security review.
 

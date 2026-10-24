@@ -10,13 +10,13 @@ on:
       - 'deploy/docker-socket-proxy/**'
       - 'deploy/traefik/**'
       - 'docs/deployment/**'
-      - '.github/workflows/go-poc.yml'
+      - '.github/workflows/go-poc.yaml'
       - 'tests/integration/**'
       - 'tests/sdk/**'
       - 'scripts/**'
       - 'build/**'
-      - '.github/workflows/release.yml'
-      - '.github/workflows/security-audit.yml'
+      - '.github/workflows/release.yaml'
+      - '.github/workflows/security-audit.yaml'
       - 'docs/security/**'
   push:
     branches: [main]

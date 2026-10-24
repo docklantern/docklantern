@@ -37,7 +37,7 @@ jobs:
         run: bash tests/integration/run-beta-install.sh
 
   security-audit:
-    uses: ./.github/workflows/security-audit.yml
+    uses: ./.github/workflows/security-audit.yaml
 
   release:
     needs: [verify-release, security-audit]
@@ -55,6 +55,11 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Publish review-tagged multi-arch image with OCI provenance
         uses: docker/build-push-action@v6
         with:
@@ -65,4 +70,6 @@ jobs:
           provenance: mode=max
           build-args: |
             VERSION=${{ github.ref_name }}
-          tags: ghcr.io/docklantern/docklantern:${{ github.ref_name }}
+          tags: |
+            ghcr.io/docklantern/docklantern:${{ github.ref_name }}
+            davidslusser/docklantern:${{ github.ref_name }}
