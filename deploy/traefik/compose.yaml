@@ -41,7 +41,7 @@ services:
       - traefik.http.middlewares.docklantern-security.headers.stsSeconds=31536000
       - traefik.http.middlewares.docklantern-security.headers.stsIncludeSubdomains=false
       - traefik.http.middlewares.docklantern-security.headers.contentTypeNosniff=true
-      - traefik.http.middlewares.docklantern-security.headers.referrerPolicy=no-referrer
+      - traefik.http.middlewares.docklantern-security.headers.referrerPolicy=same-origin
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8787/readyz"]
       interval: 30s
