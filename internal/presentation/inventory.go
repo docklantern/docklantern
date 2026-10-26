@@ -71,6 +71,11 @@ type ServiceSummary struct {
     Platform string
     ImageID string
     Enrollment string
+    DiscoveryState string
+    ValidationError string
+    GUIOverride *int
+    LabelInterval *int
+    LabelOptIn *bool
     Monitoring string
     IntervalSeconds int
     IntervalSource string
@@ -190,7 +195,8 @@ func BuildServiceSummaries(views []store.MonitorServiceView,containers []store.C
         id:=ServiceIdentity{v.Project,v.Service}
         s:=ServiceSummary{
             ServiceIdentity:id,Image:v.Image,Platform:v.Platform,
-            Enrollment:v.EnrollmentSource,Monitoring:"not_enrolled",
+            Enrollment:v.EnrollmentSource,DiscoveryState:v.State,ValidationError:v.ValidationError,
+            GUIOverride:v.GUIOverride,LabelInterval:v.LabelInterval,LabelOptIn:v.LabelOptIn,Monitoring:"not_enrolled",
             IntervalSeconds:v.EffectiveInterval,IntervalSource:v.IntervalSource,
             Paused:v.Paused,HasPolicy:v.HasPolicy,NextCheckAt:v.NextCheckAt,
             Assessment:"unknown",ContainerHealth:"not_reported",
