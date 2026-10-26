@@ -13,6 +13,7 @@ type MonitorServiceSettings struct {
     Project string
     Service string
     LegacyEnrolled bool
+    LegacyIntervalSeconds *int
     GUIEnrolled bool
     LabelOptIn *bool
     LabelIntervalSeconds *int
@@ -53,7 +54,7 @@ func (s *Store) SetDefaultMonitorInterval(ctx context.Context, seconds int) erro
 func (s *Store) MonitoringServiceSettings(ctx context.Context) ([]MonitorServiceSettings, error) {
     rows, err := s.db.QueryContext(ctx,
         `SELECT project,service,legacy_enrolled,gui_enrolled,label_opt_in,
-            label_interval_seconds,gui_interval_seconds,discovery_state,last_seen_at,validation_error
+            label_interval_seconds,gui_interval_seconds,discovery_state,last_seen_at,validation_error,legacy_interval_seconds
             FROM monitor_service_settings ORDER BY project,service`)
     if err != nil {
         return nil, err
@@ -63,9 +64,9 @@ func (s *Store) MonitoringServiceSettings(ctx context.Context) ([]MonitorService
     for rows.Next() {
         var p MonitorServiceSettings
         var legacy, gui int
-        var labelOptIn, labelInterval, guiInterval sql.NullInt64
+        var labelOptIn, labelInterval, guiInterval, legacyInterval sql.NullInt64
         err := rows.Scan(&p.Project,&p.Service,&legacy,&gui,&labelOptIn,
-            &labelInterval,&guiInterval,&p.DiscoveryState,&p.LastSeenAt,&p.ValidationError)
+            &labelInterval,&guiInterval,&p.DiscoveryState,&p.LastSeenAt,&p.ValidationError,&legacyInterval)
         if err != nil {
             return nil, err
         }
@@ -83,6 +84,7 @@ func (s *Store) MonitoringServiceSettings(ctx context.Context) ([]MonitorService
             value := int(guiInterval.Int64)
             p.GUIIntervalSeconds = &value
         }
+        if legacyInterval.Valid {v:=int(legacyInterval.Int64);p.LegacyIntervalSeconds=&v}
         out = append(out,p)
     }
     return out,rows.Err()
