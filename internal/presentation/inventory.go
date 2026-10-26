@@ -112,6 +112,18 @@ func BuildImageSummaries(policies []store.MonitorPolicy, checks []store.Registry
         id := ImageIdentity{e.Image,e.Platform}
         if at.After(lastChangeTime[id]) { lastChangeTime[id]=at;lastChange[id]=e.OccurredAt }
     }
+    // An observation should not be called stale before its monitoring policy
+    // would reasonably have rechecked it. The fastest active watcher sets the
+    // group's expected cadence; a two-hour floor tolerates retries and polling
+    // jitter for the default five-minute interval.
+    freshness := make(map[ImageIdentity]time.Duration)
+    for _,p := range policies {
+        if p.Paused || p.Image=="" || p.Platform=="" || p.IntervalSeconds<=0 {continue}
+        id := ImageIdentity{p.Image,p.Platform}
+        window := 2*time.Duration(p.IntervalSeconds)*time.Second
+        if window < 2*time.Hour {window=2*time.Hour}
+        if old,found := freshness[id]; !found || window<old {freshness[id]=window}
+    }
     groups := make(map[ImageIdentity]*ImageSummary)
     for _,p := range policies {
         if p.Image=="" || p.Platform=="" { continue }
@@ -123,7 +135,9 @@ func BuildImageSummaries(policies []store.MonitorPolicy, checks []store.Registry
                 lastSuccessful:=c
                 g.LatestObservation=&lastSuccessful
                 g.RegistryStatus=c.Status
-                if !freshRegistry(c.CheckedAt,now) {g.RegistryStatus="stale"}
+                window:=freshness[id]
+                if window==0 {window=2*time.Hour}
+                if !freshRegistry(c.CheckedAt,now,window) {g.RegistryStatus="stale"}
             }
             groups[id]=g
         }
@@ -170,11 +184,11 @@ func summarizeDeployments(c DeploymentCounts) string {
     }
 }
 
-func freshRegistry(value string,now time.Time)bool{
-    at,err:=time.Parse(time.RFC3339,value)
-    if err!=nil || now.IsZero(){return false}
+func freshRegistry(value string,now time.Time,window time.Duration)bool{
+    at,err:=time.Parse(time.RFC3339Nano,value)
+    if err!=nil || now.IsZero() || window<=0 {return false}
     age:=now.Sub(at)
-    return age>=-5*time.Second && age<=2*time.Hour
+    return age>=-5*time.Second && age<=window
 }
 
 // BuildServiceSummaries includes discovered but unenrolled Compose services.
