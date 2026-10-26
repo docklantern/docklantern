@@ -22,7 +22,7 @@ func TestSharedNavigationOnAllHTMLPages(t *testing.T) {
         {"/images", "/images", "Watched images"},
         {"/services", "/services", "Compose services"},
         {"/settings", "/settings", "Monitoring settings"},
-        {"/events", "/events", "Events"},
+        {"/events", "/events", "Activity"},
     } {
         t.Run(tc.path, func(t *testing.T) {
             response := request(handler, http.MethodGet, tc.path, "", true)
