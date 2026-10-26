@@ -80,31 +80,6 @@ func workspaceTemplate(name,markup string)*template.Template {
  return template.Must(layout.WithShell(template.Must(template.New(name).Funcs(workspaceFuncs).Parse(markup))))
 }
 
-var servicesTemplate=workspaceTemplate("services",`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>Services · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body>
-{{template "shell-start" .}}
-<header class="topbar"><div><p class="eyebrow">DOCKER COMPOSE / SERVICES</p><h1>Services</h1><p class="muted">Discovered Compose services, monitoring, and deployment context.</p></div><span class="readonly">MONITORING ONLY</span></header>
-{{range .Groups}}<section class="section" aria-label="Compose project {{.Project}}"><div class="section-head"><h2>{{.Project}}</h2><span class="helper">{{len .Services}} services</span></div>
-<div class="panel table-scroll"><table><thead><tr><th>Service</th><th>Image</th><th>Monitoring</th><th>Containers</th><th>Details</th></tr></thead><tbody>
-{{range .Services}}<tr><td>{{.Service}}</td><td class="mono image-col">{{.Image}}</td><td>{{status .Monitoring}}</td><td>{{.RunningCount}} / {{.ContainerCount}} running</td><td><a class="text-action" href="{{serviceURL .Project .Service}}">View service</a></td></tr>{{end}}
-</tbody></table></div></section>
-{{else}}<section class="section panel empty"><h2>No Compose services discovered</h2><p>Enable Docker discovery to populate this workspace; monitored and unmonitored services will both appear.</p></section>{{end}}
-<footer>Monitoring enrollment does not grant deployment permissions.</footer>{{template "shell-end" .}}</body></html>`)
-
-var serviceDetailTemplate=workspaceTemplate("service-detail",`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>Service Details · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body>
-{{template "shell-start" .}}
-<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/services">Services</a><span aria-hidden="true">/</span><span aria-current="page">{{.Service.Project}} / {{.Service.Service}}</span></nav>
-<header class="topbar"><div><p class="eyebrow">SERVICE DETAILS</p><h1>{{.Service.Project}} / {{.Service.Service}}</h1><p class="muted">Compose deployment and monitoring configuration.</p></div><span class="readonly">MONITORING ONLY</span></header>
-<section class="section"><div class="workspace-stats">
-<article class="stat-card"><div class="stat-label">Monitoring</div><strong class="workspace-value">{{status .Service.Monitoring}}</strong><span class="stat-hint">{{.Service.Enrollment}}</span></article>
-<article class="stat-card"><div class="stat-label">Effective interval</div><strong class="workspace-value">{{if .Service.HasPolicy}}{{.Service.IntervalSeconds}} seconds{{else}}Not scheduled{{end}}</strong><span class="stat-hint">{{.Service.IntervalSource}}</span></article>
-<article class="stat-card"><div class="stat-label">Running containers</div><strong class="workspace-value">{{.Service.RunningCount}} / {{.Service.ContainerCount}}</strong><span class="stat-hint">Docker health: {{.Service.ContainerHealth}}</span></article>
-</div></section>
-<section class="section panel workspace-detail"><h2>Image and deployment</h2><p class="mono">{{.Service.Image}}</p><p class="muted">Platform: {{.Service.Platform}} · Deployment assessment: {{status .Service.Assessment}}</p>
-{{if .Service.ImageID}}<p><a class="text-action" href="{{imageURL .Service.ImageID}}">View image details</a></p>{{end}}</section>
-<section class="section panel workspace-detail"><h2>Monitoring configuration</h2><p class="muted">Changes continue to use the existing authenticated and CSRF-protected service settings forms.</p>
-<p><a class="text-action" href="{{.SettingsURL}}">Manage monitoring settings</a></p></section>
-<footer>Service monitoring controls do not authorize Docker deployments.</footer>{{template "shell-end" .}}</body></html>`)
-
 // All workspace views use the existing store and OCI assessment code; these
 // GET handlers never contact the registry, write SQLite, or execute Docker.
 func(h Handler) workspaceSnapshot(ctx context.Context)(workspaceData,error){
@@ -137,7 +112,7 @@ func workspaceHeaders(w http.ResponseWriter) {
  w.Header().Set("Cache-Control","no-store")
  w.Header().Set("X-Content-Type-Options","nosniff")
  w.Header().Set("Referrer-Policy","no-referrer")
- w.Header().Set("Content-Security-Policy","default-src 'none'; style-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'")
+ w.Header().Set("Content-Security-Policy","default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
 }
 func renderWorkspace(w http.ResponseWriter,t *template.Template,data workspaceData){
  workspaceHeaders(w)
@@ -145,23 +120,5 @@ func renderWorkspace(w http.ResponseWriter,t *template.Template,data workspaceDa
 }
 func(h Handler) imagesPage(w http.ResponseWriter,r *http.Request){h.renderImagesWorkspace(w,r)}
 func(h Handler) imageDetailsPage(w http.ResponseWriter,r *http.Request){h.renderImageWorkspaceDetails(w,r)}
-func(h Handler) servicesPage(w http.ResponseWriter,r *http.Request){
- d,err:=h.workspaceSnapshot(r.Context());if err!=nil{http.Error(w,"Services unavailable",500);return}
- d.ActivePage="services"
- renderWorkspace(w,servicesTemplate,d)
-}
-func(h Handler) serviceDetailsPage(w http.ResponseWriter,r *http.Request){
- project,service:=r.PathValue("project"),r.PathValue("service")
- if project=="" || service=="" || len(project)>128 || len(service)>128{http.NotFound(w,r);return}
- d,err:=h.workspaceSnapshot(r.Context());if err!=nil{http.Error(w,"Service unavailable",500);return}
- for i:=range d.Services{
-  if d.Services[i].Project!=project || d.Services[i].Service!=service {continue}
-  d.Service=&d.Services[i]
-  d.SettingsURL="/settings?project="+url.QueryEscape(project)+"&service="+url.QueryEscape(service)+"#service-monitoring"
-  d.ActivePage="services"
-  renderWorkspace(w,serviceDetailTemplate,d)
-  return
- }
- http.NotFound(w,r)
-}
-
+func(h Handler) servicesPage(w http.ResponseWriter,r *http.Request){h.renderServicesWorkspace(w,r)}
+func(h Handler) serviceDetailsPage(w http.ResponseWriter,r *http.Request){h.renderServiceWorkspaceDetails(w,r)}
