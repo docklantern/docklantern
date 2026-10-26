@@ -20,6 +20,7 @@ import (
 type Backend interface {
  Projects(context.Context)([]store.Registration,error)
  MonitorPolicies(context.Context)([]store.MonitorPolicy,error)
+ RegistryChecks(context.Context)([]store.RegistryCheck,error)
  Containers(context.Context)([]store.Container,error)
  Register(context.Context,store.Registration)error
  SetMonitorPolicy(context.Context,store.MonitorPolicy)error
