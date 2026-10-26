@@ -66,7 +66,6 @@ func filterServices(all []presentation.ServiceSummary,filter serviceFilters)[]pr
  query:=strings.ToLower(filter.Query)
  for _,s:=range all{
   if query!="" && !strings.Contains(strings.ToLower(s.Project+" "+s.Service+" "+s.Image+" "+s.Platform),query){continue}
-  }
   switch filter.Monitoring{
   case "active":
    if s.Monitoring!="monitoring" && s.Monitoring!="check_failed"{continue}
