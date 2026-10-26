@@ -9,7 +9,6 @@ import (
 
  "github.com/docklantern/docklantern/internal/layout"
  "github.com/docklantern/docklantern/internal/presentation"
- "github.com/docklantern/docklantern/internal/store"
  "github.com/docklantern/docklantern/internal/updates"
 )
 
