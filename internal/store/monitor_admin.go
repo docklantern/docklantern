@@ -11,28 +11,28 @@ import (
 // MonitorServiceView is safe display data from validated Docker discovery and
 // monitoring preferences. It never carries Compose source paths or secrets.
 type MonitorServiceView struct {
- Project string
- Service string
- Image string
- Platform string
- State string
- ValidationError string
- EnrollmentSource string
- IntervalSource string
- EffectiveInterval int
- LabelInterval *int
- GUIOverride *int
- LegacyEnrolled bool
- GUIEnrolled bool
- LabelOptIn *bool
- HasPolicy bool
- Paused bool
- NextCheckAt string
- CanGUIEnable bool
- CanGUIDisable bool
- CanPause bool
- CanResume bool
- CanEditInterval bool
+ Project string `json:"project"`
+ Service string `json:"service"`
+ Image string `json:"image"`
+ Platform string `json:"platform"`
+ State string `json:"state"`
+ ValidationError string `json:"validation_error"`
+ EnrollmentSource string `json:"enrollment_source"`
+ IntervalSource string `json:"interval_source"`
+ EffectiveInterval int `json:"effective_interval_seconds"`
+ LabelInterval *int `json:"label_interval_seconds"`
+ GUIOverride *int `json:"gui_override_seconds"`
+ LegacyEnrolled bool `json:"legacy_enrolled"`
+ GUIEnrolled bool `json:"gui_enrolled"`
+ LabelOptIn *bool `json:"label_opt_in"`
+ HasPolicy bool `json:"has_policy"`
+ Paused bool `json:"paused"`
+ NextCheckAt string `json:"next_check_at"`
+ CanGUIEnable bool `json:"can_gui_enable"`
+ CanGUIDisable bool `json:"can_gui_disable"`
+ CanPause bool `json:"can_pause"`
+ CanResume bool `json:"can_resume"`
+ CanEditInterval bool `json:"can_edit_interval"`
 }
 
 func (s *Store) MonitorServiceViews(ctx context.Context) ([]MonitorServiceView,error) {
