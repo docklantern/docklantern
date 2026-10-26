@@ -78,7 +78,7 @@ func main(){
  case "scan":
   x,e:=scanDocker(ctx);must(e)
   items:=make([]store.Container,0,len(x))
-  for _,c:=range x{items=append(items,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health,RepoDigests:c.RepoDigests,ImageOS:c.ImageOS,ImageArchitecture:c.ImageArchitecture,ImageVariant:c.ImageVariant})}
+  for _,c:=range x{items=append(items,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health,RepoDigests:c.RepoDigests,ImageOS:c.ImageOS,ImageArchitecture:c.ImageArchitecture,ImageVariant:c.ImageVariant,MonitorLabels:c.MonitorLabels})}
   must(s.Snapshot(ctx,items));fmt.Printf("recorded %d containers\n",len(items))
  case "check-image":
   if *image==""{log.Fatal("-image is required for check-image")}
@@ -160,7 +160,7 @@ func main(){
      items,err:=scanDocker(scanCtx)
      if err==nil{
       records:=make([]store.Container,0,len(items))
-      for _,c:=range items{records=append(records,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health,RepoDigests:c.RepoDigests,ImageOS:c.ImageOS,ImageArchitecture:c.ImageArchitecture,ImageVariant:c.ImageVariant})}
+      for _,c:=range items{records=append(records,store.Container{ID:c.ID,Name:c.Name,Project:c.Project,Service:c.Service,Image:c.Image,ImageID:c.ImageID,State:c.State,Health:c.Health,RepoDigests:c.RepoDigests,ImageOS:c.ImageOS,ImageArchitecture:c.ImageArchitecture,ImageVariant:c.ImageVariant,MonitorLabels:c.MonitorLabels})}
       err=s.Snapshot(scanCtx,records)
      }
      if recordErr:=s.RecordWorkerRun(workerCtx,"docker_discovery",time.Now().UTC(),len(items),err);recordErr!=nil{return recordErr}

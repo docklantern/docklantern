@@ -75,6 +75,7 @@ func (p *Proxy) Scan(ctx context.Context)([]Container,error){
   if project==""||service==""{continue}
   out:=Container{ID:detail.ID,Name:strings.TrimPrefix(detail.Name,"/"),Project:project,Service:service,Image:detail.Config.Image,ImageID:detail.Image,State:detail.State.Status}
   if detail.State.Health!=nil{out.Health=detail.State.Health.Status}
+   out.MonitorLabels=monitorLabels(detail.Config.Labels)
   // Optional read-only image inspection, cached by local immutable config ID.
   // A denied IMAGES endpoint means provenance remains unknown, not a scan failure.
   if validID(detail.Image){

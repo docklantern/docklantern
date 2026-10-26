@@ -38,6 +38,9 @@ type Container struct{
  ImageArchitecture string `json:"image_architecture,omitempty"`
  ImageVariant string `json:"image_variant,omitempty"`
  ObservedAt string `json:"observed_at,omitempty"`
+ // MonitorLabels are transient, allowlisted Docker metadata. They are never
+ // stored in inventory or treated as deployment authorization.
+ MonitorLabels map[string]string `json:"-"`
 }
 func Open(path string)(*Store,error){
  if path==""{return nil,errors.New("database path required")}
@@ -80,6 +83,7 @@ func(s *Store)Snapshot(ctx context.Context,items []Container)error{
   digests,err:=json.Marshal(c.RepoDigests);if err!=nil{return err}
   if _,err=stmt.ExecContext(ctx,c.ID,c.Name,c.Project,c.Service,c.Image,c.ImageID,c.State,c.Health,now,string(digests),c.ImageOS,c.ImageArchitecture,c.ImageVariant);err!=nil{return err}
  }
+ if err:=s.reconcileMonitors(ctx,tx,items,time.Now().UTC());err!=nil{return err}
  return tx.Commit()
 }
 func(s *Store)Containers(ctx context.Context)([]Container,error){

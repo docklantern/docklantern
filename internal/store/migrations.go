@@ -9,7 +9,7 @@ import (
 
 // schemaVersion is deliberately separate from the SQLite application_id.
 // beta.2 databases had user_version=0 and previously used ad-hoc column checks.
-const schemaVersion = 1
+const schemaVersion = 2
 
 // initializeSchema performs the entire schema upgrade within one SQLite
 // transaction. A failed upgrade leaves the old tables/version untouched.
@@ -81,6 +81,23 @@ func initializeSchema(ctx context.Context, db *sql.DB) error {
         } {
             if _, err := tx.ExecContext(ctx, statement); err != nil {
                 return fmt.Errorf("upgrade monitoring schema: %w", err)
+            }
+        }
+    }
+
+    if version < 2 {
+        // Legacy policies reference Compose registrations, which do not exist
+        // for label-only monitoring. Preserve every policy row when removing
+        // that FK; managed deployments still require independent registration.
+        for _, statement := range []string{
+            "CREATE TABLE monitor_policies_v2(project TEXT NOT NULL,service TEXT NOT NULL,image TEXT NOT NULL,platform TEXT NOT NULL,interval_seconds INTEGER NOT NULL,paused INTEGER NOT NULL DEFAULT 0,next_check_at TEXT NOT NULL,last_checked_at TEXT NOT NULL DEFAULT '',last_error TEXT NOT NULL DEFAULT '',consecutive_failures INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(project,service))",
+            "INSERT INTO monitor_policies_v2 SELECT project,service,image,platform,interval_seconds,paused,next_check_at,last_checked_at,last_error,consecutive_failures FROM monitor_policies",
+            "DROP TABLE monitor_policies",
+            "ALTER TABLE monitor_policies_v2 RENAME TO monitor_policies",
+            "PRAGMA user_version=2",
+        } {
+            if _, err := tx.ExecContext(ctx,statement); err != nil {
+                return fmt.Errorf("upgrade label monitoring schema: %w",err)
             }
         }
     }

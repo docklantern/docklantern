@@ -70,8 +70,15 @@ func (s *Store) MonitorPolicies(ctx context.Context)([]MonitorPolicy,error){
 
 func(s *Store) DueMonitorPolicies(ctx context.Context,now time.Time,limit int)([]MonitorPolicy,error){
  if limit<1||limit>100{return nil,errors.New("invalid limit")}
- rows,err:=s.db.QueryContext(ctx,`SELECT project,service,image,platform,interval_seconds,paused,next_check_at,last_checked_at,last_error,consecutive_failures
- FROM monitor_policies WHERE paused=0 AND next_check_at<=? ORDER BY next_check_at,project,service LIMIT ?`,now.UTC().Format(time.RFC3339),limit)
+ rows,err:=s.db.QueryContext(ctx,`SELECT p.project,p.service,p.image,p.platform,p.interval_seconds,p.paused,p.next_check_at,p.last_checked_at,p.last_error,p.consecutive_failures
+ FROM monitor_policies p
+ LEFT JOIN monitor_service_settings m ON m.project=p.project AND m.service=p.service
+ WHERE p.paused=0 AND p.next_check_at<=?
+   AND (m.label_opt_in IS NULL OR m.label_opt_in!=0)
+   AND m.discovery_state!='conflict'
+   AND (m.legacy_enrolled=1 OR
+        (m.discovery_state='present' AND (m.gui_enrolled=1 OR m.label_opt_in=1)))
+ ORDER BY p.next_check_at,p.project,p.service LIMIT ?`,now.UTC().Format(time.RFC3339),limit)
  if err!=nil{return nil,err};defer rows.Close()
  out:=[]MonitorPolicy{}
  for rows.Next(){var p MonitorPolicy;if err=rows.Scan(&p.Project,&p.Service,&p.Image,&p.Platform,&p.IntervalSeconds,&p.Paused,&p.NextCheckAt,&p.LastCheckedAt,&p.LastError,&p.ConsecutiveFailures);err!=nil{return nil,err};out=append(out,p)}
@@ -96,7 +103,13 @@ func(s *Store) FinishMonitorCheck(ctx context.Context,p MonitorPolicy,finished t
  next:=finished.UTC().Add(delay)
  tx,err:=s.db.BeginTx(ctx,nil);if err!=nil{return err};defer tx.Rollback()
  result,err:=tx.ExecContext(ctx,`UPDATE monitor_policies SET last_checked_at=?,last_error=?,next_check_at=?,consecutive_failures=?
- WHERE project=? AND service=? AND image=? AND platform=? AND interval_seconds=? AND paused=0 AND next_check_at=?`,
+ WHERE project=? AND service=? AND image=? AND platform=? AND interval_seconds=? AND paused=0 AND next_check_at=?
+ AND EXISTS(SELECT 1 FROM monitor_service_settings m
+            WHERE m.project=monitor_policies.project AND m.service=monitor_policies.service
+              AND (m.label_opt_in IS NULL OR m.label_opt_in!=0)
+              AND m.discovery_state!='conflict'
+              AND (m.legacy_enrolled=1 OR
+                   (m.discovery_state='present' AND (m.gui_enrolled=1 OR m.label_opt_in=1))))`,
  finished.UTC().Format(time.RFC3339),message,next.Format(time.RFC3339),failures,p.Project,p.Service,p.Image,p.Platform,p.IntervalSeconds,p.NextCheckAt)
  if err!=nil{return err}
  changed,err:=result.RowsAffected();if err!=nil{return err}
