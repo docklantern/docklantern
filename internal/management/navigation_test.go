@@ -18,7 +18,7 @@ func TestSharedNavigationOnAllHTMLPages(t *testing.T) {
         wantActive string
         pageText string
     }{
-        {"/", "/", "Container overview"},
+        {"/", "/", "Image Overview"},
         {"/images", "/images", "Watched images"},
         {"/services", "/services", "Compose services"},
         {"/settings", "/settings", "Monitoring settings"},

@@ -71,11 +71,7 @@ func parseImageFilters(r *http.Request)(imageFilters,error) {
 }
 
 func hasRecordedChangeInWindow(image presentation.ImageSummary,now time.Time,window time.Duration)bool{
- if image.LastChangeAt==""{return false}
- at,err:=time.Parse(time.RFC3339Nano,image.LastChangeAt)
- if err!=nil{return false}
- age:=now.Sub(at)
- return age>=0 && age<=window
+ return presentation.RecentRecordedChange(image,now,window)
 }
 
 func attentionRank(image presentation.ImageSummary)int{
@@ -134,11 +130,10 @@ func(h Handler) renderImagesWorkspace(w http.ResponseWriter,r *http.Request){
  if err!=nil{http.Error(w,"Images unavailable",http.StatusInternalServerError);return}
  now:=time.Now().UTC()
  d:=imageListData{workspaceData:data,Filter:filters,Total:len(data.Images)}
- for _,item:=range data.Images{
-  if hasRecordedChangeInWindow(item,now,24*time.Hour){d.Changed24h++}
-  if item.DeploymentCounts.Different>0{d.Differences++}
-  if item.FailedServices>0{d.Errors++}
- }
+ metrics,_,_:=presentation.BuildImageOverview(data.Images,now,0)
+ d.Changed24h=metrics.RemoteChanges24h
+ d.Differences=metrics.DeploymentDifferences
+ d.Errors=metrics.MonitoringErrors
  d.Images=filterImages(data.Images,filters,now)
  d.Visible=len(d.Images)
  d.ActivePage="images"
