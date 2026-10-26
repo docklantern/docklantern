@@ -50,6 +50,8 @@ type pageData struct {
  Notice string
  Notifications store.NotificationSettings
  Discovered []store.Container
+ SelectedProject string
+ SelectedService string
  SuggestedProject string
  SuggestedService string
  SuggestedImage string
@@ -71,7 +73,7 @@ const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta
 <h2>Service monitoring</h2>
 <p class="muted">Opt in an unlabeled discovered service, or override its interval. Effective setting priority: GUI override → Docker label → global default. Original Compose project registration is not required for monitoring.</p>
 {{range .Services}}
-<div class="service-control">
+<div class="service-control{{if and (eq .Project $.SelectedProject) (eq .Service $.SelectedService)}} selected-service{{end}}">
 <div class="service-control-head">
 <div><h3>{{.Project}} / {{.Service}}</h3>
 <p class="muted">{{if .Image}}<span class="mono">{{.Image}}</span>{{else}}No validated monitoring policy{{end}}</p></div>
@@ -184,6 +186,7 @@ func (h Handler) index(w http.ResponseWriter,r *http.Request){
  draft:=pageData{ActivePage:"settings",MainClass:"settings-page",CSRF:h.Guard.Token(),Projects:projects,Policies:policies,Services:services,DefaultInterval:defaultInterval,Discovered:discovered,Notifications:settings,Notice:notice(r.URL.Query().Get("saved"))}
  selectedProject:=r.URL.Query().Get("project")
  selectedService:=r.URL.Query().Get("service")
+  draft.SelectedProject=selectedProject;draft.SelectedService=selectedService
  for _,c:=range discovered{
   if c.Project==selectedProject&&c.Service==selectedService {
    draft.SuggestedProject=c.Project
