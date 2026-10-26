@@ -16,6 +16,12 @@ import (
 func TestBeta4SettingsSectionsRetentionAndExistingAdmin(t *testing.T){
  h,db,_,guard:=setup(t)
  ctx:=context.Background()
+ // A real discovered service is needed before its legacy management form
+ // exists; a fresh empty installation correctly renders no service actions.
+ if err:=db.Snapshot(ctx,[]store.Container{{
+  ID:"demo-web-1",Project:"demo",Service:"web",Image:"nginx:latest",
+  ImageOS:"linux",ImageArchitecture:"amd64",State:"running",
+ }});err!=nil{t.Fatal(err)}
  initial,err:=db.NotificationSettings(ctx)
  if err!=nil{t.Fatal(err)}
  page:=request(h,http.MethodGet,"/settings","",true)
