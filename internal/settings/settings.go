@@ -167,6 +167,10 @@ const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta
 <footer>No automatic image pulls, deployment controls, or credential storage.</footer>{{template "shell-end" .}}</body></html>`
 
 func (h Handler) Routes(mux *http.ServeMux){
+ mux.HandleFunc("GET /images",h.imagesPage)
+ mux.HandleFunc("GET /images/{id}",h.imageDetailsPage)
+ mux.HandleFunc("GET /services",h.servicesPage)
+ mux.HandleFunc("GET /services/{project}/{service}",h.serviceDetailsPage)
  mux.HandleFunc("GET /settings",h.index)
  mux.HandleFunc("POST /settings/monitoring/default",h.saveDefaultInterval)
  mux.HandleFunc("POST /settings/monitoring/service",h.saveServiceSettings)
