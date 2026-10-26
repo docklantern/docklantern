@@ -1,0 +1,59 @@
+name: Publish approved beta.3 tag (one-time release request)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - release-requests/v0.1.0-beta.3.txt
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: docklantern-beta3-release-request
+  cancel-in-progress: false
+
+jobs:
+  tag-and-dispatch:
+    if: github.repository == 'docklantern/docklantern'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify explicit one-time beta.3 release request
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 1
+          [[ "$(cat release-requests/v0.1.0-beta.3.txt)" == "v0.1.0-beta.3" ]] || exit 1
+          # The main HEAD is the reviewed release request merge commit.
+          git show -s --format=%H "$GITHUB_SHA" | grep -Fx "$GITHUB_SHA"
+          bash scripts/verify-release-inputs.sh
+          test -s docs/releases/v0.1.0-beta.3.md
+      - name: Tag the exact reviewed main commit, without moving any existing tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v0.1.0-beta.3"
+          current="$(git ls-remote --refs --tags origin "refs/tags/$tag" | awk '{print $1}')"
+          if [[ -n "$current" ]]; then
+            [[ "$current" == "$GITHUB_SHA" ]] || {
+              echo "The beta.3 tag already exists at another commit; refusing to move it." >&2
+              exit 1
+            }
+            echo "Tag exists at the approved release commit."
+          else
+            git tag "$tag" "$GITHUB_SHA"
+            git push origin "refs/tags/$tag"
+          fi
+      - name: Dispatch the existing verified release workflow at this exact tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yaml --repo "$GITHUB_REPOSITORY" --ref v0.1.0-beta.3
+          echo "Release workflow dispatched; its verify-release and security-audit jobs gate image publication."
