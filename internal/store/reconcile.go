@@ -6,6 +6,7 @@ import (
     "errors"
     "fmt"
     "sort"
+    "strings"
     "time"
 
     "github.com/docklantern/docklantern/internal/registry"
@@ -45,7 +46,7 @@ func parseMonitorCandidate(c Container) monitorCandidate {
     if err!=nil {out.issue="unsupported or untagged image reference"} else {out.image=ref.Key()}
     out.platform=c.ImageOS+"/"+c.ImageArchitecture
     if c.ImageVariant!="" {out.platform+="/"+c.ImageVariant}
-    if !validPlatform(out.platform)||c.ImageOS==""||c.ImageArchitecture=="" {
+    if !validPlatform(out.platform)||c.ImageOS==""||c.ImageArchitecture==""||strings.ContainsAny(c.ImageOS,"/")||strings.ContainsAny(c.ImageArchitecture,"/")||strings.ContainsAny(c.ImageVariant,"/") {
         out.issue="image platform unavailable"
     }
     return out
