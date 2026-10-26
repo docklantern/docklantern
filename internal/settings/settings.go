@@ -12,6 +12,7 @@ import (
 
  "github.com/docklantern/docklantern/internal/auth"
  "github.com/docklantern/docklantern/internal/layout"
+ "github.com/docklantern/docklantern/internal/presentation"
  "github.com/docklantern/docklantern/internal/poc"
  "github.com/docklantern/docklantern/internal/store"
 )
@@ -274,9 +275,17 @@ type eventPageData struct{
  Search string
  NextBefore int64
 }
-var eventsHTML=template.Must(layout.WithShell(template.Must(template.New("events").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Events · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body>{{template "shell-start" .}}<header class="topbar"><div><p class="eyebrow">MONITORING HISTORY</p><h1>Events</h1><p class="muted">Digest movement does not confirm a newer release.</p></div><a class="text-action" href="/settings">← Settings</a></header>
+var eventsHTML=template.Must(layout.WithShell(template.Must(template.New("events").Funcs(template.FuncMap{"eventKind":presentation.EventKind,"eventScope":presentation.EventScope,"eventDelivery":presentation.EventDelivery,"shortDigest":presentation.ShortDigest}).Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Events · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body>{{template "shell-start" .}}<header class="topbar"><div><p class="eyebrow">MONITORING HISTORY</p><h1>Events</h1><p class="muted">Digest movement does not confirm a newer release.</p></div><a class="text-action" href="/settings">← Settings</a></header>
 <section class="section panel settings-panel"><form method="get" action="/events"><label>Event type<select name="kind"><option value="">All types</option><option value="remote_digest_changed" {{if eq .Kind "remote_digest_changed"}}selected{{end}}>Digest changed</option><option value="registry_failure" {{if eq .Kind "registry_failure"}}selected{{end}}>Registry failure</option><option value="registry_recovered" {{if eq .Kind "registry_recovered"}}selected{{end}}>Recovered</option><option value="registry_outage_prolonged" {{if eq .Kind "registry_outage_prolonged"}}selected{{end}}>Prolonged outage</option></select></label><label>Delivery status<select name="delivery"><option value="">All</option><option value="pending" {{if eq .DeliveryState "pending"}}selected{{end}}>Pending</option><option value="delivered" {{if eq .DeliveryState "delivered"}}selected{{end}}>Delivered</option></select></label><label>Search project, service or image<input name="search" maxlength="128" value="{{.Search}}"></label><button type="submit">Apply filters</button></form></section>
-<section class="section panel table-scroll"><table><thead><tr><th>ID</th><th>UTC time</th><th>Type</th><th>Project / service</th><th>Image</th><th>Delivery</th></tr></thead><tbody>{{range .Events}}<tr><td>{{.ID}}</td><td>{{.OccurredAt}}</td><td>{{.Kind}}</td><td>{{.Project}} / {{.Service}}</td><td class="mono">{{.Image}}</td><td>{{.DeliveryState}} ({{.DeliveryAttempts}})</td></tr>{{else}}<tr><td colspan="6" class="table-empty">No events match these filters.</td></tr>{{end}}</tbody></table></section>
+<p class="helper">Registry digest-change events are image/platform scoped and can affect multiple services. Webhook delivery is separate from registry monitoring: pending with zero attempts may mean no notifier is configured.</p>
+<section class="section panel table-scroll"><table><thead><tr><th>ID</th><th>UTC time</th><th>Observation</th><th>Scope</th><th>Image / manifest evidence</th><th>Webhook delivery</th></tr></thead><tbody>
+{{range .Events}}<tr><td>{{.ID}}</td><td>{{.OccurredAt}}</td><td><strong>{{eventKind .Kind}}</strong></td>
+<td>{{eventScope .}}</td><td class="mono image-col">{{.Image}}<small class="subtext">{{.Platform}}</small>
+{{if .PreviousDigest}}<small class="subtext" title="{{.PreviousDigest}}">Previous: {{shortDigest .PreviousDigest}}</small>{{end}}
+{{if .Digest}}<small class="subtext" title="{{.Digest}}">Current: {{shortDigest .Digest}}</small>{{end}}</td>
+<td>{{eventDelivery .}}</td></tr>
+{{else}}<tr><td colspan="6" class="table-empty">No events match these filters.</td></tr>{{end}}
+</tbody></table></section>
 {{if .NextBefore}}<form method="get" action="/events"><input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="delivery" value="{{.DeliveryState}}"><input type="hidden" name="search" value="{{.Search}}"><input type="hidden" name="before" value="{{.NextBefore}}"><button type="submit">Older events →</button></form>{{end}}
 <footer>No automatic Docker updates or deployments.</footer>{{template "shell-end" .}}</body></html>`))))
 func(h Handler) eventsPage(w http.ResponseWriter,r *http.Request){
