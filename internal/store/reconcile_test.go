@@ -55,7 +55,8 @@ func TestLabelOnlyAutoEnrollmentAndIdempotence(t *testing.T){
     if err:=s.FinishMonitorCheck(ctx,due[0],time.Now().UTC(),nil);err!=nil{t.Fatal(err)}
     policies,_=s.MonitorPolicies(ctx)
     prior:=policies[0]
-    doSnapshot(t,s,labeled,labeled) // two identical replicas
+    replica:=labeled;replica.ID="second-id";replica.Name="hello-js-web-2"
+    doSnapshot(t,s,labeled,replica) // two identical service replicas
     policies,_=s.MonitorPolicies(ctx)
     if len(policies)!=1||policies[0].NextCheckAt!=prior.NextCheckAt||policies[0].LastCheckedAt!=prior.LastCheckedAt{
         t.Fatalf("duplicate scan reset or duplicated watches: %+v; before %+v",policies,prior)
