@@ -1,4 +1,5 @@
-// Package dashboard renders the monitoring inventory as read-only server-side HTML.
+// Package dashboard renders the image-first monitoring overview using read-only
+// observations already persisted by Docker discovery and registry workers.
 package dashboard
 
 import (
@@ -19,80 +20,105 @@ import (
 var assets embed.FS
 
 var page = template.Must(layout.WithShell(template.Must(template.New("dashboard.html").Funcs(template.FuncMap{
- "short": func(s string) string { if len(s)>28 {return s[:28]+"…"};return s },
- "badge": func(s string) string { switch strings.ToLower(s) {case "running","healthy","unchanged":return "ok";case "changed","unhealthy","exited":return "warn";case "paused","first_seen","stale_inventory","stale_registry","unknown","not_checked":return "muted";default:return "neutral"} },
- "when": func(s string) string {if s==""{return "Not yet"};t,e:=time.Parse(time.RFC3339,s);if e!=nil{return s};return t.UTC().Format("2006-01-02 15:04 UTC")},
+ "badge":func(s string)string{
+  switch strings.ToLower(s){
+  case "current","unchanged","ok":return "ok"
+  case "changed","different","mixed","check_failed","error","registry_failure","registry_outage_prolonged","remote_digest_changed":return "warn"
+  default:return "muted"
+  }
+ },
+ "when":func(s string)string{
+  if s==""{return "Not recorded"}
+  t,err:=time.Parse(time.RFC3339Nano,s)
+  if err!=nil{return "Unknown"}
+  return t.UTC().Format("2006-01-02 15:04 UTC")
+ },
+ "imageURL":func(s string)string{return "/images/"+s},
  "eventKind":presentation.EventKind,
  "eventScope":presentation.EventScope,
- "eventDelivery":presentation.EventDelivery,
 }).ParseFS(assets,"assets/dashboard.html"))))
 
-type Reader interface {
+// Reader intentionally retains the existing API-facing interface. Additional
+// methods are optional for test doubles and older API readers, while Store
+// supplies full persisted change history, activity and operations data.
+type Reader interface{
  Projects(context.Context)([]store.Registration,error)
  Containers(context.Context)([]store.Container,error)
  RegistryChecks(context.Context)([]store.RegistryCheck,error)
  MonitorPolicies(context.Context)([]store.MonitorPolicy,error)
 }
 
+type activityRow struct {
+ Event store.Event
+ ImageID string
+}
+
 type view struct {
  ActivePage string
  MainClass string
- Projects []project
- Unregistered []store.Container
- Events []store.Event
+ Metrics presentation.ImageOverviewMetrics
+ Review []presentation.ImageReview
+ TotalReview int
+ Activity []activityRow
  Workers []store.WorkerStatus
- Checks []store.RegistryCheck
- Policies []store.MonitorPolicy
- Assessments []updates.Assessment
- Services []serviceRow
- ProjectCount int
- ContainerCount int
- RunningCount int
- MonitoredCount int
- ChangedCount int
- CheckedAt string
+ EventHistoryAvailable bool
 }
-type project struct {
- Registration store.Registration
- Containers []store.Container
- Policies []store.MonitorPolicy
-}
+
 func collect(ctx context.Context,s Reader)(view,error){
- registrations,e:=s.Projects(ctx);if e!=nil{return view{},e}
- containers,e:=s.Containers(ctx);if e!=nil{return view{},e}
- checks,e:=s.RegistryChecks(ctx);if e!=nil{return view{},e}
- policies,e:=s.MonitorPolicies(ctx);if e!=nil{return view{},e}
- var events []store.Event
+ registrations,err:=s.Projects(ctx)
+ if err!=nil{return view{},err}
+ containers,err:=s.Containers(ctx)
+ if err!=nil{return view{},err}
+ checks,err:=s.RegistryChecks(ctx)
+ if err!=nil{return view{},err}
+ policies,err:=s.MonitorPolicies(ctx)
+ if err!=nil{return view{},err}
+ changes:=[]store.Event{}
+ changeHistoryAvailable:=false
+ if reader,ok:=s.(interface{LatestImageChangeEvents(context.Context)([]store.Event,error)});ok{
+  changes,err=reader.LatestImageChangeEvents(ctx)
+  if err!=nil{return view{},err}
+  changeHistoryAvailable=true
+ }
+ now:=time.Now().UTC()
+ assessments:=updates.AssessMonitoredFresh(registrations,containers,policies,checks,now)
+ images:=presentation.BuildImageSummaries(policies,checks,assessments,changes,now)
+ metrics,review,total:=presentation.BuildImageOverview(images,now,8)
+ v:=view{ActivePage:"overview",Metrics:metrics,Review:review,TotalReview:total,EventHistoryAvailable:changeHistoryAvailable}
+
+ // Event feed is intentionally bounded and contains no repeated unchanged
+ // polls. Image-scoped events do not acquire an arbitrary project/service.
+ byImage:=make(map[presentation.ImageIdentity]string,len(images))
+ for _,image:=range images{
+  byImage[presentation.ImageIdentity{Reference:image.Reference,Platform:image.Platform}]=image.ID
+ }
  if reader,ok:=s.(interface{Events(context.Context,int)([]store.Event,error)});ok{
-  events,e=reader.Events(ctx,50);if e!=nil{return view{},e}
+  events,e:=reader.Events(ctx,20)
+  if e!=nil{return view{},e}
+  for _,event:=range events{
+   switch event.Kind{
+   case "remote_digest_changed","registry_failure","registry_recovered","registry_outage_prolonged":
+   default:continue
+   }
+   v.Activity=append(v.Activity,activityRow{
+    Event:event,ImageID:byImage[presentation.ImageIdentity{Reference:event.Image,Platform:event.Platform}],
+   })
+   if len(v.Activity)==6{break}
+  }
  }
- var workers []store.WorkerStatus
  if reader,ok:=s.(interface{WorkerStatuses(context.Context)([]store.WorkerStatus,error)});ok{
-  workers,e=reader.WorkerStatuses(ctx);if e!=nil{return view{},e}
+  workers,e:=reader.WorkerStatuses(ctx)
+  if e!=nil{return view{},e}
+  if len(workers)>3{workers=workers[:3]}
+  v.Workers=workers
  }
- assessments:=updates.AssessMonitoredFresh(registrations,containers,policies,checks,time.Now().UTC())
- v:=view{ActivePage:"overview",Workers:workers,Events:events,Checks:checks,Policies:policies,Assessments:assessments,ContainerCount:len(containers),MonitoredCount:len(policies)}
- if reader,ok:=s.(interface{MonitorServiceViews(context.Context)([]store.MonitorServiceView,error)});ok{
-  serviceSettings,err:=reader.MonitorServiceViews(ctx);if err!=nil{return view{},err}
-  v.Services=buildServiceRows(serviceSettings,containers,policies,checks,assessments)
- }
- idx:=make(map[string]int,len(registrations))
- for _,r:=range registrations{idx[r.Name]=len(v.Projects);v.Projects=append(v.Projects,project{Registration:r})}
- for _,c:=range containers{
-  if c.State=="running"{v.RunningCount++}
-  if i,ok:=idx[c.Project];ok {v.Projects[i].Containers=append(v.Projects[i].Containers,c)}else{v.Unregistered=append(v.Unregistered,c)}
- }
- for _,p:=range policies{if i,ok:=idx[p.Project];ok{v.Projects[i].Policies=append(v.Projects[i].Policies,p)}}
- projectsSeen:=make(map[string]bool)
- for _,p:=range registrations{projectsSeen[p.Name]=true}
- for _,c:=range containers{if c.Project!=""{projectsSeen[c.Project]=true}}
- v.ProjectCount=len(projectsSeen)
- for _,c:=range checks{if c.Status=="changed"{v.ChangedCount++}}
  return v,nil
 }
-func Handler(s Reader) http.Handler{
+
+func Handler(s Reader)http.Handler{
  mux:=http.NewServeMux()
- css,e:=assets.ReadFile("assets/dashboard.css");if e!=nil{panic(e)}
+ css,err:=assets.ReadFile("assets/dashboard.css")
+ if err!=nil{panic(err)}
  mux.HandleFunc("GET /assets/dashboard.css",func(w http.ResponseWriter,r *http.Request){
   w.Header().Set("Content-Type","text/css; charset=utf-8")
   w.Header().Set("Cache-Control","public, max-age=3600")
@@ -101,13 +127,14 @@ func Handler(s Reader) http.Handler{
  })
  mux.HandleFunc("GET /",func(w http.ResponseWriter,r *http.Request){
   if r.URL.Path!="/"{http.NotFound(w,r);return}
-  v,e:=collect(r.Context(),s);if e!=nil{http.Error(w,"Dashboard unavailable",http.StatusInternalServerError);return}
+  v,err:=collect(r.Context(),s)
+  if err!=nil{http.Error(w,"Dashboard unavailable",http.StatusInternalServerError);return}
   w.Header().Set("Content-Type","text/html; charset=utf-8")
   w.Header().Set("Cache-Control","no-store")
   w.Header().Set("X-Content-Type-Options","nosniff")
   w.Header().Set("Referrer-Policy","no-referrer")
   w.Header().Set("Content-Security-Policy","default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
-  if e=page.ExecuteTemplate(w,"dashboard.html",v);e!=nil{return}
+  _=page.ExecuteTemplate(w,"dashboard.html",v)
  })
  return mux
 }
