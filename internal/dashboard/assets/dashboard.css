@@ -113,3 +113,44 @@
 .overview-ops-links{display:flex;flex-wrap:wrap;gap:18px;margin-top:12px;font-size:12px}
 @media(max-width:1160px){.overview-secondary{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:650px){.overview-activity li{flex-direction:column;gap:5px}.overview-time{white-space:normal}.overview-secondary .section-head{gap:10px}}
+
+/* beta.4 Activity: date-grouped observation feed, with native details for delivery */
+.activity-quick-filters{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:14px}
+.activity-quick-filters a{display:inline-block;border:1px solid #33475f;border-radius:8px;padding:8px 12px;color:#a6bdd6;text-decoration:none;font-size:12px}
+.activity-quick-filters a[aria-current=page],.activity-quick-filters a:hover{background:#16334e;color:#8ce5ff;border-color:#28547d}
+.activity-filters{display:grid;grid-template-columns:minmax(150px,1fr) minmax(125px,1fr) minmax(190px,1.6fr) auto;gap:14px;padding:17px;align-items:end}
+.activity-filters label{display:grid;gap:6px;color:#adc3dc;font-size:12px;font-weight:650}
+.activity-filters input,.activity-filters select{min-width:0;width:100%;background:#0b1728;color:var(--text);border:1px solid #425778;border-radius:8px;padding:10px;font:inherit;font-size:12px}
+.activity-filter-actions{display:flex;align-items:center;gap:12px;white-space:nowrap}
+.activity-filter-actions button,.activity-pagination button{border:1px solid #4ab6e2;background:#167fc1;border-radius:8px;padding:10px 14px;color:white;font:inherit;font-weight:700;cursor:pointer}
+.activity-day{margin:0 0 25px}
+.activity-day h3{font-size:12px;letter-spacing:.35px;color:#9eb7d0;margin:0 0 12px}
+.activity-feed{list-style:none;padding:0;margin:0;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden}
+.activity-entry{padding:16px 18px;display:grid;grid-template-columns:150px minmax(0,1fr) 95px;gap:15px;border-bottom:1px solid var(--border);align-items:start}
+.activity-entry:last-child{border-bottom:none}
+.activity-entry-icon .pill{white-space:normal}
+.activity-entry-main{min-width:0;overflow-wrap:anywhere}
+.activity-entry-main strong{font-size:12px}
+.activity-entry-main a{color:#9fe1ff;text-decoration:none}
+.activity-entry-main a:hover{text-decoration:underline}
+.activity-entry-main .subtext{margin:4px 0 0}
+.activity-entry-time{white-space:nowrap;text-align:right;color:#94a9c1;font-size:11px}
+.activity-evidence{display:flex;gap:8px 18px;flex-wrap:wrap;font-size:11px;color:#a4bbd1;margin-top:10px}
+.activity-evidence code{overflow-wrap:anywhere}
+.activity-delivery{margin-top:10px;color:#8faac6;font-size:11px}
+.activity-delivery summary{font-weight:600;cursor:pointer;color:#9ed6ee}
+.activity-delivery p{margin:6px 0;overflow-wrap:anywhere}
+.activity-pagination{display:flex;justify-content:flex-end;margin-bottom:22px}
+@media(max-width:1120px){.activity-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.activity-filter-actions{grid-column:1/-1}}
+@media(max-width:700px){.activity-filters{grid-template-columns:minmax(0,1fr)}.activity-filter-actions{grid-column:auto}.activity-entry{grid-template-columns:minmax(0,1fr);gap:8px}.activity-entry-time{text-align:left}}
+/* beta.4 Settings: first-class global controls, with preserved legacy details */
+.settings-advanced{margin:0 0 30px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:0 17px 17px}
+.settings-advanced>summary,.settings-subsection>summary{cursor:pointer;padding:18px 5px;font-size:15px;font-weight:750;color:#d7e9fa}
+.settings-advanced>summary:focus-visible,.settings-subsection>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.settings-advanced>.settings-panel{margin:13px 0}
+.settings-advanced>.helper{margin:0 0 12px}
+.settings-subsection{margin:0 0 15px;border:1px solid var(--border);border-radius:10px;padding:0 10px}
+.settings-subsection>.settings-panel{margin:8px 0 15px}
+.settings-danger-zone{margin-top:18px;border-top:1px solid var(--border);padding-top:13px}
+.settings-danger-zone h3{margin-bottom:5px}
+.settings-panel a{color:#9fe1ff}
