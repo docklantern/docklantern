@@ -86,3 +86,30 @@
 .service-actions button,.service-interval-controls button{min-height:40px}
 @media(max-width:950px){.service-filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.service-filter-actions{grid-column:1/-1}}
 @media(max-width:650px){.service-filters{grid-template-columns:minmax(0,1fr)}.service-filter-actions{grid-column:auto}.service-project summary{padding:13px}.service-interval-controls input{width:100%}.service-interval-controls button{width:100%}.service-actions form,.service-actions button{width:100%}}
+
+/* beta.4: image-first Overview, built on the existing dark navy/blue palette */
+.overview-stats{margin:0 0 33px}
+.overview-stats .stat-card strong{font-variant-numeric:tabular-nums}
+.overview-table{min-width:790px}
+.overview-table .image-ref{max-width:370px}
+.overview-table td:nth-child(2){max-width:250px}
+.overview-more{margin:12px 0 0;text-align:right}
+.overview-more a,.overview-ops-links a,.overview-activity a{color:#9fe1ff;text-decoration:none}
+.overview-more a:hover,.overview-ops-links a:hover,.overview-activity a:hover{text-decoration:underline}
+.overview-secondary{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:23px;align-items:start}
+.overview-secondary .section{min-width:0}
+.overview-secondary .section-head{flex-wrap:wrap;align-items:start}
+.overview-activity,.overview-workers{margin:0;padding:0;list-style:none}
+.overview-activity li,.overview-workers li{display:flex;justify-content:space-between;align-items:start;gap:18px;padding:15px 18px;border-bottom:1px solid var(--border)}
+.overview-activity li:last-child,.overview-workers li:last-child{border-bottom:0}
+.overview-activity li>div,.overview-workers li>div{min-width:0}
+.overview-activity li strong,.overview-workers li strong{font-size:12px;display:block}
+.overview-activity-image{display:block;overflow-wrap:anywhere;margin-top:5px;color:#afcde7}
+.overview-activity-image a{overflow-wrap:anywhere}
+.overview-time{font-size:10px;white-space:nowrap;color:#849eb8;flex-shrink:0}
+.overview-workers li{align-items:center}
+.overview-workers .subtext{font-size:10px}
+.overview-no-events{color:#9aafc6;font-size:12px}
+.overview-ops-links{display:flex;flex-wrap:wrap;gap:18px;margin-top:12px;font-size:12px}
+@media(max-width:1160px){.overview-secondary{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:650px){.overview-activity li{flex-direction:column;gap:5px}.overview-time{white-space:normal}.overview-secondary .section-head{gap:10px}}
