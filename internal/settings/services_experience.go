@@ -8,7 +8,6 @@ import (
  "strings"
 
  "github.com/docklantern/docklantern/internal/presentation"
- "github.com/docklantern/docklantern/internal/updates"
 )
 
 type serviceFilters struct {
