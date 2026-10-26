@@ -1,10 +1,10 @@
 # Beta.3 SQLite schema upgrade (implementation phase #31)
 
-**Status:** Schema foundation for beta.3. This is **not yet** the label-enrollment implementation. The deployed beta.2 app remains unchanged until a later, explicitly authorized beta.3 rollout.
+**Status:** Beta.3 upgrade guide for a future approved release. The current deployment repository remains pinned to beta.2 until a beta.3 image is reviewed and published. No live host has been upgraded by this documentation.
 
 ## What changes
 
-Opening a beta.2 SQLite database (schema `PRAGMA user_version = 0`) upgrades it to **schema version 1** inside a single transaction. A failed schema migration rolls back; an unsupported newer schema is rejected. Opening a version-1 database again is idempotent.
+Opening a beta.2 SQLite database (schema `PRAGMA user_version = 0`) upgrades it through versions 1 and 2 to **schema version 3** inside a single transaction. A failed schema migration rolls back; an unsupported newer schema is rejected. Reopening a version-3 database is idempotent. Databases already on intermediate beta.3 development schema versions are upgraded to version 3.
 
 Existing `registrations`, `monitor_policies`, `inventory`, `registry_checks`, `monitor_events`, `notification_settings`, and worker status remain intact. Previous legacy column upgrades (inventory image metadata and monitoring failure counter) are retained.
 
@@ -15,7 +15,7 @@ New tables:
 
 **Every pre-existing beta.2 monitoring policy** is tagged `legacy_enrolled=1` during the one-time migration. This does **not** grant any new deployment capability. The code that saves a manual monitoring policy also maintains its provenance in the same SQLite transaction.
 
-Schema version 1 intentionally **does not** start scanning labels, enroll discovered services, or change current registry check scheduling; those are subsequent beta.3 issues [#29](https://github.com/docklantern/docklantern/issues/29) and [#30](https://github.com/docklantern/docklantern/issues/30).
+The version-2 migration removes the legacy monitoring-policy foreign key to source registrations so a label-only service can be monitored independently. Version 3 adds a policy generation counter (protecting in-flight checks from superseding GUI changes) and saves the original manual monitoring interval for reset. Existing monitoring history is preserved; versioned migrations alone do not start deployment actions.
 
 ## Before any real-host upgrade
 
@@ -27,9 +27,9 @@ Schema version 1 intentionally **does not** start scanning labels, enroll discov
 
 ## Rollback and recovery
 
-**Do not assume the older beta.2 binary can safely open schema version 1.** If reverting, stop DockLantern, verify the pre-upgrade backup, and restore the **entire pre-upgrade SQLite state** per the [deployment operations guide](https://github.com/docklantern/docklantern-deploy/blob/main/docs/operations.md#restore-from-a-known-good-sqlite-backup). Move the old `.db`, `-wal`, and `-shm` aside before restoring; never mix a restored DB with stale journals. Start a *single* process, verify health and all history.
+**Do not assume the older beta.2 binary can safely open schema version 3.** If reverting, stop DockLantern, verify the pre-upgrade backup, and restore the **entire pre-upgrade SQLite state** per the [deployment operations guide](https://github.com/docklantern/docklantern-deploy/blob/main/docs/operations.md#restore-from-a-known-good-sqlite-backup). Move the old `.db`, `-wal`, and `-shm` aside before restoring; never mix a restored DB with stale journals. Start a *single* process, verify health and all history.
 
-A fresh installation has no legacy monitoring policies and receives the default 300-second configuration. It does not enroll any new service until the subsequent label/GUI feature ships. This upgrade never pulls an image or restarts a monitored container.
+A fresh installation has no legacy monitoring policies and receives the default 300-second configuration. It does not enroll any new service until Docker discovery observes an explicit opt-in label or an operator enables a discovered service through the authenticated GUI. This upgrade never pulls an image or restarts a monitored container.
 
 ## Validation
 
@@ -42,4 +42,4 @@ Unit tests construct a real version-zero beta.2 fixture with registrations for t
 - A damaged/incompatible schema rolls back without incrementing `user_version` or losing any pre-existing records.
 - A database written by a newer application version fails closed rather than silently downgrading.
 
-**No real host changes are performed as part of Issue #31.**
+**A real-host upgrade remains a separate operator-approved action.** The disposable beta.3 release tests run only in isolated CI Docker environments. Never rely on an older beta binary to downgrade a migrated database.
