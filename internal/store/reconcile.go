@@ -149,7 +149,7 @@ func (s *Store) reconcileMonitors(ctx context.Context,tx *sql.Tx,items []Contain
         nextAt:=next
         if image!=desired.image||platform!=desired.platform||failures==0 {nextAt=stamp}
         _,err=tx.ExecContext(ctx,`UPDATE monitor_policies SET
-          image=?,platform=?,interval_seconds=?,next_check_at=?,
+          image=?,platform=?,interval_seconds=?,next_check_at=?,generation=generation+1,
           last_checked_at=CASE WHEN image!=? OR platform!=? THEN '' ELSE last_checked_at END,
           last_error=CASE WHEN image!=? OR platform!=? THEN '' ELSE last_error END,
           consecutive_failures=CASE WHEN image!=? OR platform!=? THEN 0 ELSE consecutive_failures END

@@ -47,6 +47,19 @@ func Handler(s Reader)http.Handler{
  })
  mux.HandleFunc("GET /api/v1/registry-checks",func(w http.ResponseWriter,r *http.Request){v,e:=s.RegistryChecks(r.Context());respond(w,v,e)})
  mux.HandleFunc("GET /api/v1/monitor-policies",func(w http.ResponseWriter,r *http.Request){v,e:=s.MonitorPolicies(r.Context());respond(w,v,e)})
+ mux.HandleFunc("GET /api/v1/monitoring/settings",func(w http.ResponseWriter,r *http.Request){
+  reader,ok:=s.(interface{
+   MonitorServiceViews(context.Context)([]store.MonitorServiceView,error)
+   DefaultMonitorInterval(context.Context)(int,error)
+  })
+  if !ok{http.Error(w,"monitoring settings unavailable",http.StatusNotImplemented);return}
+  seconds,err:=reader.DefaultMonitorInterval(r.Context());if err!=nil{respond(w,nil,err);return}
+  services,err:=reader.MonitorServiceViews(r.Context());if err!=nil{respond(w,nil,err);return}
+  respond(w,struct{
+   DefaultIntervalSeconds int `json:"default_interval_seconds"`
+   Services []store.MonitorServiceView `json:"services"`
+  }{seconds,services},nil)
+ })
  mux.HandleFunc("GET /api/v1/image-assessments",func(w http.ResponseWriter,r *http.Request){
   ctx:=r.Context();projects,e:=s.Projects(ctx);if e!=nil{respond(w,nil,e);return}
   containers,e:=s.Containers(ctx);if e!=nil{respond(w,nil,e);return}
