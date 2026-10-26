@@ -1,6 +1,6 @@
 # DockLantern v0.1.0-beta.3 — Implementation Plan
 
-**Status:** Approved product scope; implementation not started  
+**Status:** Feature implementation merged; automated release validation in progress. Release image and VPS deployment still require explicit approval.  
 **Date:** 2026-10-25  
 **Release theme:** Zero-touch monitoring onboarding and a consistent, service-focused dashboard  
 **Release posture:** **Monitoring-only**; no Docker pulls, updates, deployment authorization, or container restarts initiated by DockLantern.
@@ -103,4 +103,4 @@ A beta.3 release is **not ready** until [#34](https://github.com/docklantern/doc
 
 ## Implementation handoff
 
-Start with #28 (independent layout) or #31 (migration/schema foundation). Use feature branches/PRs, review test evidence per step and **do not deploy** until explicit approval. Update the ADR and this plan only when an intentional architectural decision changes.
+The beta.3 implementation PRs for #28, #31, #29, #30, #32/#26, and #33 have merged. Issue #34 tracks the remaining release gates; see [release checklist](../deployment/beta3-release-checklist.md). Do not tag/publish an image or deploy to a live host without explicit approval and a consistent SQLite backup. Update the ADR and this plan only when an intentional architectural decision changes.
