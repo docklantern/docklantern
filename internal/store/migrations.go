@@ -9,7 +9,7 @@ import (
 
 // schemaVersion is deliberately separate from the SQLite application_id.
 // beta.2 databases had user_version=0 and previously used ad-hoc column checks.
-const schemaVersion = 2
+const schemaVersion = 3
 
 // initializeSchema performs the entire schema upgrade within one SQLite
 // transaction. A failed upgrade leaves the old tables/version untouched.
@@ -102,11 +102,23 @@ func initializeSchema(ctx context.Context, db *sql.DB) error {
         }
     }
 
+    if version < 3 {
+        // Preserve the original interval of manually registered beta.2
+        // policies so an administrator can reset a temporary GUI override.
+        if err := addColumnIfMissing(ctx,tx,"monitor_service_settings","legacy_interval_seconds",
+            "INTEGER CHECK(legacy_interval_seconds BETWEEN 60 AND 86400)"); err!=nil{return err}
+        if _,err:=tx.ExecContext(ctx,`UPDATE monitor_service_settings
+            SET legacy_interval_seconds=(SELECT interval_seconds FROM monitor_policies p
+                WHERE p.project=monitor_service_settings.project AND p.service=monitor_service_settings.service)
+            WHERE legacy_enrolled=1 AND legacy_interval_seconds IS NULL`);err!=nil{return err}
+        if _,err:=tx.ExecContext(ctx,"PRAGMA user_version=3");err!=nil{return err}
+    }
+
     // user_version alone does not prove a complete/correct migration if
     // someone copied or modified a database externally. Fail closed.
     for table, expected := range map[string][]string{
         "monitoring_defaults": {"id", "interval_seconds"},
-        "monitor_service_settings": {"project", "service", "legacy_enrolled", "gui_enrolled", "label_opt_in", "label_interval_seconds", "gui_interval_seconds", "discovery_state", "last_seen_at", "validation_error"},
+        "monitor_service_settings": {"project", "service", "legacy_enrolled", "gui_enrolled", "label_opt_in", "label_interval_seconds", "gui_interval_seconds", "discovery_state", "last_seen_at", "validation_error", "legacy_interval_seconds"},
     } {
         actual, err := tableColumns(ctx, tx, table)
         if err != nil {
