@@ -2,6 +2,7 @@ package settings
 
 import (
  "net/http"
+ "net/url"
  "strings"
 )
 
@@ -48,5 +49,12 @@ func(h Handler) saveServiceSettings(w http.ResponseWriter,r *http.Request){
   // Do not expose database errors, Docker metadata or host paths in HTTP.
   http.Error(w,"Monitoring settings could not be applied",http.StatusBadRequest);return
  }
- http.Redirect(w,r,"/settings?saved=service#service-monitoring",http.StatusSeeOther)
+ // The optional destination is an exact same-service route, never an arbitrary URL.
+ // Missing/forged destinations retain the existing Settings behavior.
+ target:="/settings?saved=service#service-monitoring"
+ if requested:=r.PostFormValue("return_to"); requested!="" {
+  expected:="/services/"+url.PathEscape(project)+"/"+url.PathEscape(service)
+  if requested==expected{target=expected+"?saved=service#monitoring-controls"}
+ }
+ http.Redirect(w,r,target,http.StatusSeeOther)
 }
