@@ -6,7 +6,6 @@ import (
     "errors"
     "fmt"
     "sort"
-    "strings"
     "time"
 
     "github.com/docklantern/docklantern/internal/registry"
@@ -170,11 +169,3 @@ func (s *Store) reconcileMonitors(ctx context.Context,tx *sql.Tx,items []Contain
     return nil
 }
 
-// ServiceMonitored is used by DueMonitorPolicies. Legacy manual watches keep
-// working without labels unless the operator explicitly sets monitor=false.
-// Missing/invalid label-managed services cannot schedule further checks.
-func activeMonitorClause() string {
-    return strings.Join([]string{
-        "COALESCE(m.legacy_enrolled,0)=1 OR COALESCE(m.gui_enrolled,0)=1 OR m.label_opt_in=1",
-    },"")
-}
