@@ -26,6 +26,12 @@ type Backend interface {
  SetNotificationSettings(context.Context,store.NotificationSettings)error
  PruneDeliveredEvents(context.Context,time.Time)(int64,error)
  FilterEvents(context.Context,store.EventFilter)([]store.Event,error)
+ DefaultMonitorInterval(context.Context)(int,error)
+ SetDefaultMonitorInterval(context.Context,int)error
+ MonitorServiceViews(context.Context)([]store.MonitorServiceView,error)
+ SetServiceIntervalOverride(context.Context,string,string,*int)error
+ SetServiceGUIEnrollment(context.Context,string,string,bool)error
+ SetServicePaused(context.Context,string,string,bool)error
 }
 type Handler struct {
  Backend Backend
@@ -38,6 +44,8 @@ type pageData struct {
  CSRF string
  Projects []store.Registration
  Policies []store.MonitorPolicy
+ Services []store.MonitorServiceView
+ DefaultInterval int
  Notice string
  Notifications store.NotificationSettings
  Discovered []store.Container
@@ -47,9 +55,76 @@ type pageData struct {
 }
 var tmpl=template.Must(layout.WithShell(template.Must(template.New("settings").Parse(pageHTML))))
 const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Settings · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head>
-<body>{{template "shell-start" .}}<header class="topbar"><div><p class="eyebrow">DOCKER COMPOSE / ADMINISTRATION</p><h1>Monitoring settings</h1><p class="muted">Register Compose projects and configure read-only registry checks.</p></div><a class="text-action" href="/">← Overview</a></header>
+<body>{{template "shell-start" .}}<header class="topbar"><div><p class="eyebrow">DOCKER COMPOSE / ADMINISTRATION</p><h1>Monitoring settings</h1><p class="muted">Manage opt-in services, schedules and read-only registry checks.</p></div><a class="text-action" href="/">← Overview</a></header>
 {{if .Notice}}<p role="status" class="notice">{{.Notice}}</p>{{end}}
-<section class="section panel settings-panel"><h2>Discovered services</h2><p class="muted">Choose a discovered service to prefill registration and monitoring fields. You must still supply and validate your original Compose project directory and files; selecting a service does not enroll or enable updates.</p>
+<section class="section panel settings-panel" id="monitoring-defaults">
+<h2>Monitoring defaults</h2>
+<p class="muted">New label- or GUI-enrolled services inherit this interval unless they have a Docker interval label or GUI override. Changes apply to inheriting watches without restarting a container.</p>
+<form method="post" action="/settings/monitoring/default">
+<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+<label>Default check interval (seconds, 60–86400)
+<input type="number" name="interval_seconds" min="60" max="86400" value="{{.DefaultInterval}}" required></label>
+<button type="submit">Save global default</button>
+</form></section>
+<section class="section panel settings-panel" id="service-monitoring">
+<h2>Service monitoring</h2>
+<p class="muted">Opt in an unlabeled discovered service, or override its interval. Effective setting priority: GUI override → Docker label → global default. Original Compose project registration is not required for monitoring.</p>
+{{range .Services}}
+<div class="service-control">
+<div class="service-control-head">
+<div><h3>{{.Project}} / {{.Service}}</h3>
+<p class="muted">{{if .Image}}<span class="mono">{{.Image}}</span>{{else}}No validated monitoring policy{{end}}</p></div>
+<span class="pill">{{.EnrollmentSource}}</span>
+</div>
+<p class="muted">Discovery: {{.State}}{{if .ValidationError}} — {{.ValidationError}}{{end}}
+{{if .Paused}} · Paused{{end}}{{if .NextCheckAt}} · Next scheduled: {{.NextCheckAt}}{{end}}</p>
+<p><strong>Effective interval: {{.EffectiveInterval}}s</strong> ({{.IntervalSource}})
+{{if .LabelInterval}} · Docker label: {{.LabelInterval}}s{{end}}
+{{if .GUIOverride}} · GUI override: {{.GUIOverride}}s{{end}}</p>
+<div class="service-control-actions">
+{{if .CanGUIEnable}}
+<form method="post" action="/settings/monitoring/service">
+<input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+<input type="hidden" name="project" value="{{.Project}}">
+<input type="hidden" name="service" value="{{.Service}}">
+<button type="submit" name="action" value="enable">Enable in GUI</button></form>
+{{end}}
+{{if .CanGUIDisable}}
+<form method="post" action="/settings/monitoring/service">
+<input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+<input type="hidden" name="project" value="{{.Project}}">
+<input type="hidden" name="service" value="{{.Service}}">
+<button type="submit" name="action" value="disable">Disable GUI enrollment</button></form>
+{{end}}
+{{if .CanEditInterval}}
+<form method="post" action="/settings/monitoring/service">
+<input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+<input type="hidden" name="project" value="{{.Project}}">
+<input type="hidden" name="service" value="{{.Service}}">
+<label>Custom interval (seconds)
+<input type="number" name="interval_seconds" min="60" max="86400" value="{{.EffectiveInterval}}" required></label>
+<button type="submit" name="action" value="override">Save override</button>
+<button type="submit" name="action" value="reset" formnovalidate>Reset override</button>
+</form>
+{{end}}
+{{if .CanPause}}
+<form method="post" action="/settings/monitoring/service">
+<input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+<input type="hidden" name="project" value="{{.Project}}">
+<input type="hidden" name="service" value="{{.Service}}">
+<button type="submit" name="action" value="pause">Pause</button></form>
+{{end}}
+{{if .CanResume}}
+<form method="post" action="/settings/monitoring/service">
+<input type="hidden" name="csrf_token" value="{{$.CSRF}}">
+<input type="hidden" name="project" value="{{.Project}}">
+<input type="hidden" name="service" value="{{.Service}}">
+<button type="submit" name="action" value="resume">Resume</button></form>
+{{end}}
+</div></div>
+{{else}}<p class="muted">No Compose services discovered yet. Enable Docker discovery to show services here.</p>{{end}}
+</section>
+<section class="section panel settings-panel"><h2>Discovered services</h2><p class="muted">Discovered containers are also listed in the monitoring controls above. Prefill the legacy source registration form below only if you need to retain an existing manually configured project.</p>
 <div class="table-scroll"><table><thead><tr><th>Project</th><th>Service</th><th>Image</th><th>Choose</th></tr></thead><tbody>
 {{range .Discovered}}<tr><td>{{.Project}}</td><td>{{.Service}}</td><td class="mono">{{.Image}}</td><td><form method="get" action="/settings"><input type="hidden" name="project" value="{{.Project}}"><input type="hidden" name="service" value="{{.Service}}"><button type="submit">Prefill</button></form></td></tr>
 {{else}}<tr><td colspan="4" class="table-empty">No services discovered. Enable the optional discovery proxy and inventory scanning to populate this list.</td></tr>{{end}}
@@ -66,7 +141,7 @@ const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta
 <p class="muted">Retention does not run automatically. To delete old delivered events, use the separate confirmation below. Pending alerts are always preserved.</p>
 <form method="post" action="/settings/events/prune"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><label class="checkline"><input type="checkbox" name="confirm" value="yes" required> Confirm deletion of expired delivered events only</label><button type="submit">Prune delivered event history</button></form>
 <p><a class="text-action" href="/events">Browse and filter event history →</a></p></section>
-<section class="section panel settings-panel"><h2>Register project</h2><p class="muted">All paths must be absolute and inside an operator-approved source root. Registration never enables deployments.</p>
+<section class="section panel settings-panel"><h2>Legacy manual project registration</h2><p class="muted">Not required for label-based monitoring. All paths must be absolute and inside an operator-approved source root; registration never enables deployments.</p>
 <form method="post" action="/settings/projects"><input type="hidden" name="csrf_token" value="{{.CSRF}}">
 <label>Compose project name<input name="name" required maxlength="128" value="{{.SuggestedProject}}" placeholder="example"></label>
 <label>Project directory<input name="project_dir" required placeholder="/srv/apps/example"></label>
@@ -75,7 +150,7 @@ const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta
 <label>Environment files (one absolute path per line; optional)<textarea name="env_files" rows="2"></textarea></label>
 <label>Profiles (comma-separated; optional)<input name="profiles"></label>
 <button type="submit">Register for monitoring</button></form></section>
-<section class="section panel settings-panel"><h2>Configure watched service</h2><p class="muted">Only explicitly registered services are eligible. Select pause to stop registry checks.</p>
+<section class="section panel settings-panel"><h2>Legacy manual watched service</h2><p class="muted">This older form configures registered projects only. Use the service controls above for automatically discovered services.</p>
 <form method="post" action="/settings/policies"><input type="hidden" name="csrf_token" value="{{.CSRF}}">
 <label>Project<input name="project" required value="{{.SuggestedProject}}" placeholder="example"></label>
 <label>Service<input name="service" required value="{{.SuggestedService}}" placeholder="web"></label>
@@ -90,6 +165,8 @@ const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta
 
 func (h Handler) Routes(mux *http.ServeMux){
  mux.HandleFunc("GET /settings",h.index)
+ mux.HandleFunc("POST /settings/monitoring/default",h.saveDefaultInterval)
+ mux.HandleFunc("POST /settings/monitoring/service",h.saveServiceSettings)
  mux.HandleFunc("POST /settings/notifications",h.notifications)
  mux.HandleFunc("POST /settings/events/prune",h.prune)
  mux.HandleFunc("GET /events",h.eventsPage)
@@ -101,7 +178,9 @@ func (h Handler) index(w http.ResponseWriter,r *http.Request){
  policies,e:=h.Backend.MonitorPolicies(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
  discovered,e:=h.Backend.Containers(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
  settings,e:=h.Backend.NotificationSettings(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
- draft:=pageData{ActivePage:"settings",MainClass:"settings-page",CSRF:h.Guard.Token(),Projects:projects,Policies:policies,Discovered:discovered,Notifications:settings,Notice:notice(r.URL.Query().Get("saved"))}
+ defaultInterval,e:=h.Backend.DefaultMonitorInterval(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
+ services,e:=h.Backend.MonitorServiceViews(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
+ draft:=pageData{ActivePage:"settings",MainClass:"settings-page",CSRF:h.Guard.Token(),Projects:projects,Policies:policies,Services:services,DefaultInterval:defaultInterval,Discovered:discovered,Notifications:settings,Notice:notice(r.URL.Query().Get("saved"))}
  selectedProject:=r.URL.Query().Get("project")
  selectedService:=r.URL.Query().Get("service")
  for _,c:=range discovered{
@@ -119,7 +198,7 @@ func (h Handler) index(w http.ResponseWriter,r *http.Request){
  w.Header().Set("Content-Security-Policy","default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
  _=tmpl.Execute(w,draft)
 }
-func notice(code string)string{switch code{case "project":return "Project registered for monitoring.";case "policy":return "Monitoring policy saved.";case "notifications":return "Notification preferences saved.";case "pruned":return "Expired delivered events pruned.";default:return ""}}
+func notice(code string)string{switch code{case "project":return "Project registered for monitoring.";case "policy":return "Monitoring policy saved.";case "notifications":return "Notification preferences saved.";case "pruned":return "Expired delivered events pruned.";case "default":return "Default monitoring interval saved.";case "service":return "Service monitoring settings saved.";default:return ""}}
 func (h Handler) prepare(w http.ResponseWriter,r *http.Request)bool{
  if !strings.HasPrefix(r.Header.Get("Content-Type"),"application/x-www-form-urlencoded"){http.Error(w,"Form encoding required",415);return false}
  r.Body=http.MaxBytesReader(w,r.Body,32<<10)
