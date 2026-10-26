@@ -97,7 +97,7 @@ func main(){
   p,e:=s.MonitorPolicies(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(p))
  case "check-due","monitor":
   resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
-  scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20,Reporter:s}
+  scheduler:=monitor.Scheduler{Storage:s,Resolver:monitor.NewCachingResolver(resolver),PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20,Reporter:s}
   if *mode=="check-due"{n,e:=scheduler.RunOnce(ctx);if e!=nil{log.Printf("monitor checks failed: %v",e)};fmt.Printf("checked %d due policies\\n",n)}else{must(scheduler.Run(ctx))}
  case "events":
   records,e:=s.Events(ctx,100);must(e);must(json.NewEncoder(os.Stdout).Encode(records))
@@ -141,7 +141,7 @@ func main(){
   }
   if *inProcessMonitor {
    resolver:=monitor.HostScopedResolver{RegistryHost:os.Getenv("DOCKLANTERN_REGISTRY_CREDENTIAL_HOST"),Username:os.Getenv("DOCKLANTERN_REGISTRY_USERNAME"),Token:os.Getenv("DOCKLANTERN_REGISTRY_TOKEN")}
-   scheduler:=monitor.Scheduler{Storage:s,Resolver:resolver,PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20,Reporter:s}
+   scheduler:=monitor.Scheduler{Storage:s,Resolver:monitor.NewCachingResolver(resolver),PollEvery:*pollEvery,CheckTimeout:*checkTimeout,BatchSize:20,Reporter:s}
    must(s.RecordWorkerStart(ctx,"registry_monitor",time.Now().UTC()))
    maxAge:=3**pollEvery
    if maxAge<2*time.Minute{maxAge=2*time.Minute}
