@@ -103,6 +103,8 @@ func initializeSchema(ctx context.Context, db *sql.DB) error {
     }
 
     if version < 3 {
+        if err:=addColumnIfMissing(ctx,tx,"monitor_policies","generation",
+            "INTEGER NOT NULL DEFAULT 0");err!=nil{return err}
         // Preserve the original interval of manually registered beta.2
         // policies so an administrator can reset a temporary GUI override.
         if err := addColumnIfMissing(ctx,tx,"monitor_service_settings","legacy_interval_seconds",
