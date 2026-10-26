@@ -126,3 +126,40 @@ func TestBuildServiceSummariesIncludesUnmonitoredAndCapabilities(t *testing.T){
         t.Fatalf("monitored replicas/schedule/capabilities incorrect: %+v",got[2])
     }
 }
+
+
+func TestRegistryFreshnessRespectsMonitorIntervals(t *testing.T){
+ now:=time.Date(2026,10,26,20,0,0,0,time.UTC)
+ image:="ghcr.io/example/long-poll:latest"
+ identity:=ImageIdentity{Reference:image,Platform:"linux/amd64"}
+ check:=store.RegistryCheck{
+  Image:image,Platform:identity.Platform,Status:"unchanged",
+  CheckedAt:now.Add(-3*time.Hour).Format(time.RFC3339),
+ }
+ long:=store.MonitorPolicy{Project:"slow",Service:"web",Image:image,Platform:identity.Platform,IntervalSeconds:24*3600}
+ groups:=BuildImageSummaries([]store.MonitorPolicy{long},[]store.RegistryCheck{check},nil,nil,now)
+ if len(groups)!=1 || groups[0].RegistryStatus!="unchanged"{
+  t.Fatalf("3h-old check should be fresh under 24h polling: %+v",groups)
+ }
+ fast:=store.MonitorPolicy{Project:"fast",Service:"web",Image:image,Platform:identity.Platform,IntervalSeconds:300}
+ groups=BuildImageSummaries([]store.MonitorPolicy{long,fast},[]store.RegistryCheck{check},nil,nil,now)
+ if groups[0].RegistryStatus!="stale"{
+  t.Fatalf("fast active watcher should make 3h-old observation stale: %+v",groups)
+ }
+ fast.Paused=true
+ groups=BuildImageSummaries([]store.MonitorPolicy{long,fast},[]store.RegistryCheck{check},nil,nil,now)
+ if groups[0].RegistryStatus!="unchanged"{
+  t.Fatalf("paused fast watcher must not force premature stale state: %+v",groups)
+ }
+ checks:=[]store.RegistryCheck{check}
+ checks[0].CheckedAt=now.Add(-49*time.Hour).Format(time.RFC3339Nano)
+ groups=BuildImageSummaries([]store.MonitorPolicy{long},checks,nil,nil,now)
+ if groups[0].RegistryStatus!="stale"{
+  t.Fatalf("49h-old check must be stale for 24h policy: %+v",groups)
+ }
+ checks[0].CheckedAt=now.Add(time.Hour).Format(time.RFC3339Nano)
+ groups=BuildImageSummaries([]store.MonitorPolicy{long},checks,nil,nil,now)
+ if groups[0].RegistryStatus!="stale"{
+  t.Fatalf("future-dated registry check must not appear fresh: %+v",groups)
+ }
+}
