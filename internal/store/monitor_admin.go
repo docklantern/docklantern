@@ -28,6 +28,11 @@ type MonitorServiceView struct {
  HasPolicy bool
  Paused bool
  NextCheckAt string
+ CanGUIEnable bool
+ CanGUIDisable bool
+ CanPause bool
+ CanResume bool
+ CanEditInterval bool
 }
 
 func (s *Store) MonitorServiceViews(ctx context.Context) ([]MonitorServiceView,error) {
@@ -60,6 +65,13 @@ func (s *Store) MonitorServiceViews(ctx context.Context) ([]MonitorServiceView,e
    v.Image=p.Image;v.Platform=p.Platform;v.HasPolicy=true
    v.Paused=p.Paused;v.NextCheckAt=p.NextCheckAt
   }
+  v.CanGUIEnable=!m.LegacyEnrolled&&m.LabelOptIn==nil&&m.DiscoveryState=="present"&&!m.GUIEnrolled
+  v.CanGUIDisable=!m.LegacyEnrolled&&m.LabelOptIn==nil&&m.GUIEnrolled
+  v.CanEditInterval=v.HasPolicy || m.DiscoveryState=="present"
+  active:=(m.LabelOptIn==nil||*m.LabelOptIn)&&m.DiscoveryState!="conflict"&&
+    (m.LegacyEnrolled||(m.DiscoveryState=="present"&&(m.GUIEnrolled||(m.LabelOptIn!=nil&&*m.LabelOptIn))))
+  v.CanPause=v.HasPolicy&&!v.Paused&&active
+  v.CanResume=v.HasPolicy&&v.Paused&&active
   out=append(out,v)
  }
  return out,nil
