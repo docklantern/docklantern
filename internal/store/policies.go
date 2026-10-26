@@ -36,7 +36,8 @@ func (s *Store) SetMonitorPolicy(ctx context.Context,p MonitorPolicy) error {
  if !matched{return errors.New("service is not registered for monitoring")}
  // A new image/tag is checked immediately; existing policy is kept if only interval changes.
  p.Image=ref.Key()
- _,err=s.db.ExecContext(ctx,`INSERT INTO monitor_policies(project,service,image,platform,interval_seconds,paused,next_check_at,last_checked_at,last_error)
+ tx,err:=s.db.BeginTx(ctx,nil);if err!=nil{return err};defer tx.Rollback()
+ _,err=tx.ExecContext(ctx,`INSERT INTO monitor_policies(project,service,image,platform,interval_seconds,paused,next_check_at,last_checked_at,last_error)
  VALUES(?,?,?,?,?,?,?,?,?)
  ON CONFLICT(project,service) DO UPDATE SET
  image=excluded.image,platform=excluded.platform,interval_seconds=excluded.interval_seconds,
@@ -50,7 +51,13 @@ func (s *Store) SetMonitorPolicy(ctx context.Context,p MonitorPolicy) error {
  consecutive_failures=CASE WHEN monitor_policies.image!=excluded.image OR monitor_policies.platform!=excluded.platform
  THEN 0 ELSE monitor_policies.consecutive_failures END`,
  p.Project,p.Service,p.Image,p.Platform,p.IntervalSeconds,p.Paused,time.Now().UTC().Format(time.RFC3339),"","")
- return err
+ if err!=nil{return err}
+ // A manually saved policy is explicitly legacy-enrolled, not label-enrolled.
+ // The new metadata and old monitoring policy must commit together.
+ _,err=tx.ExecContext(ctx,`INSERT INTO monitor_service_settings(project,service,legacy_enrolled)
+ VALUES(?,?,1) ON CONFLICT(project,service) DO UPDATE SET legacy_enrolled=1`,p.Project,p.Service)
+ if err!=nil{return err}
+ return tx.Commit()
 }
 
 func (s *Store) MonitorPolicies(ctx context.Context)([]MonitorPolicy,error){
