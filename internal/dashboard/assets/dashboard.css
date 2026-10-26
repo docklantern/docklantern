@@ -19,3 +19,12 @@
 .service-control-actions input[type=number]{max-width:135px}
 .service-control-actions button{min-height:38px}
 @media(max-width:700px){.service-control-head{flex-direction:column}.service-control-actions{flex-direction:column;align-items:stretch}.settings-panel .service-control-actions form{width:100%}}
+
+/* beta.3: service-first monitoring inventory and deep links */
+#services .panel table{min-width:940px}
+#services th,#services td{vertical-align:top}
+#services td{max-width:335px;overflow-wrap:anywhere}
+#services .status-explanation{color:#d7ba8d}
+#services .service-action{display:block;margin:4px 0;font-weight:650}
+.settings-page .service-control.selected-service{border:2px solid var(--accent);background:#17334f;scroll-margin-top:24px}
+@media(max-width:700px){#services .panel table{min-width:820px}}
