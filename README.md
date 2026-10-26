@@ -2,20 +2,27 @@
 
 **Compose-first, monitoring-only Docker image visibility for VPSs and home labs.**
 
-DockLantern is a lightweight Go web application that discovers Docker Compose services through a **restricted read-only Docker socket proxy** and checks tagged OCI registry manifests for changes. The interface displays monitoring status, remote digest observations, historical events, and conservative running-image assessments.
+DockLantern is a lightweight Go web application that discovers Docker Compose services through a **restricted read-only Docker socket proxy** and checks tagged OCI registry manifests for changes. It presents registry observations, conservative deployed-image comparisons, image-scoped history, and service monitoring controls.
 
-> **Release status:** beta.3 development is in release validation; a beta.3 image has **not yet been published**. The separately managed [deployment repository](https://github.com/docklantern/docklantern-deploy) still pins `v0.1.0-beta.2` until a reviewed release is approved.
+> **Release status:** [v0.1.0-beta.3](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.3) is published. **v0.1.0-beta.4 is in release validation and is NOT yet published or deployed**. The separate [deployment repository](https://github.com/docklantern/docklantern-deploy) controls the pinned running image and requires an explicit deployment approval.
 
-## What beta.3 adds
+## Beta.4: Image-first web interface (release candidate work)
 
-- **One-label opt-in:** Add `com.docklantern.monitor: "true"` to the *target Compose service*. DockLantern automatically discovers it on the next inventory scan without adding source mounts, changing DockLantern's configuration, or registering project paths.
-- **Optional intervals:** Add `com.docklantern.interval: "10m"`, inherit the persisted global default (initially five minutes), or customize/reset the interval through the GUI. Precedence: GUI override → Docker label → global default.
-- **Monitoring controls:** Enroll an unlabeled discovered service in the GUI, pause/resume checks, and inspect where each setting came from.
-- **Consistent navigation and service status:** Shared sidebar on all pages, per-service status, read-only registry history, clear event scope, and webhook delivery status.
-- **Efficient OCI polling:** Bounded cache and credential-isolated registry rate-limit cooldowns, while preserving independent per-service schedules and backoff.
-- **Safe SQLite upgrade:** Transactional schema migrations retain beta.2 policies, registrations and event history. Back up before upgrading.
+The GUI has five primary destinations:
 
-Minimal service example:
+- **Overview:** Watched Images, Remote Changes in the last 24 hours, verified Deployment Differences, Monitoring Errors, and an Images to Review queue.
+- **Images:** Group monitored image references by canonical reference and platform; search, filter, sort, and inspect OCI registry observations separately from deployed digest assessments.
+- **Image Details:** Last successful digest evidence, recorded image-scoped changes, and links to all associated Compose services.
+- **Services and Service Details:** Compose project-grouped service inventory, discovered unmonitored services, runtime context, monitoring interval provenance, and authenticated enable/disable, pause/resume, override/reset controls.
+- **Activity and Settings:** Day-grouped, filterable event timeline with expandable webhook delivery details; global defaults, notifications, retention and Advanced / Legacy Configuration.
+
+**A remote digest movement does not establish that a newer software version is available.** Registry status and running deployment status are independent, and insufficient evidence is reported as Unknown.
+
+Beta.4 remains monitoring-only. It does not add container pulls, automatic updates, Compose execution, container restarts, or Docker write permissions.
+
+## Opt in a Compose service
+
+Add the following labels to the **target service**:
 
 ```yaml
 services:
@@ -23,40 +30,40 @@ services:
     image: example/web:latest
     labels:
       com.docklantern.monitor: "true"
-      # Optional:
+      # Optional: override the initial five-minute global default.
       com.docklantern.interval: "10m"
 ```
 
-Changed labels become visible **after recreating the target application service** using its normal Compose deployment process. Editing GUI intervals does **not** require restarting anything.
+Recreate that service using your normal Compose workflow to apply changed Docker labels. DockLantern discovers the labels on its next inventory pass. A GUI interval change does **not** restart the service.
 
-## Scope and safety
+For a discovered unlabeled service, use **Services → Service Details** to enroll it. GUI override → Compose label → global default determines the effective interval. An explicit `com.docklantern.monitor=false` prohibits GUI enrollment. Monitoring enrollment is never authorization for future deployment operations.
 
-**Monitoring only:** DockLantern does not automatically pull images, update services, run Compose or restart monitored containers. A registry digest movement **does not prove that a newer software release is available**. Docker's image configuration digest is not automatically evidence of a deployed OCI manifest digest.
+## Security and current limits
 
-The socket proxy must be private, read-only and reject mutation methods. Do not expose port 2375. Label-based monitoring does **not** confer authorization for future managed deployment; deployment features require a separate explicit executor and source validation design.
+- Use a private, read-only, GET-only Docker proxy. Never publish its Docker API port or mount a writable Docker socket in the app.
+- Run the app behind approved TLS reverse proxy authentication, origin validation and CSRF controls; do not expose the plain HTTP listener publicly.
+- Remote digest differences and stored Docker image config digests are not, by themselves, proof of an update being available.
+- The scheduler currently uses **one configured registry credential host/account per process**, not per-service registry credentials. In-memory cache keys distinguish effective credential scope, but SQLite digest baselines and image grouping are keyed only by image reference and platform. **Multiple simultaneous credential scopes for one image, or scope-aware history across credential rotation, are not supported in beta.4.** See [registry monitoring limitations](docs/operations/beta3-registry-cache.md) and [phase-7 acceptance](docs/deployment/beta4-release-checklist.md).
+- The UI is server-rendered, no JavaScript frontend framework is needed, and Docker mutations are explicitly outside beta.4.
 
-The beta deployment runs behind **an existing HTTPS reverse proxy** with HTTP Basic authentication, origin validation and CSRF protection. Do not expose plain HTTP directly.
+## Guides, development and release
 
-## Running and development
+- [Beta.4 workspace guide](docs/user-guide/beta4-workspaces.md).
+- [Beta.4 release validation checklist](docs/deployment/beta4-release-checklist.md).
+- [Beta.4 draft release notes](docs/releases/v0.1.0-beta.4.md).
+- [Label-based monitoring](docs/user-guide/beta3-label-monitoring.md) and [existing interval controls](docs/user-guide/beta3-live-monitor-settings.md).
+- [Deployment configuration](https://github.com/docklantern/docklantern-deploy) and [SQLite backup/upgrade guidance](docs/deployment/beta3-sqlite-upgrade.md).
+- [Development guide](docs/development/README.md), [roadmap](docs/product/roadmap.md), [contributing](CONTRIBUTING.md), and [security policy](SECURITY.md).
 
-- [Deployment repository](https://github.com/docklantern/docklantern-deploy): Compose configuration, Traefik integration, backup/restore, and host prerequisites.
-- [Zero-touch service enrollment](docs/user-guide/beta3-label-monitoring.md) and [live monitoring settings](docs/user-guide/beta3-live-monitor-settings.md).
-- [Service-first dashboard and events](docs/user-guide/beta3-service-status.md).
-- [Beta.3 SQLite backup/upgrade guidance](docs/deployment/beta3-sqlite-upgrade.md).
-- [Beta.3 release plan and acceptance gates](docs/product/beta3-plan.md).
-- [Development guide](docs/development/README.md), [contributing](CONTRIBUTING.md), and [security](SECURITY.md).
+Run local Go checks:
 
-To run local Go tests:
-
-```bash
+```sh
 go test -race ./...
 go vet ./...
 ```
 
-Disposable Docker integration checks require `DOCKLANTERN_INTEGRATION_TEST=1` and **must run only on a throwaway host**. The CI release gates are defined in `.github/workflows/go-poc.yaml`. **Do not execute destructive integration scripts on a production or shared VPS.**
+**Disposable Docker integration tests** require `DOCKLANTERN_INTEGRATION_TEST=1` and must only run on a throwaway host. CI checks live in `.github/workflows/go-poc.yaml`. Do not run destructive integration scripts on a shared/production Docker daemon.
 
-## Roadmap
-
-Automatic deployment, image pulls, multi-host operation and Docker event-stream discovery are **future work**, not beta.3 functionality. See the [roadmap](docs/product/roadmap.md) and [architecture decisions](docs/architecture/decisions/README.md).
+Automatic deployment, Compose source modification, multi-host management and semantic tag update policies remain future work.
 
 Project website: [docklantern.com](https://docklantern.com). Secondary domain: [docklantern.dev](https://docklantern.dev).

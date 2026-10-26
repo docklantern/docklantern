@@ -78,7 +78,7 @@ const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta
 <label class="checkline"><input type="checkbox" name="registry_recovery" value="on" {{if .Notifications.RegistryRecovery}}checked{{end}}> Registry check recovered</label>
 <label class="checkline"><input type="checkbox" name="prolonged_outage" value="on" {{if .Notifications.ProlongedOutage}}checked{{end}}> Prolonged registry outage</label>
 <label>Consecutive failures to alert (2–100)<input type="number" name="outage_failures" min="2" max="100" value="{{.Notifications.OutageFailures}}" required></label>
-<input type="hidden" name="retention_days" value="{{.Notifications.RetentionDays}}">
+
 <button type="submit">Save notification preferences</button></form>
 
 
@@ -263,13 +263,16 @@ func parseInterval(s string)(int,error){
 func(h Handler) notifications(w http.ResponseWriter,r *http.Request){
  if !h.prepare(w,r){return}
  threshold,e:=strconv.Atoi(r.PostFormValue("outage_failures"));if e!=nil{http.Error(w,"Invalid outage threshold",400);return}
- days,e:=strconv.Atoi(r.PostFormValue("retention_days"));if e!=nil{http.Error(w,"Invalid retention",400);return}
+ // Notification preference edits must not overwrite a separately saved
+ // retention period from an older browser tab. Use persisted retention.
+ current,e:=h.Backend.NotificationSettings(r.Context())
+ if e!=nil{http.Error(w,"Notification settings unavailable",http.StatusInternalServerError);return}
  pref:=store.NotificationSettings{
   DigestChanges:r.PostFormValue("digest_changes")=="on",
   RegistryFailures:r.PostFormValue("registry_failures")=="on",
   RegistryRecovery:r.PostFormValue("registry_recovery")=="on",
   ProlongedOutage:r.PostFormValue("prolonged_outage")=="on",
-  OutageFailures:threshold,RetentionDays:days,
+  OutageFailures:threshold,RetentionDays:current.RetentionDays,
  }
  if e=h.Backend.SetNotificationSettings(r.Context(),pref);e!=nil{http.Error(w,"Invalid notification settings",400);return}
  http.Redirect(w,r,"/settings?saved=notifications",http.StatusSeeOther)
