@@ -110,7 +110,7 @@ func TestBeta4ExistingSettingsAndEventsStillWork(t *testing.T){
  h,_,_,_:=setup(t)
  values:=url.Values{"project":{"example"},"service":{"web"}}
  settings:=request(h,"GET","/settings?"+values.Encode(),"",true)
- if settings.Code!=http.StatusOK || !strings.Contains(settings.Body.String(),`action="/settings/monitoring/service"`){
+ if settings.Code!=http.StatusOK || !strings.Contains(settings.Body.String(),`action="/settings/monitoring/default"`){
   t.Fatalf("monitoring settings forms not accessible: %d",settings.Code)
  }
  events:=request(h,"GET","/events?kind=remote_digest_changed","",true)
