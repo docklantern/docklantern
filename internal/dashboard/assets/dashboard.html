@@ -4,113 +4,72 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark">
-<meta name="description" content="DockLantern read-only Docker Compose monitoring overview">
+<meta name="description" content="DockLantern image-first Docker Compose monitoring overview">
 <title>Overview · DockLantern</title>
 <link rel="stylesheet" href="/assets/dashboard.css">
 </head>
 <body>
 {{template "shell-start" .}}
+<header class="topbar">
+ <div><p class="eyebrow">DOCKER COMPOSE / OVERVIEW</p><h1>Image Overview</h1>
+ <p class="muted">Review registry digest changes, verified deployment differences, and monitoring errors.</p></div>
+ <div class="top-actions"><a class="text-action" href="/images">Explore images</a><span class="readonly">MONITORING ONLY</span></div>
+</header>
 
- <header class="topbar"><div class="eyebrow">DOCKER COMPOSE / OVERVIEW</div><div class="top-actions"><a class="text-action" href="/settings">Manage monitoring</a><span class="readonly">DEPLOYMENTS DISABLED</span><a class="text-action" href="/">↻ Refresh page</a></div></header>
- <section class="hero" aria-labelledby="hero-title">
-  <div><p class="eyebrow accent">MONITOR YOUR STACKS</p><h1 id="hero-title">Container overview</h1><p class="muted">Discover Compose services, review image checks, and inspect monitoring schedules in one place.</p></div>
-  <span class="hero-glyph" aria-hidden="true">◈</span>
- </section>
- <section class="stats" aria-label="Summary">
-  <article class="stat-card"><div class="stat-label">Compose projects</div><strong>{{.ProjectCount}}</strong><span class="stat-hint">Registered or discovered</span></article>
-  <article class="stat-card"><div class="stat-label">Discovered containers</div><strong>{{.ContainerCount}}</strong><span class="stat-hint">{{.RunningCount}} currently recorded as running</span></article>
-  <article class="stat-card"><div class="stat-label">Monitoring policies</div><strong>{{.MonitoredCount}}</strong><span class="stat-hint">Including paused or inactive policies</span></article>
-  <article class="stat-card"><div class="stat-label">Remote digest changes</div><strong>{{.ChangedCount}}</strong><span class="stat-hint">Image tags with latest check marked changed; no version claim</span></article>
- </section>
- <section class="section" id="services" aria-labelledby="services-title">
-  <div class="section-head"><div><p class="eyebrow">LIVE COMPOSE INVENTORY</p><h2 id="services-title">Services and monitoring status</h2>
-  <p class="helper">One entry per Compose project/service, including all running replicas. An image digest change is not a verified newer release.</p></div>
-  <span class="helper">Read-only status · configuration in Settings</span></div>
-  <div class="panel table-scroll">
-   <table><thead><tr><th>Compose service</th><th>Containers</th><th>Monitoring</th><th>Registry &amp; image evidence</th><th>Schedule</th><th>Actions</th></tr></thead>
-   <tbody>{{range .Services}}
-    <tr>
-     <td><strong>{{.Project}} / {{.Service}}</strong>
-       <small class="subtext mono">{{.Image}}{{if .Platform}} · {{.Platform}}{{end}}</small></td>
-     <td><span class="pill {{if .RunningCount}}ok{{else}}muted{{end}}">{{.ContainerState}}</span>
-       <small class="subtext">Health: {{.ContainerHealth}}</small>
-       {{if .LastInventoryAt}}<small class="subtext">Seen: {{when .LastInventoryAt}}</small>{{end}}</td>
-     <td><strong>{{.MonitoringStatus}}</strong><small class="subtext">{{.Enrollment}}</small>
-       {{if .StatusReason}}<small class="subtext status-explanation">{{.StatusReason}}</small>{{end}}</td>
-     <td><span class="pill {{if eq .RegistryStatus "Remote digest changed"}}warn{{else}}muted{{end}}">{{.RegistryStatus}}</span>
-       {{if .RegistryCheckedAt}}<small class="subtext">Remote check: {{when .RegistryCheckedAt}}</small>{{end}}
-       <small class="subtext">Running image assessment: {{.AssessmentState}}</small>
-       {{if .AssessmentReason}}<small class="subtext">{{.AssessmentReason}}</small>{{end}}
-       {{if .LastError}}<small class="subtext error-cell">Last check error: {{.LastError}}</small>{{end}}</td>
-     <td><strong>{{.EffectiveInterval}}s</strong><small class="subtext">{{.IntervalSource}}</small>
-       <small class="subtext">Last check: {{when .LastCheckedAt}}</small>
-       <small class="subtext">Next due: {{when .NextCheckAt}}</small></td>
-     <td><a class="text-action service-action" href="{{.SettingsURL}}">Edit monitoring</a>
-       <a class="text-action service-action" href="{{.EventsURL}}">View related events</a></td>
-    </tr>
-   {{else}}<tr><td colspan="6" class="table-empty">No Compose services observed yet. Start Docker discovery, then add a monitoring label or enable a discovered service in Settings.</td></tr>{{end}}</tbody></table>
+<section class="stats overview-stats" aria-label="Image monitoring summary">
+ <article class="stat-card"><div class="stat-label">Watched Images</div><strong>{{.Metrics.WatchedImages}}</strong><span class="stat-hint">Unique registry image references and platforms</span></article>
+ <article class="stat-card"><div class="stat-label">Remote Changes · 24h</div><strong>{{.Metrics.RemoteChanges24h}}</strong><span class="stat-hint">Unique images with retained digest-change events</span></article>
+ <article class="stat-card"><div class="stat-label">Deployment Differences</div><strong>{{.Metrics.DeploymentDifferences}}</strong><span class="stat-hint">Images with at least one verified differing deployment</span></article>
+ <article class="stat-card"><div class="stat-label">Monitoring Errors</div><strong>{{.Metrics.MonitoringErrors}}</strong><span class="stat-hint">Images with a recorded failed service check</span></article>
+</section>
+
+<section class="section" id="review" aria-labelledby="review-title">
+ <div class="section-head"><div><p class="eyebrow">IMAGE LIFECYCLE</p><h2 id="review-title">Images to Review</h2>
+ <p class="helper">Failed checks, verified digest differences, recently changed digests and stale observations. These are not verified software updates.</p></div>
+ <a class="text-action" href="/images?sort=attention">View all watched images</a></div>
+ <div class="panel table-scroll">
+ <table class="overview-table"><thead><tr><th>Watched image / platform</th><th>Reason</th><th>Registry</th><th>Deployed</th><th>Services</th><th>Details</th></tr></thead><tbody>
+ {{range .Review}}<tr>
+ <td><strong class="mono image-ref">{{.Image.Reference}}</strong><small class="subtext">{{.Image.Platform}}</small></td>
+ <td>{{.Reason}}{{if .Image.LastChangeAt}}<small class="subtext">Last recorded change: {{when .Image.LastChangeAt}}</small>{{end}}</td>
+ <td><span class="pill {{badge .Image.RegistryStatus}}">{{.Image.RegistryStatus}}</span></td>
+ <td><span class="pill {{badge .Image.DeploymentStatus}}">{{.Image.DeploymentStatus}}</span></td>
+ <td>{{len .Image.Services}}</td>
+ <td><a class="text-action" href="{{imageURL .Image.ID}}">View image</a></td>
+ </tr>{{else}}<tr><td colspan="6" class="table-empty">No watched images currently meet the review criteria. <a href="/images">View all images</a> to inspect monitoring history and unknown assessments.</td></tr>{{end}}
+ </tbody></table></div>
+ {{if gt .TotalReview (len .Review)}}<p class="helper overview-more">Showing {{len .Review}} of {{.TotalReview}} images needing review. <a href="/images?sort=attention">Open Images</a> for the full inventory.</p>{{end}}
+</section>
+
+<div class="overview-secondary">
+ <section class="section" id="events" aria-labelledby="activity-title">
+  <div class="section-head"><div><p class="eyebrow">RECENT OBSERVATIONS</p><h2 id="activity-title">Recent Image Activity</h2>
+  <p class="helper">Meaningful registry changes, failures, and recoveries. Routine unchanged polls are omitted.</p></div><a class="text-action" href="/events">View all activity</a></div>
+  <div class="panel">
+  <ul class="overview-activity">
+  {{range .Activity}}<li>
+   <div><strong>{{eventKind .Event.Kind}}</strong>
+    {{if .Event.Image}}<span class="mono overview-activity-image">{{if .ImageID}}<a href="{{imageURL .ImageID}}">{{.Event.Image}}</a>{{else}}{{.Event.Image}}{{end}}{{if .Event.Platform}} · {{.Event.Platform}}{{end}}</span>{{else}}<span class="subtext">{{eventScope .Event}}</span>{{end}}
+   </div><time class="overview-time">{{when .Event.OccurredAt}}</time>
+  </li>
+  {{else}}<li class="overview-no-events">No recent meaningful registry events. <a href="/events">Browse recorded activity</a>.</li>{{end}}
+  </ul>
   </div>
  </section>
- <section class="section" id="projects">
-  <div class="section-head"><div><p class="eyebrow">OPTIONAL LEGACY REGISTRATION</p><h2>Compose projects with registered sources</h2></div><span class="helper">Original Compose source registration is not required for label-based monitoring</span></div>
-  {{if .Projects}}
-   <div class="project-grid">
-   {{range .Projects}}
-    <article class="project-card">
-     <div class="project-top"><div class="project-avatar" aria-hidden="true">▤</div><div><h3>{{.Registration.Name}}</h3><p class="path">{{.Registration.ProjectDir}}</p></div><span class="pill muted-pill">Monitoring only</span></div>
-     <div class="subhead"><strong>Discovered containers</strong><span>{{len .Containers}}</span></div>
-     {{if .Containers}}
-      <div class="table-scroll"><table><thead><tr><th>Service</th><th>Image</th><th>State</th></tr></thead><tbody>
-      {{range .Containers}}<tr><td><span class="mono strong">{{.Service}}</span><small class="subtext">{{.Name}}</small></td><td class="mono image-col" title="{{.Image}}">{{.Image}}</td><td><span class="pill {{badge .State}}">{{.State}}</span>{{if .Health}}<small class="subtext">{{.Health}}</small>{{end}}</td></tr>{{end}}
-      </tbody></table></div>
-     {{else}}<p class="empty-inline">No containers in the last inventory scan.</p>{{end}}
-     <div class="project-bottom"><span>{{len .Policies}} monitoring policies</span><span>Registered</span></div>
-    </article>
-   {{end}}
-   </div>
-  {{else}}
-   <div class="empty"><span aria-hidden="true">▤</span><h3>No registered projects yet</h3><p>Source registrations are optional for monitoring. Add com.docklantern.monitor=true to your application service or enroll a discovered service in Settings. Legacy registration remains available when needed.</p><code>docklantern-inventory -mode register -registration /path/registration.json -roots /allowed/root</code></div>
-  {{end}}
-  {{if .Unregistered}}
-   <details class="details"><summary>Discovered but not registered ({{len .Unregistered}} containers)</summary><div class="table-scroll"><table><thead><tr><th>Project</th><th>Service</th><th>Image</th><th>State</th></tr></thead><tbody>{{range .Unregistered}}<tr><td>{{.Project}}</td><td>{{.Service}}</td><td class="mono">{{.Image}}</td><td>{{.State}}</td></tr>{{end}}</tbody></table></div></details>
-  {{end}}
+ <section class="section" id="workers" aria-labelledby="operations-title">
+  <div class="section-head"><div><p class="eyebrow">MONITORING OPERATIONS</p><h2 id="operations-title">Background Checks</h2>
+  <p class="helper">Last recorded worker results, not proof a process is currently running.</p></div></div>
+  <div class="panel"><ul class="overview-workers">
+  {{range .Workers}}<li>
+   <div><strong class="mono">{{.Name}}</strong><span class="subtext">Last recorded pass: {{when .LastHeartbeatAt}}</span></div>
+   <span class="pill {{badge .State}}">{{.State}}</span>
+  </li>
+  {{else}}<li class="overview-no-events">No background worker passes recorded yet. Worker status will appear after discovery or registry monitoring runs.</li>{{end}}
+  </ul></div>
+  <div class="overview-ops-links"><a href="/services">Inspect Compose services</a><a href="/settings">Monitoring settings</a></div>
  </section>
- <section class="section" id="policies">
-  <div class="section-head"><div><p class="eyebrow">REGISTRY MONITORING</p><h2>Service schedules</h2></div><span class="helper">Managed through Docker labels, Settings, or legacy policies</span></div>
-  <div class="panel table-scroll">
-  <table><thead><tr><th>Project / service</th><th>Watched image</th><th>Interval</th><th>Status</th><th>Next check (UTC)</th><th>Last error</th></tr></thead><tbody>
-  {{range .Policies}}<tr><td><strong>{{.Project}}</strong><small class="subtext">{{.Service}}</small></td><td class="mono image-col" title="{{.Image}}">{{.Image}}<small class="subtext">{{.Platform}}</small></td><td>{{.IntervalSeconds}}s</td><td>{{if .Paused}}<span class="pill muted">Paused</span>{{else}}<span class="pill ok">Scheduled</span>{{end}}</td><td>{{when .NextCheckAt}}</td><td class="error-cell">{{if .LastError}}{{.LastError}}{{else}}—{{end}}</td></tr>
-  {{else}}<tr><td colspan="6" class="table-empty">No monitoring policies configured.</td></tr>{{end}}
-  </tbody></table></div>
- </section>
- <section class="section" id="assessments">
-  <div class="section-head"><div><p class="eyebrow">DEPLOYED IMAGE EVIDENCE</p><h2>Image status assessments</h2></div><span class="helper">Only digest identity is verified; a newer release is not inferred</span></div>
-  <div class="panel table-scroll"><table><thead><tr><th>Project / service</th><th>Watched image</th><th>Assessment</th><th>Evidence</th></tr></thead><tbody>
-  {{range .Assessments}}<tr><td>{{.Project}} / {{.Service}}</td><td class="mono image-col">{{.Image}}<small class="subtext">{{.Platform}}</small></td><td><span class="pill {{badge .State}}">{{.State}}</span></td><td>{{.Reason}}{{if .RegistryCheckedAt}}<small class="subtext">Registry: {{when .RegistryCheckedAt}}</small>{{end}}{{if .InventoryObservedAt}}<small class="subtext">Inventory: {{when .InventoryObservedAt}}</small>{{end}}{{if .DeployedDigest}}<small class="subtext">Deployed: {{short .DeployedDigest}}</small>{{end}}</td></tr>
-  {{else}}<tr><td colspan="4" class="table-empty">Configure monitoring policies to see image assessments.</td></tr>{{end}}
-  </tbody></table></div>
- </section>
- <section class="section" id="workers">
- <div class="section-head"><div><p class="eyebrow">OPERATIONS</p><h2>Background worker health</h2></div><span class="helper">Last stored pass, not a guarantee the process is currently running</span></div>
- <div class="panel table-scroll"><table><thead><tr><th>Worker</th><th>Last result</th><th>Last heartbeat</th><th>Last successful pass</th><th>Items</th></tr></thead><tbody>
- {{range .Workers}}<tr><td class="mono">{{.Name}}</td><td><span class="pill {{badge .State}}">{{.State}}</span></td><td>{{when .LastHeartbeatAt}}</td><td>{{when .LastSuccessAt}}</td><td>{{.LastItems}}</td></tr>
- {{else}}<tr><td colspan="5" class="table-empty">No worker runs recorded yet. Enable the registry scheduler, discovery scan or notifier to populate health data.</td></tr>{{end}}
- </tbody></table></div></section>
- <section class="section" id="events">
-  <div class="section-head"><div><p class="eyebrow">AUDITABLE MONITORING CHANGES</p><h2>Recent events</h2></div><a href="/events" class="text-action">Search all events →</a></div>
-  <p class="helper">Webhook delivery is independent of registry checks. Pending (0 attempts) does not mean the registry check failed; a webhook may not be configured.</p><div class="panel table-scroll"><table><thead><tr><th>Time (UTC)</th><th>Event</th><th>Scope / image</th><th>Webhook delivery</th></tr></thead><tbody>
-  {{range .Events}}<tr><td>{{when .OccurredAt}}</td><td><span class="pill {{badge .Kind}}">{{eventKind .Kind}}</span></td><td><strong>{{eventScope .}}</strong><small class="subtext mono">{{.Image}} · {{.Platform}}</small>{{if .PreviousDigest}}<small class="subtext">Previous: {{short .PreviousDigest}} → Current: {{short .Digest}}</small>{{end}}</td><td>{{eventDelivery .}}</td></tr>
-  {{else}}<tr><td colspan="4" class="table-empty">No monitoring events have been recorded yet.</td></tr>{{end}}
-  </tbody></table></div>
- </section>
- <section class="section" id="registry">
-  <div class="section-head"><div><p class="eyebrow">OCI DIGEST HISTORY</p><h2>Latest registry checks</h2></div><span class="helper">Remote tag changes ≠ verified newer releases</span></div>
-  <div class="panel table-scroll">
-  <table><thead><tr><th>Image</th><th>Platform</th><th>Remote digest</th><th>Result</th><th>Checked (UTC)</th></tr></thead><tbody>
-  {{range .Checks}}<tr><td class="mono image-col" title="{{.Image}}">{{.Image}}</td><td>{{.Platform}}</td><td class="mono" title="{{.PlatformDigest}}">{{short .PlatformDigest}}</td><td><span class="pill {{badge .Status}}">{{.Status}}</span></td><td>{{when .CheckedAt}}</td></tr>
-  {{else}}<tr><td colspan="5" class="table-empty">No successful registry checks recorded yet.</td></tr>{{end}}
-  </tbody></table></div>
- </section>
- <footer><span>DockLantern · experimental monitoring dashboard</span><span>No automatic deployments or image pulls</span></footer>
+</div>
+<footer><span>DockLantern · image monitoring preview</span><span>A remote digest change does not prove a newer version · No automatic pulls or deployments</span></footer>
 {{template "shell-end" .}}
-</body></html>
+</body>
+</html>
