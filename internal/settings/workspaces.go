@@ -5,12 +5,10 @@ import (
  "html/template"
  "net/http"
  "net/url"
- "sort"
  "time"
 
  "github.com/docklantern/docklantern/internal/layout"
  "github.com/docklantern/docklantern/internal/presentation"
- "github.com/docklantern/docklantern/internal/store"
  "github.com/docklantern/docklantern/internal/updates"
 )
 
@@ -27,6 +25,7 @@ type workspaceData struct {
  Service *presentation.ServiceSummary
  Associated []presentation.ServiceSummary
  SettingsURL string
+ Assessments []updates.Assessment
 }
 
 type serviceGroup struct {
@@ -60,6 +59,15 @@ var workspaceFuncs = template.FuncMap{
   default:return "Unknown"
   }
  },
+ "tone":func(s string)string{
+  switch s {
+  case "current","unchanged":return "ok"
+  case "different","mixed","changed","check_failed":return "warn"
+  default:return "muted"
+  }
+ },
+ "eventKind":presentation.EventKind,
+ "shortDigest":presentation.ShortDigest,
  "when":func(s string)string{
   if s==""{return "Not yet"}
   at,err:=time.Parse(time.RFC3339Nano,s)
@@ -71,29 +79,6 @@ var workspaceFuncs = template.FuncMap{
 func workspaceTemplate(name,markup string)*template.Template {
  return template.Must(layout.WithShell(template.Must(template.New(name).Funcs(workspaceFuncs).Parse(markup))))
 }
-
-var imagesTemplate=workspaceTemplate("images",`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>Images · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body>
-{{template "shell-start" .}}
-<header class="topbar"><div><p class="eyebrow">DOCKER COMPOSE / IMAGES</p><h1>Images</h1><p class="muted">Watched registry images and deployed-image evidence.</p></div><span class="readonly">MONITORING ONLY</span></header>
-<section class="section" aria-labelledby="watched-images-title"><div class="section-head"><div><h2 id="watched-images-title">Watched images</h2><p class="helper">One entry per image reference and platform. A remote digest change does not prove a newer version is available.</p></div></div>
-<div class="panel table-scroll"><table><thead><tr><th>Image</th><th>Platform</th><th>Registry</th><th>Deployed</th><th>Services</th><th>Details</th></tr></thead><tbody>
-{{range .Images}}<tr><td class="mono image-col">{{.Reference}}</td><td>{{.Platform}}</td><td>{{status .RegistryStatus}}</td><td>{{status .DeploymentStatus}}</td><td>{{len .Services}}</td><td><a class="text-action" href="{{imageURL .ID}}">View image</a></td></tr>
-{{else}}<tr><td colspan="6" class="table-empty">No watched images yet. Enable monitoring on a discovered Compose service to begin.</td></tr>{{end}}
-</tbody></table></div></section>
-<footer>No automatic image pulls or deployments.</footer>{{template "shell-end" .}}</body></html>`)
-
-var imageDetailTemplate=workspaceTemplate("image-detail",`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>Image Details · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body>
-{{template "shell-start" .}}
-<nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/images">Images</a><span aria-hidden="true">/</span><span aria-current="page">Image Details</span></nav>
-<header class="topbar"><div><p class="eyebrow">IMAGE DETAILS</p><h1 class="workspace-title mono">{{.Image.Reference}}</h1><p class="muted">{{.Image.Platform}}</p></div><span class="readonly">MONITORING ONLY</span></header>
-<section class="section"><div class="workspace-stats"><article class="stat-card"><div class="stat-label">Registry observation</div><strong class="workspace-value">{{status .Image.RegistryStatus}}</strong><span class="stat-hint">{{with .Image.LatestObservation}}Last successful check: {{when .CheckedAt}}{{else}}Not checked yet{{end}}</span></article>
-<article class="stat-card"><div class="stat-label">Deployment assessment</div><strong class="workspace-value">{{status .Image.DeploymentStatus}}</strong><span class="stat-hint">Current: {{.Image.DeploymentCounts.Current}} · Different: {{.Image.DeploymentCounts.Different}} · Unknown: {{.Image.DeploymentCounts.Unknown}}</span></article>
-<article class="stat-card"><div class="stat-label">Watched by</div><strong class="workspace-value">{{len .Image.Services}} services</strong><span class="stat-hint">{{if .Image.LastChangeAt}}Last recorded digest change: {{when .Image.LastChangeAt}}{{else}}No change found in recent events{{end}}</span></article></div></section>
-<section class="section" aria-labelledby="image-services-title"><h2 id="image-services-title">Associated services</h2><p class="helper">Each Compose service has independent monitoring settings.</p><div class="panel table-scroll"><table><thead><tr><th>Compose service</th><th>Monitoring</th><th>Deployment</th><th>Inspect</th></tr></thead><tbody>
-{{range .Associated}}<tr><td>{{.Project}} / {{.Service}}</td><td>{{status .Monitoring}}</td><td>{{status .Assessment}}</td><td><a class="text-action" href="{{serviceURL .Project .Service}}">View service</a></td></tr>
-{{else}}<tr><td colspan="4" class="table-empty">No associated discovered service details available.</td></tr>{{end}}</tbody></table></div></section>
-<p class="helper">Registry checks and deployed digest comparisons are independent observations, not release-version judgments.</p>
-<footer>No Docker mutation or update execution.</footer>{{template "shell-end" .}}</body></html>`)
 
 var servicesTemplate=workspaceTemplate("services",`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><title>Services · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body>
 {{template "shell-start" .}}
@@ -128,13 +113,14 @@ func(h Handler) workspaceSnapshot(ctx context.Context)(workspaceData,error){
  policies,err:=h.Backend.MonitorPolicies(ctx);if err!=nil{return workspaceData{},err}
  checks,err:=h.Backend.RegistryChecks(ctx);if err!=nil{return workspaceData{},err}
  views,err:=h.Backend.MonitorServiceViews(ctx);if err!=nil{return workspaceData{},err}
- events,err:=h.Backend.FilterEvents(ctx,store.EventFilter{Kind:"remote_digest_changed",Limit:200})
+ events,err:=h.Backend.LatestImageChangeEvents(ctx)
  if err!=nil{return workspaceData{},err}
  now:=time.Now().UTC()
  assessments:=updates.AssessMonitoredFresh(projects,containers,policies,checks,now)
  result:=workspaceData{
   Images:presentation.BuildImageSummaries(policies,checks,assessments,events,now),
   Services:presentation.BuildServiceSummaries(views,containers,policies,assessments),
+  Assessments:assessments,
  }
  for _,s:=range result.Services{
   if len(result.Groups)==0 || result.Groups[len(result.Groups)-1].Project!=s.Project{
@@ -157,35 +143,8 @@ func renderWorkspace(w http.ResponseWriter,t *template.Template,data workspaceDa
  workspaceHeaders(w)
  _=t.Execute(w,data)
 }
-func(h Handler) imagesPage(w http.ResponseWriter,r *http.Request){
- d,err:=h.workspaceSnapshot(r.Context());if err!=nil{http.Error(w,"Images unavailable",500);return}
- d.ActivePage="images"
- renderWorkspace(w,imagesTemplate,d)
-}
-func(h Handler) imageDetailsPage(w http.ResponseWriter,r *http.Request){
- id,err:=presentation.ParseImageID(r.PathValue("id"))
- if err!=nil{http.NotFound(w,r);return}
- d,err:=h.workspaceSnapshot(r.Context());if err!=nil{http.Error(w,"Image unavailable",500);return}
- for i:=range d.Images{
-  item:=&d.Images[i]
-  if item.Reference!=id.Reference || item.Platform!=id.Platform{continue}
-  d.Image=item
-  watchers:=make(map[presentation.ServiceIdentity]struct{},len(item.Services))
-  for _,s:=range item.Services{watchers[s]=struct{}{}}
-  for _,s:=range d.Services{
-   if _,ok:=watchers[s.ServiceIdentity];ok{d.Associated=append(d.Associated,s)}
-  }
-  sort.Slice(d.Associated,func(i,j int)bool{
-   a,b:=d.Associated[i],d.Associated[j]
-   if a.Project!=b.Project{return a.Project<b.Project}
-   return a.Service<b.Service
-  })
-  d.ActivePage="images"
-  renderWorkspace(w,imageDetailTemplate,d)
-  return
- }
- http.NotFound(w,r)
-}
+func(h Handler) imagesPage(w http.ResponseWriter,r *http.Request){h.renderImagesWorkspace(w,r)}
+func(h Handler) imageDetailsPage(w http.ResponseWriter,r *http.Request){h.renderImageWorkspaceDetails(w,r)}
 func(h Handler) servicesPage(w http.ResponseWriter,r *http.Request){
  d,err:=h.workspaceSnapshot(r.Context());if err!=nil{http.Error(w,"Services unavailable",500);return}
  d.ActivePage="services"

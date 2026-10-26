@@ -28,6 +28,8 @@ type Backend interface {
  SetNotificationSettings(context.Context,store.NotificationSettings)error
  PruneDeliveredEvents(context.Context,time.Time)(int64,error)
  FilterEvents(context.Context,store.EventFilter)([]store.Event,error)
+ LatestImageChangeEvents(context.Context)([]store.Event,error)
+ ImageEvents(context.Context,string,string,int64,int)([]store.Event,error)
  DefaultMonitorInterval(context.Context)(int,error)
  SetDefaultMonitorInterval(context.Context,int)error
  MonitorServiceViews(context.Context)([]store.MonitorServiceView,error)
