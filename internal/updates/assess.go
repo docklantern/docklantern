@@ -33,7 +33,16 @@ func Assess(projects []store.Registration,containers []store.Container,policies 
 func AssessFresh(projects []store.Registration,containers []store.Container,policies []store.MonitorPolicy,checks []store.RegistryCheck,now time.Time)[]Assessment{
  return assess(projects,containers,policies,checks,now,5*time.Minute,2*time.Hour)
 }
+// AssessMonitoredFresh accepts monitoring-only policies originating from
+// verified Docker labels or authenticated GUI enrollment. Those policies do
+// not require a Compose deployment source registration.
+func AssessMonitoredFresh(projects []store.Registration,containers []store.Container,policies []store.MonitorPolicy,checks []store.RegistryCheck,now time.Time)[]Assessment{
+ return assessWithEnrollment(projects,containers,policies,checks,now,5*time.Minute,2*time.Hour,true)
+}
 func assess(projects []store.Registration,containers []store.Container,policies []store.MonitorPolicy,checks []store.RegistryCheck,now time.Time,maxInventoryAge,maxRegistryAge time.Duration)[]Assessment{
+ return assessWithEnrollment(projects,containers,policies,checks,now,maxInventoryAge,maxRegistryAge,false)
+}
+func assessWithEnrollment(projects []store.Registration,containers []store.Container,policies []store.MonitorPolicy,checks []store.RegistryCheck,now time.Time,maxInventoryAge,maxRegistryAge time.Duration,monitoringOnly bool)[]Assessment{
  registered:=make(map[string]map[string]bool)
  for _,p:=range projects{
   services:=make(map[string]bool)
@@ -45,7 +54,7 @@ func assess(projects []store.Registration,containers []store.Container,policies 
  result:=make([]Assessment,0,len(policies))
  for _,p:=range policies{
   a:=Assessment{Project:p.Project,Service:p.Service,Image:p.Image,Platform:p.Platform,State:"unknown",Reason:"No matching immutable deployed manifest reference available",ReleaseClassification:"not_verified"}
-  if !registered[p.Project][p.Service]{a.State="unregistered";a.Reason="Service is not currently registered";result=append(result,a);continue}
+  if !monitoringOnly && !registered[p.Project][p.Service]{a.State="unregistered";a.Reason="Service is not currently registered";result=append(result,a);continue}
   c,ok:=remote[p.Image+"|"+p.Platform]
   if !ok{a.State="not_checked";a.Reason="No successful remote registry check";result=append(result,a);continue}
   a.RemoteDigest=c.PlatformDigest
