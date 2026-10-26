@@ -71,6 +71,11 @@ type ServiceSummary struct {
     Platform string
     ImageID string
     Enrollment string
+    DiscoveryState string
+    ValidationError string
+    GUIOverride *int
+    LabelInterval *int
+    LabelOptIn *bool
     Monitoring string
     IntervalSeconds int
     IntervalSource string
