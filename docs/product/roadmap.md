@@ -1,35 +1,43 @@
-# Roadmap (Draft)
+# DockLantern Roadmap
 
-Roadmap stages are exploratory and carry no delivery-date commitment.
+Roadmap stages are exploratory and do not commit to delivery dates. **Monitoring enrollment and automatic deployment authorization are independent.**
 
-## Stage 0 — Architecture validation
+## Stage 0 — Architecture validation (initial exploration)
 
-Validate Compose labels, registered file lists, interpolation, relative bind mounts, Traefik networks and managed override locations. Threat-model Docker and private registry access. Decide executor, language, license and CI choices.
+Compose discovery/labels, OCI registry auth, image/platform handling, registered paths, and Docker/socket threat modeling established the monitoring-only baseline.
 
-## Stage 1 — Monitoring
+## Stage 1 — Compose-first image monitoring
 
-Project discovery/enrollment, OCI manifest checks and auth, configurable polling, pauses/check-now, dashboard and check history.
+### v0.1.0-beta.3 — Released
 
-## v0.1.0-beta.3 — Monitoring UX and scale (next planned beta)
+[Published beta.3](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.3) provides opt-in monitoring with `com.docklantern.monitor=true`, interval labels and GUI overrides, global defaults, pauses, persistent SQLite history, read-only image status, conservative deployed-image evidence, and deduplicated OCI registry checks. An explicit `monitor=false` label blocks monitoring enrollment.
 
-See the [implementation plan](beta3-plan.md) and tracking [issue #27](https://github.com/docklantern/docklantern/issues/27). Required beta.3 outcomes:
+Beta.3 is published; [issue #34](https://github.com/docklantern/docklantern/issues/34) was closed after operator acceptance with some host checks explicitly deferred. Publication does not mean future betas are already deployed.
 
-- Zero-touch, explicit opt-in Compose label monitoring with no edits to the DockLantern deployment or Compose source mounts.
-- Live GUI interval overrides, label interval fallback and persistent global defaults.
-- Persistent shared sidebar across all HTML pages and service-centric status views.
-- Safe migration of beta.2 SQLite registrations/history; no unauthorized deployment.
-- Efficient/deduplicated OCI registry checks, unambiguous event statuses, and automated end-to-end gates.
+### v0.1.0-beta.4 — Image-first Management Experience (release validation)
 
-Beta.3 is **monitoring-only**. Deployment control remains future work.
+**Development branches/PRs merged:** [#44](https://github.com/docklantern/docklantern/pull/44), [#52](https://github.com/docklantern/docklantern/pull/52), [#53](https://github.com/docklantern/docklantern/pull/53), [#54](https://github.com/docklantern/docklantern/pull/54), [#55](https://github.com/docklantern/docklantern/pull/55), [#56](https://github.com/docklantern/docklantern/pull/56).
 
-## Stage 2 — Controlled deployment
+- Five workspaces: Overview, Images, Services, Activity, Settings.
+- Canonical image/platform grouping and dedicated Image Details showing digest evidence and related services.
+- Compose project-grouped Services and Service Details with existing monitoring controls.
+- Consistent registry and deployed status semantics, including conservative Unknown assessment.
+- Image-centric Overview review queue and date-grouped Activity.
+- Simplified global Settings plus Advanced / Legacy Configuration.
+- Tested compatibility, security, accessibility and operator release gates.
 
-Compose override generation, validation, image pulls, manual/opt-in automatic deployment, journaling, readiness checks and failure recovery.
+**Not yet released or deployed.** See [beta.4 release checklist](../deployment/beta4-release-checklist.md) and [issue #51](https://github.com/docklantern/docklantern/issues/51). The current image/platform persisted observation identity is not credential-scope-aware; multiple simultaneous credential scopes for one tagged image require future design work.
 
-## Stage 3 — Cooperative management
+Beta.4 adds **no** Docker write permission or deployment executor.
 
-Drift detection, manual non-destructive adoption, deployment groups, logs/history, user-facing onboarding and documentation.
+## Stage 2 — Controlled deployment (future; not authorized)
 
-## Future
+Potential work: deliberate executor design, Compose override generation, validation and image pulls, opt-in/manual deployment, journaling, readiness checks, rollback and failure recovery. This requires its own threat model and user authorization; monitoring enrollment alone is never sufficient.
 
-Standalone Docker updates, semantic tag policies, notification channels, stronger rollback, and multi-host management.
+## Stage 3 — Cooperative management (future)
+
+External drift detection, non-destructive adoption, deployment groups, logs/history, larger-scale onboarding and operational tooling.
+
+## Longer-term exploration
+
+Semantic version/update policies, per-service credential-scope-aware observation persistence, richer notification channels, stronger rollback, Docker event-based discovery and multi-host management.
