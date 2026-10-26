@@ -9,6 +9,7 @@ import (
  "strings"
  "time"
 
+ "github.com/docklantern/docklantern/internal/layout"
  "github.com/docklantern/docklantern/internal/store"
  "github.com/docklantern/docklantern/internal/updates"
 )
@@ -16,11 +17,11 @@ import (
 //go:embed assets/dashboard.html assets/dashboard.css
 var assets embed.FS
 
-var page = template.Must(template.New("dashboard.html").Funcs(template.FuncMap{
+var page = template.Must(layout.WithShell(template.Must(template.New("dashboard.html").Funcs(template.FuncMap{
  "short": func(s string) string { if len(s)>28 {return s[:28]+"…"};return s },
  "badge": func(s string) string { switch strings.ToLower(s) {case "running","healthy","unchanged":return "ok";case "changed","unhealthy","exited":return "warn";case "paused","first_seen","stale_inventory","stale_registry","unknown","not_checked":return "muted";default:return "neutral"} },
  "when": func(s string) string {if s==""{return "Not yet"};t,e:=time.Parse(time.RFC3339,s);if e!=nil{return s};return t.UTC().Format("2006-01-02 15:04 UTC")},
-}).ParseFS(assets,"assets/dashboard.html"))
+}).ParseFS(assets,"assets/dashboard.html"))))
 
 type Reader interface {
  Projects(context.Context)([]store.Registration,error)
@@ -30,6 +31,8 @@ type Reader interface {
 }
 
 type view struct {
+ ActivePage string
+ MainClass string
  Projects []project
  Unregistered []store.Container
  Events []store.Event
@@ -62,7 +65,7 @@ func collect(ctx context.Context,s Reader)(view,error){
  if reader,ok:=s.(interface{WorkerStatuses(context.Context)([]store.WorkerStatus,error)});ok{
   workers,e=reader.WorkerStatuses(ctx);if e!=nil{return view{},e}
  }
- v:=view{Workers:workers,Events:events,Checks:checks,Policies:policies,Assessments:updates.AssessFresh(registrations,containers,policies,checks,time.Now().UTC()),ProjectCount:len(registrations),ContainerCount:len(containers),MonitoredCount:len(policies)}
+ v:=view{ActivePage:"overview",Workers:workers,Events:events,Checks:checks,Policies:policies,Assessments:updates.AssessFresh(registrations,containers,policies,checks,time.Now().UTC()),ProjectCount:len(registrations),ContainerCount:len(containers),MonitoredCount:len(policies)}
  idx:=make(map[string]int,len(registrations))
  for _,r:=range registrations{idx[r.Name]=len(v.Projects);v.Projects=append(v.Projects,project{Registration:r})}
  for _,c:=range containers{

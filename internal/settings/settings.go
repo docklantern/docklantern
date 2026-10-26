@@ -11,6 +11,7 @@ import (
  "strings"
 
  "github.com/docklantern/docklantern/internal/auth"
+ "github.com/docklantern/docklantern/internal/layout"
  "github.com/docklantern/docklantern/internal/poc"
  "github.com/docklantern/docklantern/internal/store"
 )
@@ -32,6 +33,8 @@ type Handler struct {
  Roots []string
 }
 type pageData struct {
+ ActivePage string
+ MainClass string
  CSRF string
  Projects []store.Registration
  Policies []store.MonitorPolicy
@@ -42,9 +45,9 @@ type pageData struct {
  SuggestedService string
  SuggestedImage string
 }
-var tmpl=template.Must(template.New("settings").Parse(pageHTML))
+var tmpl=template.Must(layout.WithShell(template.Must(template.New("settings").Parse(pageHTML))))
 const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Settings · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head>
-<body><main class="main settings-page"><header class="topbar"><div><p class="eyebrow">DOCKER COMPOSE / ADMINISTRATION</p><h1>Monitoring settings</h1><p class="muted">Register Compose projects and configure read-only registry checks.</p></div><a class="text-action" href="/">← Overview</a></header>
+<body>{{template "shell-start" .}}<header class="topbar"><div><p class="eyebrow">DOCKER COMPOSE / ADMINISTRATION</p><h1>Monitoring settings</h1><p class="muted">Register Compose projects and configure read-only registry checks.</p></div><a class="text-action" href="/">← Overview</a></header>
 {{if .Notice}}<p role="status" class="notice">{{.Notice}}</p>{{end}}
 <section class="section panel settings-panel"><h2>Discovered services</h2><p class="muted">Choose a discovered service to prefill registration and monitoring fields. You must still supply and validate your original Compose project directory and files; selecting a service does not enroll or enable updates.</p>
 <div class="table-scroll"><table><thead><tr><th>Project</th><th>Service</th><th>Image</th><th>Choose</th></tr></thead><tbody>
@@ -83,7 +86,7 @@ const pageHTML=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta
 <button type="submit">Save monitoring policy</button></form></section>
 <section class="section panel settings-panel"><h2>Registered projects</h2><div class="table-scroll"><table><thead><tr><th>Project</th><th>Services</th><th>Directory</th></tr></thead><tbody>{{range .Projects}}<tr><td>{{.Name}}</td><td>{{range .Services}}{{.}} {{end}}</td><td class="mono">{{.ProjectDir}}</td></tr>{{else}}<tr><td colspan="3" class="table-empty">None registered yet.</td></tr>{{end}}</tbody></table></div>
 <h2>Existing schedules</h2><div class="table-scroll"><table><thead><tr><th>Project/service</th><th>Image</th><th>Interval</th><th>State</th></tr></thead><tbody>{{range .Policies}}<tr><td>{{.Project}} / {{.Service}}</td><td class="mono">{{.Image}}</td><td>{{.IntervalSeconds}}s</td><td>{{if .Paused}}Paused{{else}}Scheduled{{end}}</td></tr>{{else}}<tr><td colspan="4" class="table-empty">None configured yet.</td></tr>{{end}}</tbody></table></div></section>
-<footer>No automatic image pulls, deployment controls, or credential storage.</footer></main></body></html>`
+<footer>No automatic image pulls, deployment controls, or credential storage.</footer>{{template "shell-end" .}}</body></html>`
 
 func (h Handler) Routes(mux *http.ServeMux){
  mux.HandleFunc("GET /settings",h.index)
@@ -98,7 +101,7 @@ func (h Handler) index(w http.ResponseWriter,r *http.Request){
  policies,e:=h.Backend.MonitorPolicies(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
  discovered,e:=h.Backend.Containers(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
  settings,e:=h.Backend.NotificationSettings(r.Context());if e!=nil{http.Error(w,"Settings unavailable",500);return}
- draft:=pageData{CSRF:h.Guard.Token(),Projects:projects,Policies:policies,Discovered:discovered,Notifications:settings,Notice:notice(r.URL.Query().Get("saved"))}
+ draft:=pageData{ActivePage:"settings",MainClass:"settings-page",CSRF:h.Guard.Token(),Projects:projects,Policies:policies,Discovered:discovered,Notifications:settings,Notice:notice(r.URL.Query().Get("saved"))}
  selectedProject:=r.URL.Query().Get("project")
  selectedService:=r.URL.Query().Get("service")
  for _,c:=range discovered{
@@ -184,24 +187,26 @@ func(h Handler) prune(w http.ResponseWriter,r *http.Request){
  http.Redirect(w,r,"/settings?saved=pruned",http.StatusSeeOther)
 }
 type eventPageData struct{
+ ActivePage string
+ MainClass string
  Events []store.Event
  Kind string
  DeliveryState string
  Search string
  NextBefore int64
 }
-var eventsHTML=template.Must(template.New("events").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Events · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body><main class="main settings-page"><header class="topbar"><div><p class="eyebrow">MONITORING HISTORY</p><h1>Events</h1><p class="muted">Digest movement does not confirm a newer release.</p></div><a class="text-action" href="/settings">← Settings</a></header>
+var eventsHTML=template.Must(layout.WithShell(template.Must(template.New("events").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Events · DockLantern</title><link rel="stylesheet" href="/assets/dashboard.css"></head><body>{{template "shell-start" .}}<header class="topbar"><div><p class="eyebrow">MONITORING HISTORY</p><h1>Events</h1><p class="muted">Digest movement does not confirm a newer release.</p></div><a class="text-action" href="/settings">← Settings</a></header>
 <section class="section panel settings-panel"><form method="get" action="/events"><label>Event type<select name="kind"><option value="">All types</option><option value="remote_digest_changed" {{if eq .Kind "remote_digest_changed"}}selected{{end}}>Digest changed</option><option value="registry_failure" {{if eq .Kind "registry_failure"}}selected{{end}}>Registry failure</option><option value="registry_recovered" {{if eq .Kind "registry_recovered"}}selected{{end}}>Recovered</option><option value="registry_outage_prolonged" {{if eq .Kind "registry_outage_prolonged"}}selected{{end}}>Prolonged outage</option></select></label><label>Delivery status<select name="delivery"><option value="">All</option><option value="pending" {{if eq .DeliveryState "pending"}}selected{{end}}>Pending</option><option value="delivered" {{if eq .DeliveryState "delivered"}}selected{{end}}>Delivered</option></select></label><label>Search project, service or image<input name="search" maxlength="128" value="{{.Search}}"></label><button type="submit">Apply filters</button></form></section>
 <section class="section panel table-scroll"><table><thead><tr><th>ID</th><th>UTC time</th><th>Type</th><th>Project / service</th><th>Image</th><th>Delivery</th></tr></thead><tbody>{{range .Events}}<tr><td>{{.ID}}</td><td>{{.OccurredAt}}</td><td>{{.Kind}}</td><td>{{.Project}} / {{.Service}}</td><td class="mono">{{.Image}}</td><td>{{.DeliveryState}} ({{.DeliveryAttempts}})</td></tr>{{else}}<tr><td colspan="6" class="table-empty">No events match these filters.</td></tr>{{end}}</tbody></table></section>
 {{if .NextBefore}}<form method="get" action="/events"><input type="hidden" name="kind" value="{{.Kind}}"><input type="hidden" name="delivery" value="{{.DeliveryState}}"><input type="hidden" name="search" value="{{.Search}}"><input type="hidden" name="before" value="{{.NextBefore}}"><button type="submit">Older events →</button></form>{{end}}
-<footer>No automatic Docker updates or deployments.</footer></main></body></html>`))
+<footer>No automatic Docker updates or deployments.</footer>{{template "shell-end" .}}</body></html>`))))
 func(h Handler) eventsPage(w http.ResponseWriter,r *http.Request){
  q:=r.URL.Query()
  before:=int64(0)
  if q.Has("before"){v,e:=strconv.ParseInt(q.Get("before"),10,64);if e!=nil||v<=0{http.Error(w,"Invalid cursor",400);return};before=v}
  f:=store.EventFilter{Kind:q.Get("kind"),DeliveryState:q.Get("delivery"),Search:q.Get("search"),BeforeID:before,Limit:50}
  events,e:=h.Backend.FilterEvents(r.Context(),f);if e!=nil{http.Error(w,"Invalid event filter",400);return}
- data:=eventPageData{Events:events,Kind:f.Kind,DeliveryState:f.DeliveryState,Search:f.Search}
+ data:=eventPageData{ActivePage:"events",MainClass:"settings-page",Events:events,Kind:f.Kind,DeliveryState:f.DeliveryState,Search:f.Search}
  if len(events)==50{data.NextBefore=events[len(events)-1].ID}
  w.Header().Set("Content-Type","text/html; charset=utf-8")
  w.Header().Set("Cache-Control","no-store")

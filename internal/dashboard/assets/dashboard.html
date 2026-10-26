@@ -9,21 +9,8 @@
 <link rel="stylesheet" href="/assets/dashboard.css">
 </head>
 <body>
-<div class="shell">
-<aside class="sidebar">
- <div class="brand"><span class="brand-icon" aria-hidden="true">◈</span><span>Dock<span class="brand-accent">Lantern</span><small>COMPOSE MONITOR</small></span></div>
- <nav aria-label="Main navigation">
- <a class="nav-link active" aria-current="page" href="/"><span aria-hidden="true">▦</span> Overview</a>
- <a class="nav-link" href="#projects"><span aria-hidden="true">▤</span> Projects</a>
- <a class="nav-link" href="#assessments"><span aria-hidden="true">◇</span> Image status</a>
- <a class="nav-link" href="/events"><span aria-hidden="true">♧</span> Event history</a>
- <a class="nav-link" href="#registry"><span aria-hidden="true">◎</span> Registry checks</a>
- <a class="nav-link" href="#policies"><span aria-hidden="true">◷</span> Monitoring</a>
- <a class="nav-link" href="/settings"><span aria-hidden="true">⚙</span> Settings</a>
- </nav>
- <div class="sidebar-foot"><span class="status-dot"></span> Read-only dashboard<small>Local access only</small></div>
-</aside>
-<main id="main" class="main">
+{{template "shell-start" .}}
+
  <header class="topbar"><div class="eyebrow">DOCKER COMPOSE / OVERVIEW</div><div class="top-actions"><a class="text-action" href="/settings">Manage monitoring</a><span class="readonly">DEPLOYMENTS DISABLED</span><a class="text-action" href="/">↻ Refresh page</a></div></header>
  <section class="hero" aria-labelledby="hero-title">
   <div><p class="eyebrow accent">MONITOR YOUR STACKS</p><h1 id="hero-title">Container overview</h1><p class="muted">Discover Compose services, review image checks, and inspect monitoring schedules in one place.</p></div>
@@ -96,5 +83,5 @@
   </tbody></table></div>
  </section>
  <footer><span>DockLantern · experimental monitoring dashboard</span><span>No automatic deployments or image pulls</span></footer>
-</main></div>
+{{template "shell-end" .}}
 </body></html>
