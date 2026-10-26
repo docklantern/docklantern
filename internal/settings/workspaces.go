@@ -60,6 +60,15 @@ var workspaceFuncs = template.FuncMap{
   default:return "Unknown"
   }
  },
+ "tone":func(s string)string{
+  switch s {
+  case "current","unchanged":return "ok"
+  case "different","mixed","changed","check_failed":return "warn"
+  default:return "muted"
+  }
+ },
+ "eventKind":presentation.EventKind,
+ "shortDigest":presentation.ShortDigest,
  "when":func(s string)string{
   if s==""{return "Not yet"}
   at,err:=time.Parse(time.RFC3339Nano,s)
