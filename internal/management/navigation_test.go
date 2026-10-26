@@ -19,6 +19,8 @@ func TestSharedNavigationOnAllHTMLPages(t *testing.T) {
         pageText string
     }{
         {"/", "/", "Container overview"},
+        {"/images", "/images", "Watched images"},
+        {"/services", "/services", "Compose services"},
         {"/settings", "/settings", "Monitoring settings"},
         {"/events", "/events", "Events"},
     } {
@@ -54,7 +56,7 @@ func TestSharedNavigationOnAllHTMLPages(t *testing.T) {
             if len(active) != 2 || active[1] != tc.wantActive {
                 t.Errorf("%s active link = %v; want %q", tc.path, active, tc.wantActive)
             }
-            for _, link := range []string{"/", "/#projects", "/#assessments", "/#registry", "/#policies", "/events", "/settings"} {
+            for _, link := range []string{"/", "/images", "/services", "/events", "/settings"} {
                 if !strings.Contains(sidebar, `href="`+link+`"`) {
                     t.Errorf("%s missing navigation destination %q", tc.path, link)
                 }
