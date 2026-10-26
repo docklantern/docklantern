@@ -32,23 +32,27 @@ func (s *Store) DefaultMonitorInterval(ctx context.Context) (int, error) {
 
 // SetDefaultMonitorInterval is used by the future GUI; it does not itself
 // enroll any service or change running Docker containers.
-func (s *Store) SetDefaultMonitorInterval(ctx context.Context, seconds int) error {
-    if seconds < 60 || seconds > 86400 {
-        return errors.New("default interval must be between 60 and 86400 seconds")
-    }
-    result, err := s.db.ExecContext(ctx,
-        "UPDATE monitoring_defaults SET interval_seconds=? WHERE id=1", seconds)
-    if err != nil {
-        return err
-    }
-    affected, err := result.RowsAffected()
-    if err != nil {
-        return err
-    }
-    if affected != 1 {
-        return errors.New("monitoring default row missing")
-    }
-    return nil
+func (s *Store) SetDefaultMonitorInterval(ctx context.Context,seconds int)error {
+    if err:=intervalRange(seconds);err!=nil{return err}
+    tx,err:=s.db.BeginTx(ctx,nil);if err!=nil{return err};defer tx.Rollback()
+    result,err:=tx.ExecContext(ctx,
+        "UPDATE monitoring_defaults SET interval_seconds=? WHERE id=1",seconds)
+    if err!=nil{return err}
+    affected,err:=result.RowsAffected();if err!=nil{return err}
+    if affected!=1{return errors.New("monitoring default row missing")}
+    // Only label/GUI-managed watches inheriting the global default change.
+    // A legacy/manual policy and explicit label/GUI intervals are untouched.
+    stamp:=time.Now().UTC().Format(time.RFC3339)
+    _,err=tx.ExecContext(ctx,`UPDATE monitor_policies SET interval_seconds=?,
+       next_check_at=CASE WHEN paused=0 AND consecutive_failures=0 THEN ? ELSE next_check_at END,
+       generation=generation+1
+       WHERE interval_seconds!=? AND EXISTS(
+         SELECT 1 FROM monitor_service_settings m
+         WHERE m.project=monitor_policies.project AND m.service=monitor_policies.service
+           AND m.legacy_enrolled=0 AND m.gui_interval_seconds IS NULL AND m.label_interval_seconds IS NULL)`,
+       seconds,stamp,seconds)
+    if err!=nil{return err}
+    return tx.Commit()
 }
 
 func (s *Store) MonitoringServiceSettings(ctx context.Context) ([]MonitorServiceSettings, error) {
