@@ -135,3 +135,13 @@ jobs:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-beta-install.sh
 
+
+  beta3-zero-touch-onboarding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm label-based enrollment through actual read-only Docker proxy
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/integration/run-beta3-onboarding.sh
