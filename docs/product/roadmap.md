@@ -10,6 +10,18 @@ Validate Compose labels, registered file lists, interpolation, relative bind mou
 
 Project discovery/enrollment, OCI manifest checks and auth, configurable polling, pauses/check-now, dashboard and check history.
 
+## v0.1.0-beta.3 — Monitoring UX and scale (next planned beta)
+
+See the [implementation plan](beta3-plan.md) and tracking [issue #27](https://github.com/docklantern/docklantern/issues/27). Required beta.3 outcomes:
+
+- Zero-touch, explicit opt-in Compose label monitoring with no edits to the DockLantern deployment or Compose source mounts.
+- Live GUI interval overrides, label interval fallback and persistent global defaults.
+- Persistent shared sidebar across all HTML pages and service-centric status views.
+- Safe migration of beta.2 SQLite registrations/history; no unauthorized deployment.
+- Efficient/deduplicated OCI registry checks, unambiguous event statuses, and automated end-to-end gates.
+
+Beta.3 is **monitoring-only**. Deployment control remains future work.
+
 ## Stage 2 — Controlled deployment
 
 Compose override generation, validation, image pulls, manual/opt-in automatic deployment, journaling, readiness checks and failure recovery.

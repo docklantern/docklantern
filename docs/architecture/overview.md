@@ -33,7 +33,7 @@ See [ADR 0005](decisions/0005-executor-boundary.md) for executor decision and [A
 
 ## Discovery / onboarding
 
-Find running containers using Compose labels, then explicitly enroll each project. Validate host paths, file sequence, environment inputs, profiles, effective config and supported image references before enabling deployment. Discovery metadata is a hint, not an immutable record of original source.
+Find running containers using Compose labels. **Beginning with beta.3, monitoring-only enrollment** uses an explicit opt-in service label or an authenticated GUI opt-in, with Docker image/platform metadata and no Compose source mounts. The monitored project/service is reconciled from discovery; default is not monitored. Monitoring labels do not authorize deployment. **Managed deployment remains gated** on separately registered and validated Compose project paths, file order, environment context, profiles and effective configuration. Discovery metadata is a hint, not an immutable record of original source. See [ADR 0007](decisions/0007-label-enrollment-monitoring-only.md).
 
 ## Update lifecycle
 

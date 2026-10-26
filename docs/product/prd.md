@@ -31,6 +31,8 @@ Initially, one Docker Engine on a Linux VPS hosting multiple independent Compose
 | MON-01 | Live per-service polling changes persisted without restart | Must |
 | MON-02 | Check tags against platform-specific registry manifests/digests | Must |
 | MON-03 | Pause monitoring and trigger check-now | Must |
+| MON-04 | Opt-in label/GUI-based Compose monitoring without source mounts (no deployment rights) | Must for beta.3 |
+| MON-05 | Global polling default and per-service GUI > label > default precedence, live and persistent | Must for beta.3 |
 | REG-01 | Public Docker Hub, GHCR, generic OCI registry | Must |
 | REG-02 | Private credentials, safe storage and redaction | Must |
 | UPD-01 | Manual and opt-in auto deployment | Must |
@@ -40,13 +42,14 @@ Initially, one Docker Engine on a Linux VPS hosting multiple independent Compose
 | STATE-02 | Detect drift including same-tag/new-digest deployments | Must |
 | STATE-03 | Manually adopt external deployments without recreate/pull | Must |
 | UI-01 | Projects, services, tags, polling, history, last checks/pulls and logs | Must |
+| UI-02 | Shared navigation on all HTML pages and service-centric status/source explanation | Must for beta.3 |
 | SEC-01 | Authentication and restricted deployment executor | Must |
 | GROUP-01 | Coordinate deployments for services sharing an app image | Should |
 | DOCKER-01 | Discover and monitor standalone Docker containers | Should |
 
 ## Live configuration behavior
 
-Store polling intervals, watched tags, deployment selections, and policies in updater state, not original Compose files. Watched tag and desired deployed reference are distinct; changing the watched tag does not automatically deploy an image. Initial suggested polling default: 300 seconds with a 60-second minimum, subject to testing and registry rate limiting.
+Store effective polling schedules, GUI overrides, watched tags, deployment selections, and policies in updater state, not original Compose files. Optional service labels express declarative monitoring opt-in and intervals, not deployment authority. Watched tag and desired deployed reference are distinct; changing the watched tag does not automatically deploy an image. Initial suggested polling default: 300 seconds with a 60-second minimum, subject to testing and registry rate limiting.
 
 ## Acceptance examples
 
