@@ -28,3 +28,17 @@
 #services .service-action{display:block;margin:4px 0;font-weight:650}
 .settings-page .service-control.selected-service{border:2px solid var(--accent);background:#17334f;scroll-margin-top:24px}
 @media(max-width:700px){#services .panel table{min-width:820px}}
+
+/* beta.4: image-first workspaces and nested navigation */
+.breadcrumbs{display:flex;align-items:center;gap:10px;margin:0 0 19px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
+.breadcrumbs a{color:#99dfff;text-decoration:none}
+.breadcrumbs a:hover{text-decoration:underline}
+.breadcrumbs span[aria-current=page]{color:var(--text)}
+.workspace-title{font-size:clamp(20px,2.6vw,32px);overflow-wrap:anywhere}
+.workspace-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.workspace-stats .workspace-value{font-size:clamp(15px,2vw,22px);line-height:1.25;overflow-wrap:anywhere}
+.workspace-detail{padding:21px 24px;overflow-wrap:anywhere}
+.workspace-detail p{margin:11px 0 0}
+.workspace-detail .mono{overflow-wrap:anywhere}
+@media(max-width:900px){.workspace-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.workspace-stats{grid-template-columns:minmax(0,1fr)}}
