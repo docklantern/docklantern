@@ -17,13 +17,42 @@
   <span class="hero-glyph" aria-hidden="true">◈</span>
  </section>
  <section class="stats" aria-label="Summary">
-  <article class="stat-card"><div class="stat-label">Registered projects</div><strong>{{.ProjectCount}}</strong><span class="stat-hint">Explicitly enrolled</span></article>
+  <article class="stat-card"><div class="stat-label">Compose projects</div><strong>{{.ProjectCount}}</strong><span class="stat-hint">Registered or discovered</span></article>
   <article class="stat-card"><div class="stat-label">Discovered containers</div><strong>{{.ContainerCount}}</strong><span class="stat-hint">{{.RunningCount}} currently recorded as running</span></article>
-  <article class="stat-card"><div class="stat-label">Monitoring policies</div><strong>{{.MonitoredCount}}</strong><span class="stat-hint">Including paused policies</span></article>
-  <article class="stat-card"><div class="stat-label">Changed remote tags</div><strong>{{.ChangedCount}}</strong><span class="stat-hint">Since previous successful check</span></article>
+  <article class="stat-card"><div class="stat-label">Monitoring policies</div><strong>{{.MonitoredCount}}</strong><span class="stat-hint">Including paused or inactive policies</span></article>
+  <article class="stat-card"><div class="stat-label">Remote digest changes</div><strong>{{.ChangedCount}}</strong><span class="stat-hint">Image tags with latest check marked changed; no version claim</span></article>
+ </section>
+ <section class="section" id="services" aria-labelledby="services-title">
+  <div class="section-head"><div><p class="eyebrow">LIVE COMPOSE INVENTORY</p><h2 id="services-title">Services and monitoring status</h2>
+  <p class="helper">One entry per Compose project/service, including all running replicas. An image digest change is not a verified newer release.</p></div>
+  <span class="helper">Read-only status · configuration in Settings</span></div>
+  <div class="panel table-scroll">
+   <table><thead><tr><th>Compose service</th><th>Containers</th><th>Monitoring</th><th>Registry &amp; image evidence</th><th>Schedule</th><th>Actions</th></tr></thead>
+   <tbody>{{range .Services}}
+    <tr>
+     <td><strong>{{.Project}} / {{.Service}}</strong>
+       <small class="subtext mono">{{.Image}}{{if .Platform}} · {{.Platform}}{{end}}</small></td>
+     <td><span class="pill {{if .RunningCount}}ok{{else}}muted{{end}}">{{.ContainerState}}</span>
+       <small class="subtext">Health: {{.ContainerHealth}}</small>
+       {{if .LastInventoryAt}}<small class="subtext">Seen: {{when .LastInventoryAt}}</small>{{end}}</td>
+     <td><strong>{{.MonitoringStatus}}</strong><small class="subtext">{{.Enrollment}}</small>
+       {{if .StatusReason}}<small class="subtext status-explanation">{{.StatusReason}}</small>{{end}}</td>
+     <td><span class="pill {{if eq .RegistryStatus "Remote digest changed"}}warn{{else}}muted{{end}}">{{.RegistryStatus}}</span>
+       {{if .RegistryCheckedAt}}<small class="subtext">Remote check: {{when .RegistryCheckedAt}}</small>{{end}}
+       <small class="subtext">Running image assessment: {{.AssessmentState}}</small>
+       {{if .AssessmentReason}}<small class="subtext">{{.AssessmentReason}}</small>{{end}}
+       {{if .LastError}}<small class="subtext error-cell">Last check error: {{.LastError}}</small>{{end}}</td>
+     <td><strong>{{.EffectiveInterval}}s</strong><small class="subtext">{{.IntervalSource}}</small>
+       <small class="subtext">Last check: {{when .LastCheckedAt}}</small>
+       <small class="subtext">Next due: {{when .NextCheckAt}}</small></td>
+     <td><a class="text-action service-action" href="{{.SettingsURL}}">Edit monitoring</a>
+       <a class="text-action service-action" href="{{.EventsURL}}">View related events</a></td>
+    </tr>
+   {{else}}<tr><td colspan="6" class="table-empty">No Compose services observed yet. Start Docker discovery, then add a monitoring label or enable a discovered service in Settings.</td></tr>{{end}}</tbody></table>
+  </div>
  </section>
  <section class="section" id="projects">
-  <div class="section-head"><div><p class="eyebrow">PROJECT INVENTORY</p><h2>Compose projects</h2></div><span class="helper">Snapshot from SQLite · refresh with CLI scan</span></div>
+  <div class="section-head"><div><p class="eyebrow">OPTIONAL LEGACY REGISTRATION</p><h2>Compose projects with registered sources</h2></div><span class="helper">Original Compose source registration is not required for label-based monitoring</span></div>
   {{if .Projects}}
    <div class="project-grid">
    {{range .Projects}}
@@ -40,14 +69,14 @@
    {{end}}
    </div>
   {{else}}
-   <div class="empty"><span aria-hidden="true">▤</span><h3>No registered projects yet</h3><p>Register a Compose project through the local CLI to see it here. Discovery does not automatically enroll projects.</p><code>docklantern-inventory -mode register -registration /path/registration.json -roots /allowed/root</code></div>
+   <div class="empty"><span aria-hidden="true">▤</span><h3>No registered projects yet</h3><p>Source registrations are optional for monitoring. Add com.docklantern.monitor=true to your application service or enroll a discovered service in Settings. Legacy registration remains available when needed.</p><code>docklantern-inventory -mode register -registration /path/registration.json -roots /allowed/root</code></div>
   {{end}}
   {{if .Unregistered}}
    <details class="details"><summary>Discovered but not registered ({{len .Unregistered}} containers)</summary><div class="table-scroll"><table><thead><tr><th>Project</th><th>Service</th><th>Image</th><th>State</th></tr></thead><tbody>{{range .Unregistered}}<tr><td>{{.Project}}</td><td>{{.Service}}</td><td class="mono">{{.Image}}</td><td>{{.State}}</td></tr>{{end}}</tbody></table></div></details>
   {{end}}
  </section>
  <section class="section" id="policies">
-  <div class="section-head"><div><p class="eyebrow">REGISTRY MONITORING</p><h2>Service schedules</h2></div><span class="helper">Configured via local CLI</span></div>
+  <div class="section-head"><div><p class="eyebrow">REGISTRY MONITORING</p><h2>Service schedules</h2></div><span class="helper">Managed through Docker labels, Settings, or legacy policies</span></div>
   <div class="panel table-scroll">
   <table><thead><tr><th>Project / service</th><th>Watched image</th><th>Interval</th><th>Status</th><th>Next check (UTC)</th><th>Last error</th></tr></thead><tbody>
   {{range .Policies}}<tr><td><strong>{{.Project}}</strong><small class="subtext">{{.Service}}</small></td><td class="mono image-col" title="{{.Image}}">{{.Image}}<small class="subtext">{{.Platform}}</small></td><td>{{.IntervalSeconds}}s</td><td>{{if .Paused}}<span class="pill muted">Paused</span>{{else}}<span class="pill ok">Scheduled</span>{{end}}</td><td>{{when .NextCheckAt}}</td><td class="error-cell">{{if .LastError}}{{.LastError}}{{else}}—{{end}}</td></tr>
@@ -69,8 +98,8 @@
  </tbody></table></div></section>
  <section class="section" id="events">
   <div class="section-head"><div><p class="eyebrow">AUDITABLE MONITORING CHANGES</p><h2>Recent events</h2></div><a href="/events" class="text-action">Search all events →</a></div>
-  <div class="panel table-scroll"><table><thead><tr><th>Time (UTC)</th><th>Event</th><th>Service / image</th><th>Notification</th></tr></thead><tbody>
-  {{range .Events}}<tr><td>{{when .OccurredAt}}</td><td><span class="pill {{badge .Kind}}">{{.Kind}}</span></td><td>{{if .Project}}{{.Project}} / {{.Service}}{{else}}{{.Image}}{{end}}<small class="subtext">{{.Platform}}</small></td><td><span class="pill {{badge .DeliveryState}}">{{.DeliveryState}}</span> {{if .DeliveryAttempts}}<small class="subtext">{{.DeliveryAttempts}} attempt(s)</small>{{end}}</td></tr>
+  <p class="helper">Webhook delivery is independent of registry checks. Pending (0 attempts) does not mean the registry check failed; a webhook may not be configured.</p><div class="panel table-scroll"><table><thead><tr><th>Time (UTC)</th><th>Event</th><th>Scope / image</th><th>Webhook delivery</th></tr></thead><tbody>
+  {{range .Events}}<tr><td>{{when .OccurredAt}}</td><td><span class="pill {{badge .Kind}}">{{eventKind .Kind}}</span></td><td><strong>{{eventScope .}}</strong><small class="subtext mono">{{.Image}} · {{.Platform}}</small>{{if .PreviousDigest}}<small class="subtext">Previous: {{short .PreviousDigest}} → Current: {{short .Digest}}</small>{{end}}</td><td>{{eventDelivery .}}</td></tr>
   {{else}}<tr><td colspan="4" class="table-empty">No monitoring events have been recorded yet.</td></tr>{{end}}
   </tbody></table></div>
  </section>
