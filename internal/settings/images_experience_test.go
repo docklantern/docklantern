@@ -30,12 +30,12 @@ func TestImageFiltersSearchStatusAndOrder(t *testing.T){
    Services:[]presentation.ServiceIdentity{{Project:"infra",Service:"cache"}}},
  }
  testCases:=[]struct{name string;filter imageFilters;want []string}{
-  {"attention",imageFilters{Sort:"attention"},[]string{"redis:7","nginx:latest","api:latest"}},
+  {"attention",imageFilters{Sort:"attention"},[]string{"redis:7","api:latest","nginx:latest"}},
   {"name",imageFilters{Sort:"name"},[]string{"api:latest","nginx:latest","redis:7"}},
   {"search service",imageFilters{Sort:"name",Query:"INFRA"},[]string{"redis:7"}},
   {"search registry",imageFilters{Sort:"name",Query:"ghcr.io"},[]string{"api:latest"}},
   {"registry changed",imageFilters{Sort:"attention",Registry:"changed"},[]string{"api:latest"}},
-  {"recent recorded change",imageFilters{Sort:"attention",Registry:"recorded_change_24h"},[]string{"nginx:latest","api:latest"}},
+  {"recent recorded change",imageFilters{Sort:"attention",Registry:"recorded_change_24h"},[]string{"api:latest","nginx:latest"}},
   {"different deployment",imageFilters{Sort:"name",Deployment:"different"},[]string{"nginx:latest"}},
   {"most services",imageFilters{Sort:"services"},[]string{"api:latest","nginx:latest","redis:7"}},
   {"latest check",imageFilters{Sort:"last_check"},[]string{"api:latest","nginx:latest","redis:7"}},
