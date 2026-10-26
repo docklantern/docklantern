@@ -23,6 +23,8 @@ type Container struct {
  ImageOS string `json:"image_os,omitempty"`
  ImageArchitecture string `json:"image_architecture,omitempty"`
  ImageVariant string `json:"image_variant,omitempty"`
+ // Only DockLantern's monitoring labels are passed to the persistence layer.
+ MonitorLabels map[string]string `json:"monitor_labels,omitempty"`
 }
 type Runner interface { Run(context.Context,string,...string)([]byte,error) }
 type Shell struct{}
@@ -55,6 +57,7 @@ func Scan(ctx context.Context,r Runner)([]Container,error){
    if project==""||service==""{continue}
    item:=Container{ID:x.ID,Name:strings.TrimPrefix(x.Name,"/"),Project:project,Service:service,Image:x.Config.Image,ImageID:x.Image,State:x.State.Status}
    if x.State.Health!=nil{item.Health=x.State.Health.Status}
+   item.MonitorLabels=monitorLabels(x.Config.Labels)
    if validID(x.Image){
     b,err:=r.Run(ctx,"docker","image","inspect",x.Image)
     if err==nil{
