@@ -20,7 +20,20 @@ func TestAuthenticatedNotificationSettings(t *testing.T){
  if got:=request(h,"POST","/settings/notifications",form.Encode(),false).Code;got!=401{t.Fatalf("unauthorized accepted %d",got)}
  if got:=request(h,"POST","/settings/notifications",form.Encode(),true).Code;got!=303{t.Fatalf("settings update failed %d",got)}
  current,err:=db.NotificationSettings(context.Background())
- if err!=nil||current.OutageFailures!=4||current.RetentionDays!=14||current.RegistryFailures||!current.DigestChanges{t.Fatalf("%+v %v",current,err)}
+ if err!=nil||current.OutageFailures!=4||current.RetentionDays!=30||current.RegistryFailures||!current.DigestChanges{t.Fatalf("%+v %v",current,err)}
+ // The notification form can arrive from a stale tab; retention is now
+ // saved by its own CSRF-protected handler and must not be reset here.
+ newRetention:=url.Values{"csrf_token":{guard.Token()},"retention_days":{"17"}}
+ if got:=request(h,"POST","/settings/retention",newRetention.Encode(),true).Code;got!=303{
+  t.Fatalf("retention settings update failed: %d",got)
+ }
+ if got:=request(h,"POST","/settings/notifications",form.Encode(),true).Code;got!=303{
+  t.Fatalf("stale notification form failed: %d",got)
+ }
+ current,err=db.NotificationSettings(context.Background())
+ if err!=nil||current.RetentionDays!=17{
+  t.Fatalf("notification form overwrote newer retention: %+v %v",current,err)
+ }
  bad:=url.Values{"csrf_token":{guard.Token()},"outage_failures":{"1"},"retention_days":{"0"}}
  if got:=request(h,"POST","/settings/notifications",bad.Encode(),true).Code;got!=400{t.Fatalf("bad setting accepted %d",got)}
  prune:=url.Values{"csrf_token":{guard.Token()}}
