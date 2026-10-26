@@ -58,6 +58,11 @@ func TestLiveMonitorGUIFormsAndCSRF(t *testing.T){
  }
  p,err:=db.MonitorPolicies(ctx)
  if err!=nil||len(p)!=1||p[0].IntervalSeconds!=180{t.Fatalf("override %+v %v",p,err)}
+ api:=request(h,"GET","/api/v1/monitoring/settings","",true)
+ if api.Code!=http.StatusOK{t.Fatalf("settings API %d: %s",api.Code,api.Body.String())}
+ for _,term:=range []string{`"default_interval_seconds":120`,`"effective_interval_seconds":180`,`"interval_source":"GUI override"`,`"enrollment_source":"GUI"`}{
+  if !strings.Contains(api.Body.String(),term){t.Errorf("API response missing %s",term)}
+ }
  settings=request(h,"GET","/settings","",true)
  for _,expected:=range []string{"GUI override","180s","Reset override","Pause"}{
   if !strings.Contains(settings.Body.String(),expected){t.Errorf("missing updated state %q",expected)}
