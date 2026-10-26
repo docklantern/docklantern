@@ -45,49 +45,7 @@ func Open(path string)(*Store,error){
  db,err:=sql.Open("sqlite",path);if err!=nil{return nil,err}
  db.SetMaxOpenConns(1)
  ctx,cancel:=context.WithTimeout(context.Background(),10*time.Second);defer cancel()
- for _,q:=range []string{
-  "PRAGMA busy_timeout=5000",
-  "PRAGMA journal_mode=WAL",
-  "CREATE TABLE IF NOT EXISTS registrations(name TEXT PRIMARY KEY,project_dir TEXT NOT NULL,files_json TEXT NOT NULL,env_files_json TEXT NOT NULL,services_json TEXT NOT NULL,profiles_json TEXT NOT NULL,enabled INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS inventory(container_id TEXT PRIMARY KEY,name TEXT NOT NULL,project TEXT NOT NULL,service TEXT NOT NULL,image TEXT NOT NULL,image_id TEXT NOT NULL,state TEXT NOT NULL,health TEXT NOT NULL,observed_at TEXT NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS registry_checks(image TEXT NOT NULL,platform TEXT NOT NULL,index_digest TEXT NOT NULL,platform_digest TEXT NOT NULL,previous_digest TEXT NOT NULL,status TEXT NOT NULL,checked_at TEXT NOT NULL,PRIMARY KEY(image,platform))",
-  "CREATE TABLE IF NOT EXISTS monitor_events(id INTEGER PRIMARY KEY AUTOINCREMENT,kind TEXT NOT NULL,project TEXT NOT NULL,service TEXT NOT NULL,image TEXT NOT NULL,platform TEXT NOT NULL,previous_digest TEXT NOT NULL,digest TEXT NOT NULL,occurred_at TEXT NOT NULL,delivery_state TEXT NOT NULL,delivery_attempts INTEGER NOT NULL,next_delivery_at TEXT NOT NULL,last_delivery_error TEXT NOT NULL)",
-  "CREATE INDEX IF NOT EXISTS idx_monitor_events_due ON monitor_events(delivery_state,next_delivery_at,id)",
-  "CREATE TABLE IF NOT EXISTS worker_status(name TEXT PRIMARY KEY,state TEXT NOT NULL,last_started_at TEXT NOT NULL,last_success_at TEXT NOT NULL,last_error_at TEXT NOT NULL,last_error TEXT NOT NULL,last_heartbeat_at TEXT NOT NULL,last_items INTEGER NOT NULL)",
-  "CREATE TABLE IF NOT EXISTS notification_settings(id INTEGER PRIMARY KEY CHECK(id=1),digest_changes INTEGER NOT NULL,registry_failures INTEGER NOT NULL,registry_recovery INTEGER NOT NULL,prolonged_outage INTEGER NOT NULL,outage_failures INTEGER NOT NULL,retention_days INTEGER NOT NULL)",
-  "INSERT OR IGNORE INTO notification_settings(id,digest_changes,registry_failures,registry_recovery,prolonged_outage,outage_failures,retention_days) VALUES(1,1,1,1,1,3,30)",
-   "CREATE TABLE IF NOT EXISTS monitor_policies(project TEXT NOT NULL,service TEXT NOT NULL,image TEXT NOT NULL,platform TEXT NOT NULL,interval_seconds INTEGER NOT NULL,paused INTEGER NOT NULL DEFAULT 0,next_check_at TEXT NOT NULL,last_checked_at TEXT NOT NULL DEFAULT '',last_error TEXT NOT NULL DEFAULT '',PRIMARY KEY(project,service),FOREIGN KEY(project) REFERENCES registrations(name))",
- }{if _,err=db.ExecContext(ctx,q);err!=nil{db.Close();return nil,fmt.Errorf("sqlite init: %w",err)}}
- // Safe additive migration of older persisted inventory databases.
- rows,err:=db.QueryContext(ctx,"PRAGMA table_info(inventory)")
- if err!=nil{db.Close();return nil,err}
- columns:=make(map[string]bool)
- for rows.Next(){var id int;var name,typ string;var notnull,pk int;var def sql.NullString
-  if err=rows.Scan(&id,&name,&typ,&notnull,&def,&pk);err!=nil{break}
-  columns[name]=true
- }
- if scanErr:=rows.Err();err==nil{err=scanErr}
- rows.Close()
- if err!=nil{db.Close();return nil,err}
- for _,column:=range []string{"repo_digests_json","image_os","image_architecture","image_variant"}{
-  if columns[column]{continue}
-  if _,err=db.ExecContext(ctx,"ALTER TABLE inventory ADD COLUMN "+column+" TEXT NOT NULL DEFAULT ''");err!=nil{db.Close();return nil,err}
- }
- // Persist the backoff counter across restarts (older databases lack this column).
- policyRows,err:=db.QueryContext(ctx,"PRAGMA table_info(monitor_policies)")
- if err!=nil{db.Close();return nil,err}
- hasFailures:=false
- for policyRows.Next(){
-  var id,required,pk int;var name,kind string;var def sql.NullString
-  if err=policyRows.Scan(&id,&name,&kind,&required,&def,&pk);err!=nil{break}
-  if name=="consecutive_failures"{hasFailures=true}
- }
- if err==nil{err=policyRows.Err()}
- policyRows.Close()
- if err!=nil{db.Close();return nil,err}
- if !hasFailures{
-  if _,err=db.ExecContext(ctx,"ALTER TABLE monitor_policies ADD COLUMN consecutive_failures INTEGER NOT NULL DEFAULT 0");err!=nil{db.Close();return nil,err}
- }
+ if err=initializeSchema(ctx,db);err!=nil{_ =db.Close();return nil,fmt.Errorf("sqlite init: %w",err)}
  return &Store{db:db},nil
 }
 func(s *Store)Close()error{return s.db.Close()}
