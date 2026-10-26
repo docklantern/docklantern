@@ -2,18 +2,15 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <div class="shell">
   <aside class="sidebar" aria-label="DockLantern navigation">
-    <div class="brand"><span class="brand-icon" aria-hidden="true">◈</span><span>Dock<span class="brand-accent">Lantern</span><small>COMPOSE MONITOR</small></span></div>
+    <div class="brand"><span class="brand-icon" aria-hidden="true">◈</span><span>Dock<span class="brand-accent">Lantern</span><small>COMPOSE IMAGE MONITOR</small></span></div>
     <nav aria-label="Main navigation">
       <a class="nav-link{{if eq .ActivePage "overview"}} active{{end}}"{{if eq .ActivePage "overview"}} aria-current="page"{{end}} href="/"><span aria-hidden="true">▦</span> Overview</a>
-      <a class="nav-link" href="/#services"><span aria-hidden="true">▥</span> Services</a>
-      <a class="nav-link" href="/#projects"><span aria-hidden="true">▤</span> Projects</a>
-      <a class="nav-link" href="/#assessments"><span aria-hidden="true">◇</span> Image status</a>
-      <a class="nav-link{{if eq .ActivePage "events"}} active{{end}}"{{if eq .ActivePage "events"}} aria-current="page"{{end}} href="/events"><span aria-hidden="true">♧</span> Event history</a>
-      <a class="nav-link" href="/#registry"><span aria-hidden="true">◎</span> Registry checks</a>
-      <a class="nav-link" href="/#policies"><span aria-hidden="true">◷</span> Monitoring</a>
+      <a class="nav-link{{if eq .ActivePage "images"}} active{{end}}"{{if eq .ActivePage "images"}} aria-current="page"{{end}} href="/images"><span aria-hidden="true">◇</span> Images</a>
+      <a class="nav-link{{if eq .ActivePage "services"}} active{{end}}"{{if eq .ActivePage "services"}} aria-current="page"{{end}} href="/services"><span aria-hidden="true">▥</span> Services</a>
+      <a class="nav-link{{if eq .ActivePage "events"}} active{{end}}"{{if eq .ActivePage "events"}} aria-current="page"{{end}} href="/events"><span aria-hidden="true">♧</span> Activity</a>
       <a class="nav-link{{if eq .ActivePage "settings"}} active{{end}}"{{if eq .ActivePage "settings"}} aria-current="page"{{end}} href="/settings"><span aria-hidden="true">⚙</span> Settings</a>
     </nav>
-    <div class="sidebar-foot"><span class="status-dot"></span> Read-only dashboard<small>Monitoring only</small></div>
+    <div class="sidebar-foot"><span class="status-dot"></span> Read-only monitoring<small>Deployments disabled</small></div>
   </aside>
   <main id="main" class="main{{if .MainClass}} {{.MainClass}}{{end}}">
 {{end}}
