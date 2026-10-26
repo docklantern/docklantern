@@ -33,3 +33,9 @@ func EventDelivery(e store.Event) string {
  }
  return e.DeliveryState
 }
+
+func ShortDigest(s string)string {
+ if len(s)>28 {return s[:28]+"…"}
+ if s==""{return "Not available"}
+ return s
+}
