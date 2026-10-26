@@ -35,6 +35,10 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-beta-install.sh
+      - name: Verify automatic label monitoring after application startup
+        env:
+          DOCKLANTERN_INTEGRATION_TEST: "1"
+        run: bash tests/integration/run-beta3-onboarding.sh
 
   security-audit:
     uses: ./.github/workflows/security-audit.yaml
