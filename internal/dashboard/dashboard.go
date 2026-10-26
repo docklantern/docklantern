@@ -10,6 +10,7 @@ import (
  "time"
 
  "github.com/docklantern/docklantern/internal/layout"
+ "github.com/docklantern/docklantern/internal/presentation"
  "github.com/docklantern/docklantern/internal/store"
  "github.com/docklantern/docklantern/internal/updates"
 )
@@ -21,6 +22,9 @@ var page = template.Must(layout.WithShell(template.Must(template.New("dashboard.
  "short": func(s string) string { if len(s)>28 {return s[:28]+"…"};return s },
  "badge": func(s string) string { switch strings.ToLower(s) {case "running","healthy","unchanged":return "ok";case "changed","unhealthy","exited":return "warn";case "paused","first_seen","stale_inventory","stale_registry","unknown","not_checked":return "muted";default:return "neutral"} },
  "when": func(s string) string {if s==""{return "Not yet"};t,e:=time.Parse(time.RFC3339,s);if e!=nil{return s};return t.UTC().Format("2006-01-02 15:04 UTC")},
+ "eventKind":presentation.EventKind,
+ "eventScope":presentation.EventScope,
+ "eventDelivery":presentation.EventDelivery,
 }).ParseFS(assets,"assets/dashboard.html"))))
 
 type Reader interface {
@@ -40,6 +44,7 @@ type view struct {
  Checks []store.RegistryCheck
  Policies []store.MonitorPolicy
  Assessments []updates.Assessment
+ Services []serviceRow
  ProjectCount int
  ContainerCount int
  RunningCount int
@@ -65,7 +70,12 @@ func collect(ctx context.Context,s Reader)(view,error){
  if reader,ok:=s.(interface{WorkerStatuses(context.Context)([]store.WorkerStatus,error)});ok{
   workers,e=reader.WorkerStatuses(ctx);if e!=nil{return view{},e}
  }
- v:=view{ActivePage:"overview",Workers:workers,Events:events,Checks:checks,Policies:policies,Assessments:updates.AssessFresh(registrations,containers,policies,checks,time.Now().UTC()),ProjectCount:len(registrations),ContainerCount:len(containers),MonitoredCount:len(policies)}
+ assessments:=updates.AssessMonitoredFresh(registrations,containers,policies,checks,time.Now().UTC())
+ v:=view{ActivePage:"overview",Workers:workers,Events:events,Checks:checks,Policies:policies,Assessments:assessments,ContainerCount:len(containers),MonitoredCount:len(policies)}
+ if reader,ok:=s.(interface{MonitorServiceViews(context.Context)([]store.MonitorServiceView,error)});ok{
+  serviceSettings,err:=reader.MonitorServiceViews(ctx);if err!=nil{return view{},err}
+  v.Services=buildServiceRows(serviceSettings,containers,policies,checks,assessments)
+ }
  idx:=make(map[string]int,len(registrations))
  for _,r:=range registrations{idx[r.Name]=len(v.Projects);v.Projects=append(v.Projects,project{Registration:r})}
  for _,c:=range containers{
@@ -73,6 +83,10 @@ func collect(ctx context.Context,s Reader)(view,error){
   if i,ok:=idx[c.Project];ok {v.Projects[i].Containers=append(v.Projects[i].Containers,c)}else{v.Unregistered=append(v.Unregistered,c)}
  }
  for _,p:=range policies{if i,ok:=idx[p.Project];ok{v.Projects[i].Policies=append(v.Projects[i].Policies,p)}}
+ projectsSeen:=make(map[string]bool)
+ for _,p:=range registrations{projectsSeen[p.Name]=true}
+ for _,c:=range containers{if c.Project!=""{projectsSeen[c.Project]=true}}
+ v.ProjectCount=len(projectsSeen)
  for _,c:=range checks{if c.Status=="changed"{v.ChangedCount++}}
  return v,nil
 }
