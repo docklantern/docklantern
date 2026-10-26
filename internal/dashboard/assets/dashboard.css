@@ -7,3 +7,15 @@
 .skip-link{position:absolute;top:8px;left:8px;z-index:20;transform:translateY(-160%);padding:10px 14px;background:#122f49;color:#fff;border:2px solid var(--accent);border-radius:8px;text-decoration:none}
 .skip-link:focus{transform:translateY(0)}
 .sidebar nav .nav-link:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* Beta.3 inline monitoring controls retain the shared responsive application shell. */
+.service-control{border:1px solid var(--border);border-radius:10px;padding:16px;margin:15px 0;background:var(--surface2);overflow-wrap:anywhere}
+.service-control-head{display:flex;justify-content:space-between;gap:12px;align-items:start}
+.service-control-head h3{margin:0 0 6px}
+.service-control-head p{margin:0}
+.service-control>p{margin:10px 0;font-size:12px}
+.service-control-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.settings-panel .service-control-actions form{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:3px 0}
+.service-control-actions input[type=number]{max-width:135px}
+.service-control-actions button{min-height:38px}
+@media(max-width:700px){.service-control-head{flex-direction:column}.service-control-actions{flex-direction:column;align-items:stretch}.settings-panel .service-control-actions form{width:100%}}
