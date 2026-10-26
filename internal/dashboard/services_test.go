@@ -57,8 +57,8 @@ func TestServiceFirstDashboardWithLabelEnrollmentAndRegistryEvents(t *testing.T)
  if strings.Contains(body,"available update")||strings.Contains(body,"newer release available"){
   t.Fatal("remote digest was incorrectly labeled as a newer release")
  }
- if strings.Count(body,"hello-js / web")!=1{
-  t.Fatalf("service row duplicated across replicas: %d",strings.Count(body,"hello-js / web"))
+ if strings.Count(body,"<strong>hello-js / web</strong>")!=1{
+  t.Fatalf("service row duplicated across replicas: %d",strings.Count(body,"<strong>hello-js / web</strong>"))
  }
 }
 
