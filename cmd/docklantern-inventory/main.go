@@ -16,6 +16,7 @@ import (
  "os"
  "strings"
  "time"
+ "github.com/docklantern/docklantern/internal/buildinfo"
  "github.com/docklantern/docklantern/internal/auth"
  "github.com/docklantern/docklantern/internal/management"
  "github.com/docklantern/docklantern/internal/discovery"
@@ -26,7 +27,6 @@ import (
  "github.com/docklantern/docklantern/internal/store"
  appRuntime "github.com/docklantern/docklantern/internal/runtime"
 )
-var version = "dev"
 func main(){
  showVersion:=flag.Bool("version",false,"print binary release version")
  mode:=flag.String("mode","serve","serve, discover, scan, register, projects, check-image, set-policy, policies, check-due, monitor")
@@ -45,7 +45,7 @@ func main(){
  backupPath:=flag.String("backup","","create a consistent SQLite backup at a new path, then exit")
  pruneEvents:=flag.Bool("prune-events",false,"explicitly remove delivered events older than configured retention")
  flag.Parse()
- if *showVersion{fmt.Println("DockLantern",version);return}
+ if *showVersion{fmt.Println("DockLantern",buildinfo.Version);return}
  scanDocker:=func(ctx context.Context)([]discovery.Container,error){
   if endpoint:=os.Getenv("DOCKLANTERN_DOCKER_PROXY_URL");endpoint!=""{
    proxy,err:=discovery.NewProxy(endpoint);if err!=nil{return nil,err}
@@ -106,6 +106,7 @@ func main(){
  case "projects":
   x,e:=s.Projects(ctx);must(e);must(json.NewEncoder(os.Stdout).Encode(x))
  case "serve":
+  log.Printf("DockLantern running binary build: %s",buildinfo.Version)
   // Non-loopback binding requires explicit HTTPS reverse-proxy configuration.
   proxyMode:=os.Getenv("DOCKLANTERN_ALLOW_PROXY")=="1"
   origin:=os.Getenv("DOCKLANTERN_PUBLIC_ORIGIN")
