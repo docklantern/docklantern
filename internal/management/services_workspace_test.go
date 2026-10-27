@@ -63,7 +63,8 @@ func TestBeta4ServicesWorkspaceAndMonitoringActions(t *testing.T){
  if details.Code!=200{t.Fatalf("service detail status %d",details.Code)}
  for _,term:=range []string{
   "Monitoring configuration","Enrollment source","Effective interval","Running containers",
-  "Image and deployment evidence","Enable monitoring",`action="/settings/monitoring/service"`,
+  "Image and deployment evidence","Docker-observed container image","Registry watch image",
+  "Last Docker inventory scan","Enable monitoring",`action="/settings/monitoring/service"`,
   `name="csrf_token"`,`name="return_to" value="/services/site/web"`,
  }{
   if !strings.Contains(details.Body.String(),term){t.Errorf("missing service detail term %q",term)}

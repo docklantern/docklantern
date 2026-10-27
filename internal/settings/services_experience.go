@@ -178,9 +178,9 @@ var servicesExperienceTemplate=workspaceTemplate("services-v2",`<!doctype html><
 </form>
 {{range .Groups}}
 <details class="service-project" open><summary><span class="project-heading">{{.Project}}</span><span class="helper">{{len .Services}} services</span></summary>
-<div class="table-scroll"><table><thead><tr><th>Service</th><th>Watched image / platform</th><th>Monitoring</th><th>Deployed image</th><th>Runtime</th><th>Schedule</th><th>Details</th></tr></thead><tbody>
+<div class="table-scroll"><table><thead><tr><th>Service</th><th>Docker-observed image / platform</th><th>Monitoring</th><th>Deployed image</th><th>Runtime</th><th>Schedule</th><th>Details</th></tr></thead><tbody>
 {{range .Services}}<tr>
-<td><strong>{{.Service}}</strong></td><td class="mono image-col">{{if .Image}}{{.Image}}{{else}}No validated image{{end}}<small class="subtext">{{.Platform}}</small></td>
+<td><strong>{{.Service}}</strong></td><td class="mono image-col">{{if .MixedDiscoveredImages}}Multiple container image references{{else if .DiscoveredImage}}{{.DiscoveredImage}}{{else}}No recent Docker inventory{{end}}<small class="subtext">{{.Platform}}</small>{{if .HasPolicy}}{{if ne .Image .DiscoveredImage}}<small class="subtext">Watched: {{.Image}}</small>{{end}}{{end}}</td>
 <td><span class="pill {{tone .Monitoring}}">{{status .Monitoring}}</span><small class="subtext">{{.Enrollment}}</small></td>
 <td><span class="pill {{tone .Assessment}}">{{status .Assessment}}</span></td>
 <td>{{.RunningCount}} / {{.ContainerCount}} running<small class="subtext">Health: {{.ContainerHealth}}</small></td>
@@ -206,7 +206,9 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 </div></section>
 <section class="section panel workspace-detail" aria-labelledby="service-image-title"><h2 id="service-image-title">Image and deployment evidence</h2>
 <dl class="digest-list">
-<div><dt>Discovered image</dt><dd class="mono">{{if .Service.Image}}{{.Service.Image}}{{else}}Unavailable{{end}}</dd></div>
+<div><dt>Docker-observed container image</dt><dd class="mono">{{if .Service.MixedDiscoveredImages}}Mixed image references across replicas{{else if .Service.DiscoveredImage}}{{.Service.DiscoveredImage}}{{else}}No recent Docker inventory{{end}}</dd></div>
+<div><dt>Last Docker inventory scan</dt><dd>{{when .Service.InventoryObservedAt}}</dd></div>
+<div><dt>Registry watch image</dt><dd class="mono">{{if .Service.HasPolicy}}{{.Service.Image}}{{else}}Not enrolled{{end}}</dd></div>
 <div><dt>Platform</dt><dd>{{if .Service.Platform}}{{.Service.Platform}}{{else}}Unknown{{end}}</dd></div>
 <div><dt>Deployed assessment</dt><dd><span class="pill {{tone .Service.Assessment}}">{{status .Service.Assessment}}</span>{{if .Reason}}<small class="subtext">{{.Reason}}</small>{{end}}</dd></div>
 <div><dt>Deployed digest</dt><dd class="mono">{{if .DeployedDigest}}{{.DeployedDigest}}{{else}}Not verified{{end}}</dd></div>
@@ -215,6 +217,7 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 <div><dt>Registry checked</dt><dd>{{when .RegistryCheckedAt}}</dd></div>
 </dl>
 {{if .Service.ImageID}}<p><a class="text-action" href="{{imageURL .Service.ImageID}}">View image details</a></p>{{end}}
+<p class="helper">Docker-observed image is the reference recorded when a container was created. Pulling a newer tag or restarting the same container does not change it. The monitored registry reference can differ, especially for legacy manual policies. The application build is shown in the sidebar.</p>
 <p class="helper">A different remote digest does not prove a newer release.</p>
 </section>
 <section class="section panel workspace-detail" id="monitoring-controls" aria-labelledby="service-monitoring-title"><h2 id="service-monitoring-title">Monitoring configuration</h2>

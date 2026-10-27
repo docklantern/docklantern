@@ -70,6 +70,9 @@ type ServiceSummary struct {
     Image string
     Platform string
     ImageID string
+    DiscoveredImage string
+    MixedDiscoveredImages bool
+    InventoryObservedAt string
     Enrollment string
     DiscoveryState string
     ValidationError string
@@ -224,6 +227,15 @@ func BuildServiceSummaries(views []store.MonitorServiceView,containers []store.C
         health:=""
         healthSeen:=false
         for _,c:=range byContainers[id]{
+            // Persisted registry watch policy may intentionally refer to an older
+            // image (e.g. a legacy manual policy). Keep its identity separate
+            // from what Docker actually reported at the latest inventory scan.
+            if s.ContainerCount==0 {
+                s.DiscoveredImage=c.Image
+            } else if s.DiscoveredImage!=c.Image {
+                s.MixedDiscoveredImages=true
+            }
+            if c.ObservedAt>s.InventoryObservedAt {s.InventoryObservedAt=c.ObservedAt}
             s.ContainerCount++
             if c.State=="running"{s.RunningCount++}
             if s.Image==""{s.Image=c.Image}

@@ -154,3 +154,64 @@
 .settings-danger-zone{margin-top:18px;border-top:1px solid var(--border);padding-top:13px}
 .settings-danger-zone h3{margin-bottom:5px}
 .settings-panel a{color:#9fe1ff}
+
+
+/* Test-VPS feedback: readable typography without remote font downloads.
+   Prefer Inter when locally available, followed by legible native sans fonts.
+   All views share this CSS; keep image tags/digests in a distinct monospace face. */
+:root {
+  --muted: #b1c4da;
+}
+body {
+  font-family: Inter, "Segoe UI", "Noto Sans", Roboto, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  font-synthesis: none;
+}
+h1, h2, h3 { line-height: 1.32; }
+.muted, .helper { color: var(--muted); }
+.helper, .stat-hint, .subtext, .overview-time, .overview-no-events,
+.overview-activity .overview-time, .overview-workers .subtext, .activity-entry-time,
+.activity-delivery, .activity-evidence, .activity-entry-main .subtext,
+.settings-panel .helper, .sidebar-foot, footer, .path, .subhead,
+.project-bottom, .activity-day h3, .readonly {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #b1c4da;
+}
+.stat-label, .settings-panel label, .image-filters label,
+.service-filters label, .activity-filters label, .service-interval-form label {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #bed0e5;
+}
+th {
+  font-size: 11.5px;
+  letter-spacing: .045em;
+  color: #b0c3dc;
+}
+td { font-size: 13.5px; line-height: 1.55; }
+.pill { font-size: 11.5px; line-height: 1.35; }
+.mono, code {
+  font-family: "Cascadia Code", "SFMono-Regular", "Noto Sans Mono", "DejaVu Sans Mono", ui-monospace, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: .11em;
+  color: #b2c8df;
+}
+.nav-link { font-size: 14px; }
+.brand small { font-size: 10.5px; letter-spacing: .12em; }
+.sidebar-foot .build-version { margin: 9px 0 0; font-size: 11.5px; letter-spacing: 0; overflow-wrap: anywhere; color: #b2c8df; }
+.text-action, .overview-ops-links, .overview-more { font-size: 13px; }
+.image-filters input, .image-filters select, .service-filters input,
+.service-filters select, .service-interval-form input, .activity-filters input,
+.activity-filters select, .settings-panel input, .settings-panel select,
+.settings-panel textarea { font-size: 13.5px; line-height: 1.5; }
+@media (max-width:700px) {
+  .nav-link { font-size: 13px; }
+  .sidebar-foot { display: block; padding: 7px 1px 3px; border-top: 0; font-size: 11.5px; }
+  .sidebar-foot .build-version { display: inline; margin-left: 9px; }
+}
