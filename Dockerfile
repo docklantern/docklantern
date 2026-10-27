@@ -7,7 +7,7 @@ RUN go mod download
 COPY cmd/ ./cmd/
 COPY internal/ ./internal/
 ARG VERSION=dev
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false -ldflags="-s -w -X main.version=${VERSION}" -o /out/docklantern-inventory ./cmd/docklantern-inventory
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false -ldflags="-s -w -X github.com/docklantern/docklantern/internal/buildinfo.Version=${VERSION}" -o /out/docklantern-inventory ./cmd/docklantern-inventory
 
 # Monitoring-only runtime: no Docker CLI, Compose or Buildx binaries.
 # Optional discovery uses the constrained read-only HTTP socket proxy.
