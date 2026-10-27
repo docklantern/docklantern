@@ -163,3 +163,30 @@ func TestRegistryFreshnessRespectsMonitorIntervals(t *testing.T){
   t.Fatalf("future-dated registry check must not appear fresh: %+v",groups)
  }
 }
+
+
+func TestServiceSummaryKeepsRegistryWatchSeparateFromDockerObservedImage(t *testing.T) {
+ id:=ServiceIdentity{Project:"docklantern",Service:"docklantern"}
+ watched:="docker.io/davidslusser/docklantern:v0.1.0-beta.2"
+ observed:="docker.io/davidslusser/docklantern:v0.1.0-beta.4"
+ stamp:="2026-10-27T21:00:00Z"
+ views:=[]store.MonitorServiceView{{Project:id.Project,Service:id.Service,Image:watched,Platform:"linux/amd64",HasPolicy:true,EnrollmentSource:"Legacy manual"}}
+ policies:=[]store.MonitorPolicy{{Project:id.Project,Service:id.Service,Image:watched,Platform:"linux/amd64"}}
+ containers:=[]store.Container{{Project:id.Project,Service:id.Service,Image:observed,State:"running",ObservedAt:stamp,ImageOS:"linux",ImageArchitecture:"amd64"}}
+ out:=BuildServiceSummaries(views,containers,policies,nil)
+ if len(out)!=1{t.Fatalf("expected one service, got %+v",out)}
+ s:=out[0]
+ if s.Image!=watched || s.DiscoveredImage!=observed || s.InventoryObservedAt!=stamp || s.MixedDiscoveredImages{
+  t.Fatalf("policy and Docker provenance were conflated: %+v",s)
+ }
+ if s.ImageID!=ImageID(ImageIdentity{Reference:watched,Platform:"linux/amd64"}){
+  t.Fatalf("watch image deep link must remain attached to watched image: %s",s.ImageID)
+ }
+ // Replicas referencing different images must not claim one universally
+ // deployed image reference.
+ containers=append(containers,store.Container{Project:id.Project,Service:id.Service,Image:watched,State:"running",ObservedAt:stamp})
+ out=BuildServiceSummaries(views,containers,policies,nil)
+ if !out[0].MixedDiscoveredImages || out[0].ContainerCount!=2{
+  t.Fatalf("mixed replica image references must be explicit: %+v",out[0])
+ }
+}
