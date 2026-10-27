@@ -10,7 +10,7 @@
       <a class="nav-link{{if eq .ActivePage "events"}} active{{end}}"{{if eq .ActivePage "events"}} aria-current="page"{{end}} href="/events"><span aria-hidden="true">♧</span> Activity</a>
       <a class="nav-link{{if eq .ActivePage "settings"}} active{{end}}"{{if eq .ActivePage "settings"}} aria-current="page"{{end}} href="/settings"><span aria-hidden="true">⚙</span> Settings</a>
     </nav>
-    <div class="sidebar-foot"><span class="status-dot"></span> Read-only monitoring<small>Deployments disabled</small></div>
+    <div class="sidebar-foot"><span class="status-dot"></span> Read-only monitoring<small>Deployments disabled</small><small class="build-version">Running app: {{appBuildVersion}}</small></div>
   </aside>
   <main id="main" class="main{{if .MainClass}} {{.MainClass}}{{end}}">
 {{end}}
