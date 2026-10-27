@@ -4,6 +4,8 @@ package layout
 import (
     "embed"
     "html/template"
+
+    "github.com/docklantern/docklantern/internal/buildinfo"
 )
 
 //go:embed shell.html
@@ -16,5 +18,7 @@ func WithShell(t *template.Template) (*template.Template, error) {
     if err != nil {
         return nil, err
     }
-    return t.Parse(string(markup))
+    return t.Funcs(template.FuncMap{
+        "appBuildVersion": func() string { return buildinfo.Version },
+    }).Parse(string(markup))
 }
