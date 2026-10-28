@@ -1,8 +1,10 @@
 # v0.1.0-beta.4 — Release validation and operator acceptance
 
-**Status: IN PROGRESS — release not approved, published or deployed.**  
+**Status: IN PROGRESS — beta.4 is running as an unreleased test-VPS build; merged PR #58 is not yet deployed there. The beta.4 release is not approved or published, and no release deployment is authorized.**  
 **Tracker:** [#51](https://github.com/docklantern/docklantern/issues/51)  
 **Scope:** monitoring-only image-first GUI. **Do not tag, publish or deploy on the basis of CI alone.**
+
+The beta.3 predecessor gate [#34](https://github.com/docklantern/docklantern/issues/34) is closed. Its operator-deferred host safety checks should still be exercised during beta.4 acceptance where practical.
 
 ## Gate 1 — Code and regression checks
 
@@ -47,9 +49,23 @@ Review at desktop (~1440px), tablet (~800px) and mobile (~390px). Capture screen
 - [ ] Mobile view has no clipped navigation/forms; tables scroll horizontally when necessary and do not conceal required actions.
 - [ ] High-contrast/status colors remain readable, especially failures, Unknown and disabled states.
 
+### PR #58 acceptance on the existing beta.4 test VPS
+
+**Checkpoint (2026-10-27):** [PR #58](https://github.com/docklantern/docklantern/pull/58) was merged at `5d1bc5fa2af472cd604e69ac248fd3b86e0fe706`. The exact merged commit passed [10/10 Go checks](https://github.com/docklantern/docklantern/actions/runs/40601983136) and [3/3 security checks](https://github.com/docklantern/docklantern/actions/runs/40601983487). The operator confirmed the misleading beta.2 image reference was an old persisted monitoring policy and corrected it in Settings. **The test VPS has not yet received PR #58.** The following manual checks remain open:
+
+- [ ] Obtain **separate explicit approval** before changing or recreating the test-VPS DockLantern container to include PR #58. A merged PR does not grant deployment approval.
+- [ ] Record active Compose overlays and the current `docker inspect` container image reference, immutable image ID and created time; compare `docklantern-inventory -version` with the sidebar's **Running app** label after the approved test upgrade. The binary build version is not the Docker image tag.
+- [ ] On desktop (~1440px), tablet (~800px) and mobile (~390px), inspect sidebar, tables, badges, filters, digests, helper text and activity timestamps for readable size and contrast, and test keyboard-only navigation and visible focus.
+- [ ] On Services and Service Details, separately confirm the **Docker-observed container image**, latest inventory observation timestamp, and persisted **registry watch image**. They must not be presented as interchangeable; no registry watch policy is proof of a running image.
+- [ ] Verify Overview/Images/Services/Activity/Settings and both details pages with real but noncritical monitoring data; compare status/count behavior with registry observations, including mixed platforms, failing/stale checks and explicit `monitor=false`.
+- [ ] Check unchanged IDs, image IDs and start times for unrelated monitored containers; verify monitoring form changes do not cause pulls/restarts/recreates.
+- [ ] Attach operator screenshots/notes, sanitized versions/observations, resource baseline and any accepted deferrals to [#51](https://github.com/docklantern/docklantern/issues/51). Never paste secrets or complete environment-bearing Compose output.
+
+Safe read-only host diagnostics are in the [running-image reference guide](../operations/beta4-running-image-reference.md). The assistant cannot certify live host or visual acceptance from passing CI alone.
+
 ## Gate 3 — VPS operating and data checks (only after explicit deployment authorization)
 
-Before replacing the running beta.3 image:
+Before changing the running DockLantern image (identify the test VPS's actual current beta.4 candidate; published beta.3 is the release/rollback baseline, not necessarily the live image):
 
 - [ ] Confirm the published beta.3 deployment is healthy; record the current pinned image digest, exact Compose overlays, proxy configuration, and SQLite schema.
 - [ ] Create/locate a consistent SQLite backup; confirm integrity and how to restore. In a small beta with recreatable test services, a **full restore drill may be explicitly deferred by the operator** (record that decision).
