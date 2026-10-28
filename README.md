@@ -4,7 +4,7 @@
 
 DockLantern is a lightweight Go web application that discovers Docker Compose services through a **restricted read-only Docker socket proxy** and checks tagged OCI registry manifests for changes. It presents registry observations, conservative deployed-image comparisons, image-scoped history, and service monitoring controls.
 
-> **Release status:** [v0.1.0-beta.3](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.3) is published. **v0.1.0-beta.4 is in release validation and is not yet published or promoted through an approved release deployment**. Unreleased builds may be tested separately. The separate [deployment repository](https://github.com/docklantern/docklantern-deploy) controls the pinned running image and requires an explicit deployment approval.
+> **Release status:** [v0.1.0-beta.3](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.3) is the published GitHub prerelease. An older `v0.1.0-beta.4` tag already published registry images from a pre-PR #58 commit without creating a GitHub prerelease; those images are **not** the fully accepted build. **`v0.1.0-beta.4.1` is the planned, untagged/unpublished release candidate.** The PR #58 test build was separately deployed and accepted on the test VPS. [Release deployment](https://github.com/docklantern/docklantern-deploy) still requires separate approval.
 
 ## Beta.4: Image-first web interface (release candidate work)
 
@@ -50,7 +50,7 @@ For a discovered unlabeled service, use **Services → Service Details** to enro
 
 - [Beta.4 workspace guide](docs/user-guide/beta4-workspaces.md).
 - [Beta.4 release validation checklist](docs/deployment/beta4-release-checklist.md).
-- [Beta.4 draft release notes](docs/releases/v0.1.0-beta.4.md).
+- [Beta.4.1 candidate release notes](docs/releases/v0.1.0-beta.4.1.md) and [historical beta.4 draft](docs/releases/v0.1.0-beta.4.md).
 - [Label-based monitoring](docs/user-guide/beta3-label-monitoring.md) and [existing interval controls](docs/user-guide/beta3-live-monitor-settings.md).
 - [Deployment configuration](https://github.com/docklantern/docklantern-deploy) and [SQLite backup/upgrade guidance](docs/deployment/beta3-sqlite-upgrade.md).
 - [Development guide](docs/development/README.md), [roadmap](docs/product/roadmap.md), [contributing](CONTRIBUTING.md), and [security policy](SECURITY.md).
