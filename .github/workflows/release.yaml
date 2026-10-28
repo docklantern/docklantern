@@ -21,7 +21,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          [[ "$GITHUB_REF" == refs/tags/* ]] ||
+            { echo "Release workflow must run on a version tag" >&2; exit 1; }
           [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || exit 1
+          notes_file="docs/releases/${GITHUB_REF_NAME}.md"
+          [[ -s "$notes_file" ]] ||
+            { echo "Missing or empty release notes: $notes_file" >&2; exit 1; }
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main ||
             { echo "Release tag must point to a reviewed main-branch commit" >&2; exit 1; }
@@ -78,22 +83,22 @@ jobs:
           tags: |
             ghcr.io/docklantern/docklantern:${{ github.ref_name }}
             davidslusser/docklantern:${{ github.ref_name }}
-      - name: Create GitHub beta prerelease after image publishing succeeds
-        if: github.ref_name == 'v0.1.0-beta.3'
+      - name: Create GitHub release after image publishing succeeds
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          [[ "$tag" == "v0.1.0-beta.3" ]] || {
-            # The same release workflow remains available for future versions;
-            # notes for each must be provided in its own release PR.
-            echo "Release notes must be prepared for $tag separately" >&2
-            exit 1
-          }
+          notes_file="docs/releases/${tag}.md"
+          [[ -s "$notes_file" ]] ||
+            { echo "Missing or empty release notes: $notes_file" >&2; exit 1; }
+          release_flags=()
+          if [[ "$tag" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
           gh release create "$tag" \
             --verify-tag \
-            --prerelease \
+            "${release_flags[@]}" \
             --title "DockLantern $tag" \
-            --notes-file docs/releases/v0.1.0-beta.3.md
+            --notes-file "$notes_file"
