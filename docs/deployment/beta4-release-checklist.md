@@ -1,10 +1,17 @@
-# v0.1.0-beta.4 — Release validation and operator acceptance
+# v0.1.0-beta.4.1 — Release validation and operator acceptance
 
-**Status: IN PROGRESS — beta.4 is running as an unreleased test-VPS build; merged PR #58 is not yet deployed there. The beta.4 release is not approved or published, and no release deployment is authorized.**  
+**Status: IN PROGRESS — v0.1.0-beta.4.1 is the selected release candidate; it is NOT tagged, published, or approved for a release deployment. PR #58 was separately authorized and successfully deployed to the test VPS.**  
 **Tracker:** [#51](https://github.com/docklantern/docklantern/issues/51)  
 **Scope:** monitoring-only image-first GUI. **Do not tag, publish or deploy on the basis of CI alone.**
 
 The beta.3 predecessor gate [#34](https://github.com/docklantern/docklantern/issues/34) is closed. Its operator-deferred host safety checks should still be exercised during beta.4 acceptance where practical.
+
+### Existing beta.4 tag and release-candidate provenance
+
+- **Preserve the existing `v0.1.0-beta.4` tag and registry artifacts:** the tag points to `fede82cef7f7fd802397be5121cde471f8a21fa1` before PRs #58–#60. Its [versioned release run](https://github.com/docklantern/docklantern/actions/runs/40418851278) successfully published GHCR and Docker Hub images but skipped creating a GitHub prerelease. **Do not move, reuse, or overwrite** that tag.
+- The candidate is `v0.1.0-beta.4.1`, untagged and unpublished as of this review. Matching notes are [here](../releases/v0.1.0-beta.4.1.md). Merged PR #60 ensures missing notes fail verification before any new image publication.
+- After PRs #59/#60, main commit `4de9b833b04140230e72aa81356345f3b00fb99b` passed [10/10 Go jobs](https://github.com/docklantern/docklantern/actions/runs/40628465289) and [3/3 security jobs](https://github.com/docklantern/docklantern/actions/runs/40628465280). Reverify CI for the exact final merge/tag target.
+- **Separate explicit operator approvals** are required for (1) release tagging/image publication and (2) subsequent digest-pinned release deployment. The local PR #58 test deployment is not beta.4.1 publication.
 
 ## Gate 1 — Code and regression checks
 
@@ -49,30 +56,31 @@ Review at desktop (~1440px), tablet (~800px) and mobile (~390px). Capture screen
 - [ ] Mobile view has no clipped navigation/forms; tables scroll horizontally when necessary and do not conceal required actions.
 - [ ] High-contrast/status colors remain readable, especially failures, Unknown and disabled states.
 
-### PR #58 acceptance on the existing beta.4 test VPS
+### PR #58 test-VPS acceptance — confirmed by operator (2026-10-27)
 
-**Checkpoint (2026-10-27):** [PR #58](https://github.com/docklantern/docklantern/pull/58) was merged at `5d1bc5fa2af472cd604e69ac248fd3b86e0fe706`. The exact merged commit passed [10/10 Go checks](https://github.com/docklantern/docklantern/actions/runs/40601983136) and [3/3 security checks](https://github.com/docklantern/docklantern/actions/runs/40601983487). The operator confirmed the misleading beta.2 image reference was an old persisted monitoring policy and corrected it in Settings. **The test VPS has not yet received PR #58.** The following manual checks remain open:
+[PR #58](https://github.com/docklantern/docklantern/pull/58) merged at `5d1bc5fa2af472cd604e69ac248fd3b86e0fe706`, with [10/10 Go checks](https://github.com/docklantern/docklantern/actions/runs/40601983136) and [3/3 security checks](https://github.com/docklantern/docklantern/actions/runs/40601983487). The operator authorized a **test-VPS-only** upgrade, verified the pre-upgrade SQLite snapshot (`integrity_check: ok`), and built/deployed `docklantern:beta4-pr58-5d1bc5fa` on amd64. Embedded version: `v0.1.0-beta.4+5d1bc5fa`.
 
-- [ ] Obtain **separate explicit approval** before changing or recreating the test-VPS DockLantern container to include PR #58. A merged PR does not grant deployment approval.
-- [ ] Record active Compose overlays and the current `docker inspect` container image reference, immutable image ID and created time; compare `docklantern-inventory -version` with the sidebar's **Running app** label after the approved test upgrade. The binary build version is not the Docker image tag.
-- [ ] On desktop (~1440px), tablet (~800px) and mobile (~390px), inspect sidebar, tables, badges, filters, digests, helper text and activity timestamps for readable size and contrast, and test keyboard-only navigation and visible focus.
-- [ ] On Services and Service Details, separately confirm the **Docker-observed container image**, latest inventory observation timestamp, and persisted **registry watch image**. They must not be presented as interchangeable; no registry watch policy is proof of a running image.
-- [ ] Verify Overview/Images/Services/Activity/Settings and both details pages with real but noncritical monitoring data; compare status/count behavior with registry observations, including mixed platforms, failing/stale checks and explicit `monitor=false`.
-- [ ] Check unchanged IDs, image IDs and start times for unrelated monitored containers; verify monitoring form changes do not cause pulls/restarts/recreates.
-- [ ] Attach operator screenshots/notes, sanitized versions/observations, resource baseline and any accepted deferrals to [#51](https://github.com/docklantern/docklantern/issues/51). Never paste secrets or complete environment-bearing Compose output.
+- [x] Dashboard typography/contrast, sidebar build version, Docker-observed image + inventory timestamp versus separately persisted registry watch reference accepted by operator.
+- [x] Desktop, mobile (~390px), tablet (~800px), keyboard navigation and focus visibility spot-checked and accepted; this is not a formal accessibility certification.
+- [x] Verified proxy has no published host port, private internal Docker discovery network, no direct app socket mount, writable SQLite volume, read-only legacy hello-js/hello-py mounts and administrator secret. Live `GET /containers/json` returned **200** and `POST /containers/create` returned **403**.
+- [x] Readiness PASS. Three idle app+proxy samples over ~24 seconds showed **32.53–32.73 MiB combined memory** and near-zero CPU. This is not a sustained/load or page-latency benchmark.
+- [x] Pause/resume tested on two hello services; operator confirmed monitoring active afterward. All three hello containers were running with zero restart counts in paused-state snapshot and no diff was reported across snapshots (no observed recreation/restart).
+- [x] Earlier beta.2 image display was traced to a legacy persisted watch policy and corrected; it was not proof of a stale running container.
+- [ ] Record or explicitly defer remaining targeted edge-case checks (mixed platform, stale/failing registry checks, explicit label opt-out, override/reset, API compatibility) in #51.
+- [ ] Confirm protected **off-host** backup custody and restore/rollback drill disposition; capture page latency if required for final sign-off.
 
 Safe read-only host diagnostics are in the [running-image reference guide](../operations/beta4-running-image-reference.md). The assistant cannot certify live host or visual acceptance from passing CI alone.
 
 ## Gate 3 — VPS operating and data checks (only after explicit deployment authorization)
 
-Before changing the running DockLantern image (identify the test VPS's actual current beta.4 candidate; published beta.3 is the release/rollback baseline, not necessarily the live image):
+The test-VPS checks below applied to the approved PR #58 local build, **not** a final digest-pinned release deployment:
 
 - [ ] Confirm the published beta.3 deployment is healthy; record the current pinned image digest, exact Compose overlays, proxy configuration, and SQLite schema.
-- [ ] Create/locate a consistent SQLite backup; confirm integrity and how to restore. In a small beta with recreatable test services, a **full restore drill may be explicitly deferred by the operator** (record that decision).
+- [x] Pre-upgrade SQLite backup completed and integrity returned `ok`. **Still pending:** off-host copy and a recorded restore/rollback drill or an explicit operator-approved deferral.
 - [ ] Verify the deployment Compose config with the exact active overlays, network aliases and Traefik routing.
-- [ ] Verify Docker socket proxy has no published host port, is reachable only over the intended private network and denies POST; no writable socket reaches the application.
-- [ ] Record resource baseline: application resident memory, idle/load CPU, page response time and SQLite file size.
-- [ ] Only after beta.4 images are **approved/published**, upgrade by reviewed digest-pinned deployment PR; restart/recreate **DockLantern only**, not monitored services.
+- [x] Private GET-only Docker proxy enforcement, network isolation, no app Docker socket mount and read-only legacy binds checked on test VPS (GET 200 / POST 403). This does not test every endpoint.
+- [x] Idle CPU/memory and `/readyz` baseline recorded; **page response time, SQLite file size and sustained/load behavior remain unmeasured**.
+- [ ] Only after `v0.1.0-beta.4.1` publication is separately approved/completed, review a digest-pinned deployment PR and obtain **new explicit deployment approval**; recreate DockLantern only.
 - [ ] Check authenticated Overview, Images, Image Details, Services, Service Details, Activity, Settings, `/readyz`, selected `/api/v1/*` endpoints and unchanged monitored target containers.
 - [ ] Compare CPU/memory/page responsiveness with beta.3. Log any unacceptable slowdown and revert the app using the previous verified image if needed.
 
@@ -99,10 +107,10 @@ Track any future credential-scope-aware persistence as an architectural feature 
 Only after Gates 1–5 are reviewed:
 
 - [ ] Resolve/document known exceptions and security findings on [#51](https://github.com/docklantern/docklantern/issues/51).
-- [ ] Obtain **explicit approval to publish/tag** `v0.1.0-beta.4`; the GitHub tag/build may then publish GHCR and Docker Hub multi-platform images through the standard controlled workflow.
+- [ ] Obtain explicit operator approval **to create the new `v0.1.0-beta.4.1` tag and publish** its GHCR/Docker Hub images and GitHub prerelease from an accepted final-main commit. Never reuse or move the existing `v0.1.0-beta.4` tag.
 - [ ] Verify actual GHCR/Docker Hub manifest digests and `linux/amd64`, `linux/arm64` support; record SHA, provenance and scan evidence.
 - [ ] Obtain **separate explicit approval to deploy**, review a digest-pinned deployment PR and preserve current Traefik/target-service configuration.
 - [ ] If monitoring/GUI regression occurs, stop the new app, restore prior pinned digest and verify existing SQLite schema compatibility. Do not downgrade blindly after any future schema migration; restore a matching snapshot if schema changes occurred.
 - [ ] Record post-deploy smoke evidence, operator disposition and final release notes.
 
-**Current state:** Automated checks can be performed by CI in this repository. Real-browser visual assessment, the operator's VPS, release tagging/publishing, deployment and post-deploy sign-off are **not complete** solely because this document exists.
+**Current state:** Operator dashboard, mobile/tablet/keyboard, read-only socket proxy, idle resource, backup integrity, and basic pause/resume checks are recorded as accepted above. Off-host backup/restore disposition, remaining edge-case/API and page-latency evidence, and release approval still require sign-off in #51. **No `v0.1.0-beta.4.1` tag, prerelease, image publication or release deployment is authorized.**
