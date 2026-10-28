@@ -16,7 +16,7 @@ Beta.3 is published; [issue #34](https://github.com/docklantern/docklantern/issu
 
 ### v0.1.0-beta.4 — Image-first Management Experience (release validation)
 
-**Development branches/PRs merged:** [#44](https://github.com/docklantern/docklantern/pull/44), [#52](https://github.com/docklantern/docklantern/pull/52), [#53](https://github.com/docklantern/docklantern/pull/53), [#54](https://github.com/docklantern/docklantern/pull/54), [#55](https://github.com/docklantern/docklantern/pull/55), [#56](https://github.com/docklantern/docklantern/pull/56).
+**Development branches/PRs merged:** [#44](https://github.com/docklantern/docklantern/pull/44), [#52](https://github.com/docklantern/docklantern/pull/52), [#53](https://github.com/docklantern/docklantern/pull/53), [#54](https://github.com/docklantern/docklantern/pull/54), [#55](https://github.com/docklantern/docklantern/pull/55), [#56](https://github.com/docklantern/docklantern/pull/56), [#57](https://github.com/docklantern/docklantern/pull/57), [#58](https://github.com/docklantern/docklantern/pull/58).
 
 - Five workspaces: Overview, Images, Services, Activity, Settings.
 - Canonical image/platform grouping and dedicated Image Details showing digest evidence and related services.
@@ -26,7 +26,7 @@ Beta.3 is published; [issue #34](https://github.com/docklantern/docklantern/issu
 - Simplified global Settings plus Advanced / Legacy Configuration.
 - Tested compatibility, security, accessibility and operator release gates.
 
-**Not yet released or deployed.** See [beta.4 release checklist](../deployment/beta4-release-checklist.md) and [issue #51](https://github.com/docklantern/docklantern/issues/51). The current image/platform persisted observation identity is not credential-scope-aware; multiple simultaneous credential scopes for one tagged image require future design work.
+**Not yet published or promoted through an approved digest-pinned release deployment.** An unreleased beta.4 build is running on the test VPS; PR #58 is merged but not yet deployed to that host. See [beta.4 release checklist](../deployment/beta4-release-checklist.md) and [issue #51](https://github.com/docklantern/docklantern/issues/51). The current image/platform persisted observation identity is not credential-scope-aware; multiple simultaneous credential scopes for one tagged image require future design work.
 
 Beta.4 adds **no** Docker write permission or deployment executor.
 

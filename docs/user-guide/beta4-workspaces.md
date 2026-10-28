@@ -31,6 +31,14 @@ A change event is image-scoped: if several Compose services watch the same refer
 
 **Service Details** shows discovered image/platform, running-container/health context, conservative deployed evidence, monitoring source/precedence, last attempt, scheduling and a link back to Image Details.
 
+To distinguish version provenance after PR #58:
+
+- **Running app** in the sidebar is the build version embedded in the running DockLantern binary (also available with `docklantern-inventory -version`).
+- **Docker-observed image** reflects the container's Docker `Config.Image` from the most recent successful inventory, with an observation timestamp. The immutable image ID requires inspection on the host.
+- **Registry watch image** is the saved reference being monitored. A manually preserved older policy can legitimately differ from the running image; the reference is not evidence that the container runs that version.
+
+See the [read-only test-VPS diagnostic guide](../operations/beta4-running-image-reference.md).
+
 When allowed by the persisted monitoring rules, you can use authenticated GUI forms to:
 
 - Enable or disable GUI enrollment on an unlabeled service.

@@ -4,7 +4,7 @@
 
 DockLantern is a lightweight Go web application that discovers Docker Compose services through a **restricted read-only Docker socket proxy** and checks tagged OCI registry manifests for changes. It presents registry observations, conservative deployed-image comparisons, image-scoped history, and service monitoring controls.
 
-> **Release status:** [v0.1.0-beta.3](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.3) is published. **v0.1.0-beta.4 is in release validation and is NOT yet published or deployed**. The separate [deployment repository](https://github.com/docklantern/docklantern-deploy) controls the pinned running image and requires an explicit deployment approval.
+> **Release status:** [v0.1.0-beta.3](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.3) is published. **v0.1.0-beta.4 is in release validation and is not yet published or promoted through an approved release deployment**. Unreleased builds may be tested separately. The separate [deployment repository](https://github.com/docklantern/docklantern-deploy) controls the pinned running image and requires an explicit deployment approval.
 
 ## Beta.4: Image-first web interface (release candidate work)
 
