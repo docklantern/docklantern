@@ -30,6 +30,9 @@ type serviceDetailsData struct {
  CSRF string
  ReturnTo string
  Saved bool
+ SavedWatch bool
+ CheckNotice string
+ LastSuccessfulAt string
  CanOverride bool
  CanReset bool
  Reason string
@@ -118,9 +121,11 @@ func(h Handler) renderServiceWorkspaceDetails(w http.ResponseWriter,r *http.Requ
  if project==""||service==""||len(project)>128||len(service)>128{
   http.NotFound(w,r);return
  }
- if saved:=r.URL.Query().Get("saved");saved!="" && saved!="service"{
+ if saved:=r.URL.Query().Get("saved");saved!="" && saved!="service" && saved!="watch"{
   http.Error(w,"Invalid service status",http.StatusBadRequest);return
  }
+ checkNotice,valid:=checkNotice(r.URL.Query().Get("check"))
+ if !valid {http.Error(w,"Invalid check status",http.StatusBadRequest);return}
  data,err:=h.workspaceSnapshot(r.Context())
  if err!=nil{http.Error(w,"Service unavailable",http.StatusInternalServerError);return}
  for i:=range data.Services{
@@ -134,6 +139,8 @@ func(h Handler) renderServiceWorkspaceDetails(w http.ResponseWriter,r *http.Requ
    CSRF:h.Guard.Token(),
    ReturnTo:"/services/"+url.PathEscape(project)+"/"+url.PathEscape(service),
    Saved:r.URL.Query().Get("saved")=="service",
+   SavedWatch:r.URL.Query().Get("saved")=="watch",
+   CheckNotice:checkNotice,
    CanOverride:s.CanEditInterval && s.Monitoring!="disabled_by_label" && s.Monitoring!="invalid_discovery",
    CanReset:s.GUIOverride!=nil && s.CanEditInterval && s.Monitoring!="disabled_by_label" && s.Monitoring!="invalid_discovery",
   }
@@ -144,6 +151,12 @@ func(h Handler) renderServiceWorkspaceDetails(w http.ResponseWriter,r *http.Requ
     details.RemoteDigest=a.RemoteDigest
     details.InventoryObservedAt=a.InventoryObservedAt
     details.RegistryCheckedAt=a.RegistryCheckedAt
+    break
+   }
+  }
+  for _,img:=range data.Images {
+   if img.Reference==s.Image && img.Platform==s.Platform && img.LatestObservation!=nil {
+    details.LastSuccessfulAt=img.LatestObservation.CheckedAt
     break
    }
   }
@@ -199,6 +212,8 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/services">Services</a><span aria-hidden="true">/</span><span aria-current="page">{{.Service.Project}} / {{.Service.Service}}</span></nav>
 <header class="topbar"><div><p class="eyebrow">SERVICE DETAILS</p><h1>{{.Service.Project}} / {{.Service.Service}}</h1><p class="muted">Compose deployment evidence and service-level monitoring.</p></div><span class="readonly">MONITORING ONLY</span></header>
 {{if .Saved}}<p class="notice" role="status">Service monitoring settings saved.</p>{{end}}
+{{if .SavedWatch}}<p class="notice" role="status">Registry watch target saved. No Compose files or containers were changed.</p>{{end}}
+{{if .CheckNotice}}<p class="notice" role="status">{{.CheckNotice}}</p>{{end}}
 <section class="section" aria-label="Service monitoring summary"><div class="workspace-stats">
 <article class="stat-card"><div class="stat-label">Monitoring</div><strong class="workspace-value"><span class="pill {{tone .Service.Monitoring}}">{{status .Service.Monitoring}}</span></strong><span class="stat-hint">{{.Service.Enrollment}}</span></article>
 <article class="stat-card"><div class="stat-label">Effective interval</div><strong class="workspace-value">{{if .Service.HasPolicy}}{{.Service.IntervalSeconds}} seconds{{else}}Not scheduled{{end}}</strong><span class="stat-hint">{{.Service.IntervalSource}}</span></article>
@@ -209,6 +224,7 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 <div><dt>Docker-observed container image</dt><dd class="mono">{{if .Service.MixedDiscoveredImages}}Mixed image references across replicas{{else if .Service.DiscoveredImage}}{{.Service.DiscoveredImage}}{{else}}No recent Docker inventory{{end}}</dd></div>
 <div><dt>Last Docker inventory scan</dt><dd>{{when .Service.InventoryObservedAt}}</dd></div>
 <div><dt>Registry watch image</dt><dd class="mono">{{if .Service.HasPolicy}}{{.Service.Image}}{{else}}Not enrolled{{end}}</dd></div>
+<div><dt>Watch target source</dt><dd>{{.Service.WatchSource}}{{if .Service.WatchImageOverride}} · Explicit tag override{{end}}</dd></div>
 <div><dt>Platform</dt><dd>{{if .Service.Platform}}{{.Service.Platform}}{{else}}Unknown{{end}}</dd></div>
 <div><dt>Deployed assessment</dt><dd><span class="pill {{tone .Service.Assessment}}">{{status .Service.Assessment}}</span>{{if .Reason}}<small class="subtext">{{.Reason}}</small>{{end}}</dd></div>
 <div><dt>Deployed digest</dt><dd class="mono">{{if .DeployedDigest}}{{.DeployedDigest}}{{else}}Not verified{{end}}</dd></div>
@@ -228,11 +244,17 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 <div><dt>Docker label interval</dt><dd>{{with .Service.LabelInterval}}{{.}} seconds{{else}}Not set{{end}}</dd></div>
 <div><dt>GUI override</dt><dd>{{with .Service.GUIOverride}}{{.}} seconds{{else}}Not set{{end}}</dd></div>
 <div><dt>Last monitoring attempt</dt><dd>{{when .Service.LastCheckedAt}}</dd></div>
+<div><dt>Last successful registry observation</dt><dd>{{when .LastSuccessfulAt}}</dd></div>
+<div><dt>Last manual check request</dt><dd>{{when .Service.LastManualRequestAt}}</dd></div>
+<div><dt>Consecutive check failures</dt><dd>{{.Service.ConsecutiveFailures}}</dd></div>
 <div><dt>Next scheduled check</dt><dd>{{if .Service.HasPolicy}}{{when .Service.NextCheckAt}}{{else}}Not scheduled{{end}}</dd></div>
 {{if .Service.LastError}}<div><dt>Last check error</dt><dd class="error-cell">{{.Service.LastError}}</dd></div>{{end}}
 </dl>
 {{if eq .Service.Monitoring "disabled_by_label"}}<p class="helper status-explanation">Monitoring is explicitly disabled by the Docker Compose label. A GUI override cannot enable it. Change the Compose label to manage enrollment.</p>{{end}}
-{{if eq .Service.Monitoring "invalid_discovery"}}<p class="helper status-explanation">Discovery metadata is invalid or conflicting. Correct it before attempting monitoring changes.</p>{{end}}
+{{if eq .Service.Monitoring "invalid_discovery"}}<p class="helper status-explanation">Discovery metadata is invalid or conflicting. Correct it before attempting monitoring changes, or reset a stale watch target if offered below.</p>{{end}}
+{{if eq .Service.Monitoring "paused"}}<p class="helper status-explanation">Monitoring is paused. Resume monitoring before requesting an immediate check.</p>{{end}}
+{{if eq .Service.Monitoring "not_enrolled"}}<p class="helper status-explanation">This service is not enrolled; enable monitoring before using Check Now.</p>{{end}}
+{{if .Service.LastError}}<p class="helper status-explanation">The next normal check may be delayed by retry backoff. Check Now cannot override registry rate limits.</p>{{end}}
 <div class="service-actions">
 {{if .Service.CanGUIEnable}}
 <form method="post" action="/settings/monitoring/service"><input type="hidden" name="csrf_token" value="{{.CSRF}}"><input type="hidden" name="project" value="{{.Service.Project}}"><input type="hidden" name="service" value="{{.Service.Service}}"><input type="hidden" name="return_to" value="{{.ReturnTo}}"><button type="submit" name="action" value="enable">Enable monitoring</button></form>
@@ -256,7 +278,41 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 {{if .CanReset}}<button type="submit" name="action" value="reset" formnovalidate>Reset to label/default</button>{{end}}
 </div></form>
 {{end}}
-{{if not .CanOverride}}<p class="helper">No monitoring configuration actions are currently available for this service.</p>{{end}}
+<div class="service-watch-actions">
+<h3>Watched registry tag</h3>
+<p class="helper">Choose another tagged reference in the same registry and repository. This changes what DockLantern observes, not the deployed image or Compose configuration.</p>
+{{if .Service.CanEditWatch}}
+<form method="post" action="/settings/monitoring/watch">
+<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+<input type="hidden" name="project" value="{{.Service.Project}}">
+<input type="hidden" name="service" value="{{.Service.Service}}">
+<label for="watched-image">Registry image reference (explicit tag)</label>
+<div class="service-interval-controls">
+<input id="watched-image" type="text" name="image" maxlength="512" value="{{if .Service.WatchImageOverride}}{{.Service.WatchImageOverride}}{{else}}{{.Service.Image}}{{end}}" required>
+<button type="submit" name="action" value="set">Save watched tag</button>
+</div></form>{{end}}
+{{if .Service.CanResetWatch}}
+<form method="post" action="/settings/monitoring/watch">
+<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+<input type="hidden" name="project" value="{{.Service.Project}}">
+<input type="hidden" name="service" value="{{.Service.Service}}">
+<button type="submit" name="action" value="reset">Reset watch to Docker-observed image</button></form>{{end}}
+{{if not .Service.CanEditWatch}}{{if not .Service.CanResetWatch}}<p class="helper">Watched-tag editing is not available for this service. Legacy manual policies use advanced Settings.</p>{{end}}{{end}}
+</div>
+<div class="service-check-actions">
+<h3>Registry check</h3>
+{{if .Service.CanCheckNow}}
+<form method="post" action="/settings/monitoring/check-now/service">
+<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+<input type="hidden" name="project" value="{{.Service.Project}}">
+<input type="hidden" name="service" value="{{.Service.Service}}">
+<button type="submit">Check Now</button></form>
+<p class="helper">Requests a read-only registry observation through the background worker. Existing cooldown and retry backoff still apply.</p>
+{{else}}
+<p class="helper">Check Now is unavailable while monitoring is paused, disabled, unenrolled, or discovery is invalid.</p>
+{{end}}
+</div>
+{{if not .CanOverride}}<p class="helper">Interval editing is unavailable for this service.</p>{{end}}
 <p class="helper">Precedence: GUI override → Docker label → global default. Monitoring changes never pull images or restart containers.</p>
 <p><a class="text-action" href="{{.SettingsURL}}">Manage monitoring settings in Settings</a></p>
 </section>
