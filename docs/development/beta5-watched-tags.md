@@ -18,7 +18,7 @@
 - The canonical registry and repository must match the verified current Docker-observed reference. Only the tag can differ. The platform must match the last verified inventory and existing policy; an override cannot change architecture.
 - A nil image resets to the Docker-observed tag; setting the same tag as Docker also clears a redundant override.
 - Only a discovered, valid and currently enrolled non-legacy service may change its watch target. A paused service can change the target without resuming; an unenrolled, missing/conflicting or label-disabled service cannot.
-- The preference survives DockLantern restarts, same-repository external Compose tag changes, temporary GUI disable/re-enable and temporary loss of discovery. If the running service changes to a **different registry/repository**, discovery marks a conflict and blocks monitoring until the operator resolves it. The stale override is preserved for review rather than silently discarded.
+- The preference survives DockLantern restarts, same-repository external Compose tag changes, temporary GUI disable/re-enable and temporary loss of discovery. If the running service changes to a **different registry/repository**, discovery marks a conflict and blocks monitoring; the stale override is preserved for review. When verified discovery shows this *specific* watch-repository conflict, the operator may reset to the new Docker-observed reference (or select a valid tag in the new repository), clearing the conflict without an unauthorized deployment. Reset also clears a stale preference while GUI enrollment is disabled, but must **not re-enroll** the service. Other invalid-discovery/replica conflicts remain ineligible.
 
 ## SQLite and event semantics
 
