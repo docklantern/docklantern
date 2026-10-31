@@ -125,7 +125,6 @@ func (s *Store) reconcileMonitors(ctx context.Context,tx *sql.Tx,items []Contain
         // The explicit opt-out always wins over legacy and GUI enrollment.
         if desired.label!=nil&&!*desired.label {continue}
         if legacy!=0 {continue} // Never silently overwrite beta.2 policies.
-        if gui==0&&(desired.label==nil||!*desired.label){continue}
         // Never coerce an old GUI watch to a different image repository if
         // an external Compose deployment changes the service's image.
         // Mark it conflicting instead and retain both watch preference and
@@ -140,6 +139,7 @@ func (s *Store) reconcileMonitors(ctx context.Context,tx *sql.Tx,items []Contain
             }
             desired.image=requested.Key()
         }
+        if gui==0&&(desired.label==nil||!*desired.label){continue}
         interval:=defaultInterval
         if desired.interval!=nil{interval=*desired.interval}
         if override.Valid {interval=int(override.Int64)}
