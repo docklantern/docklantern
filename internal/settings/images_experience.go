@@ -44,6 +44,10 @@ type imageDetailsData struct {
  Evidence []imageServiceEvidence
  History []store.Event
  NextBefore int64
+ CSRF string
+ CheckNotice string
+ CanCheckNow bool
+ EligibleWatches int
 }
 
 func parseImageFilters(r *http.Request)(imageFilters,error) {
@@ -144,6 +148,8 @@ func(h Handler) renderImagesWorkspace(w http.ResponseWriter,r *http.Request){
 func(h Handler) renderImageWorkspaceDetails(w http.ResponseWriter,r *http.Request){
  identity,err:=presentation.ParseImageID(r.PathValue("id"))
  if err!=nil{http.NotFound(w,r);return}
+ notice,valid:=checkNotice(r.URL.Query().Get("check"))
+ if !valid{http.Error(w,"Invalid check status",http.StatusBadRequest);return}
  before:=int64(0)
  if raw:=r.URL.Query().Get("before");raw!=""{
   before,err=strconv.ParseInt(raw,10,64)
@@ -173,8 +179,9 @@ func(h Handler) renderImageWorkspaceDetails(w http.ResponseWriter,r *http.Reques
    assess[presentation.ServiceIdentity{Project:a.Project,Service:a.Service}]=a
   }
  }
- details:=imageDetailsData{workspaceData:data}
+ details:=imageDetailsData{workspaceData:data,CSRF:h.Guard.Token(),CheckNotice:notice}
  for _,s:=range data.Associated{
+  if s.CanCheckNow{details.EligibleWatches++}
   row:=imageServiceEvidence{Service:s}
   if a,ok:=assess[s.ServiceIdentity];ok{
    row.Reason=a.Reason
@@ -193,6 +200,7 @@ func(h Handler) renderImageWorkspaceDetails(w http.ResponseWriter,r *http.Reques
   details.NextBefore=events[len(events)-1].ID
  }
  details.History=events
+ details.CanCheckNow=details.EligibleWatches>0
  workspaceHeaders(w)
  _=imageExperienceDetailTemplate.Execute(w,details)
 }
@@ -246,11 +254,24 @@ var imageExperienceDetailTemplate=workspaceTemplate("image-detail-v2",`<!doctype
 {{template "shell-start" .}}
 <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/images">Images</a><span aria-hidden="true">/</span><span aria-current="page">Image Details</span></nav>
 <header class="topbar"><div><p class="eyebrow">IMAGE DETAILS</p><h1 class="workspace-title mono">{{.Image.Reference}}</h1><p class="muted">Platform: {{.Image.Platform}}</p></div><span class="readonly">MONITORING ONLY</span></header>
+{{if .CheckNotice}}<p class="notice" role="status">{{.CheckNotice}}</p>{{end}}
 <section class="section" aria-label="Image assessment summary"><div class="workspace-stats">
 <article class="stat-card"><div class="stat-label">Registry status</div><strong class="workspace-value"><span class="pill {{tone .Image.RegistryStatus}}">{{status .Image.RegistryStatus}}</span></strong><span class="stat-hint">{{with .Image.LatestObservation}}Last successful check: {{when .CheckedAt}}{{else}}No successful registry check recorded{{end}}</span></article>
 <article class="stat-card"><div class="stat-label">Deployed status</div><strong class="workspace-value"><span class="pill {{tone .Image.DeploymentStatus}}">{{status .Image.DeploymentStatus}}</span></strong><span class="stat-hint">{{.Image.DeploymentCounts.Current}} current · {{.Image.DeploymentCounts.Different}} different · {{.Image.DeploymentCounts.Unknown}} unknown · {{.Image.DeploymentCounts.NotRunning}} not running</span></article>
 <article class="stat-card"><div class="stat-label">Associated services</div><strong class="workspace-value">{{len .Image.Services}}</strong><span class="stat-hint">{{if .Image.LastChangeAt}}Last recorded change: {{when .Image.LastChangeAt}}{{else}}No retained digest-change event{{end}}</span></article>
 </div></section>
+<section class="section panel workspace-detail" aria-labelledby="image-check-title">
+<h2 id="image-check-title">Registry check</h2>
+<p class="helper">Check Now requests an observation for eligible services watching this exact image and platform, not all containers on the host. Registry backoff and request cooldown still apply.</p>
+{{if .CanCheckNow}}
+<p class="helper">{{.EligibleWatches}} eligible watcher(s) currently associated with this image.</p>
+<form method="post" action="/settings/monitoring/check-now/image">
+<input type="hidden" name="csrf_token" value="{{.CSRF}}">
+<input type="hidden" name="image_id" value="{{.Image.ID}}">
+<button type="submit">Check Now</button>
+</form>
+{{else}}<p class="helper">No eligible watches are currently active for this image. Paused, disabled and invalid services cannot be forced to check.</p>{{end}}
+</section>
 <section class="section panel workspace-detail" aria-labelledby="registry-evidence-title"><h2 id="registry-evidence-title">Registry evidence</h2>
 <p class="helper">Remote OCI manifest identity, not a verified newer application version.</p>
 {{with .Image.LatestObservation}}
