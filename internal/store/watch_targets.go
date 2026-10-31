@@ -30,6 +30,8 @@ func explicitWatchReference(raw string) (registry.Reference, error) {
     return ref, nil
 }
 
+const watchRepositoryConflict = "watched image no longer matches Docker image repository"
+
 func sameImageRepository(base string, requested registry.Reference) bool {
     source, err := registry.Parse(base)
     return err == nil && source.Registry == requested.Registry &&
@@ -64,11 +66,11 @@ func (s *Store) SetServiceWatchOverride(ctx context.Context, project, service st
 
     var legacy, gui int
     var optIn sql.NullInt64
-    var state string
+    var state, validationError string
     var oldOverride sql.NullString
-    err = tx.QueryRowContext(ctx, `SELECT legacy_enrolled,gui_enrolled,label_opt_in,discovery_state,watch_image_override
+    err = tx.QueryRowContext(ctx, `SELECT legacy_enrolled,gui_enrolled,label_opt_in,discovery_state,validation_error,watch_image_override
         FROM monitor_service_settings WHERE project=? AND service=?`,project,service).
-        Scan(&legacy,&gui,&optIn,&state,&oldOverride)
+        Scan(&legacy,&gui,&optIn,&state,&validationError,&oldOverride)
     if errors.Is(err,sql.ErrNoRows) {
         return errors.New("service is not discovered or registered")
     }
@@ -76,8 +78,16 @@ func (s *Store) SetServiceWatchOverride(ctx context.Context, project, service st
     if legacy != 0 {
         return errors.New("legacy manual watches must be changed through registered monitoring policies")
     }
-    if state != "present" || (optIn.Valid && optIn.Int64 == 0) ||
-        (gui == 0 && (!optIn.Valid || optIn.Int64 != 1)) {
+    // The only recoverable conflict is one created by our own watch-tag
+    // repository guard after otherwise-valid Docker discovery. Do not
+    // override replica/label/platform validation errors. A reset is also
+    // allowed while a previously GUI-enrolled service is disabled: it only
+    // clears a preference and cannot enable any network checks.
+    recovering := state == "conflict" && validationError == watchRepositoryConflict && oldOverride.Valid
+    enrolled := gui != 0 || (optIn.Valid && optIn.Int64 == 1)
+    if (state != "present" && !recovering) ||
+        (optIn.Valid && optIn.Int64 == 0) ||
+        (!enrolled && (image != nil || !oldOverride.Valid)) {
         return errors.New("service is not eligible to change watched image")
     }
 
@@ -101,7 +111,8 @@ func (s *Store) SetServiceWatchOverride(ctx context.Context, project, service st
         ImageOS:osName, ImageArchitecture:architecture, ImageVariant:variant,
         State:runState,
     })
-    if source.issue != "" || !source.running || source.platform != platform {
+    if source.issue != "" || !source.running ||
+        (source.platform != platform && !recovering) {
         return errors.New("unverified Docker image or platform")
     }
 
@@ -117,23 +128,37 @@ func (s *Store) SetServiceWatchOverride(ctx context.Context, project, service st
     // Avoid invalidating scheduled/in-flight work for an idempotent request.
     unchanged := (stored == nil && !oldOverride.Valid) ||
         (stored != nil && oldOverride.Valid && stored == oldOverride.String)
-    if unchanged && previous == selected { return tx.Commit() }
+    if unchanged && previous == selected && platform == source.platform && !recovering {
+        return tx.Commit()
+    }
 
-    if _,err=tx.ExecContext(ctx,`UPDATE monitor_service_settings SET watch_image_override=?
-        WHERE project=? AND service=?`,stored,project,service);err!=nil{return err}
+    if recovering {
+        // The prior successful snapshot already verified this service's
+        // image/platform and the sole conflict was the obsolete watch.
+        // Resolve it atomically with the replacement target; no Docker call.
+        _,err=tx.ExecContext(ctx,`UPDATE monitor_service_settings SET
+            watch_image_override=?,discovery_state='present',validation_error=''
+            WHERE project=? AND service=?`,stored,project,service)
+    } else {
+        _,err=tx.ExecContext(ctx,`UPDATE monitor_service_settings SET watch_image_override=?
+            WHERE project=? AND service=?`,stored,project,service)
+    }
+    if err!=nil{return err}
     stamp:=time.Now().UTC().Format(time.RFC3339)
     // Changing image identity invalidates in-flight generation/CAS, resets
     // only *per-service* attempts/backoff and schedules a new observation.
     // Never delete image-scoped registry_checks or monitor_events: other
     // services may watch the same reference/platform.
-    _,err=tx.ExecContext(ctx,`UPDATE monitor_policies SET image=?,
-        next_check_at=CASE WHEN image!=? THEN ? ELSE next_check_at END,
-        last_checked_at=CASE WHEN image!=? THEN '' ELSE last_checked_at END,
-        last_error=CASE WHEN image!=? THEN '' ELSE last_error END,
-        consecutive_failures=CASE WHEN image!=? THEN 0 ELSE consecutive_failures END,
+    _,err=tx.ExecContext(ctx,`UPDATE monitor_policies SET image=?,platform=?,
+        next_check_at=CASE WHEN image!=? OR platform!=? THEN ? ELSE next_check_at END,
+        last_checked_at=CASE WHEN image!=? OR platform!=? THEN '' ELSE last_checked_at END,
+        last_error=CASE WHEN image!=? OR platform!=? THEN '' ELSE last_error END,
+        consecutive_failures=CASE WHEN image!=? OR platform!=? THEN 0 ELSE consecutive_failures END,
         generation=generation+1
         WHERE project=? AND service=?`,
-        selected,selected,stamp,selected,selected,selected,project,service)
+        selected,source.platform,selected,source.platform,stamp,
+        selected,source.platform,selected,source.platform,
+        selected,source.platform,project,service)
     if err!=nil{return fmt.Errorf("change watched image: %w",err)}
     return tx.Commit()
 }
