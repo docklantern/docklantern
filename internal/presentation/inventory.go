@@ -77,6 +77,8 @@ type ServiceSummary struct {
     DiscoveryState string
     ValidationError string
     GUIOverride *int
+    WatchImageOverride *string
+    WatchSource string
     LabelInterval *int
     LabelOptIn *bool
     Monitoring string
@@ -86,6 +88,8 @@ type ServiceSummary struct {
     HasPolicy bool
     NextCheckAt string
     LastCheckedAt string
+    LastManualRequestAt string
+    ConsecutiveFailures int
     LastError string
     Assessment string
     ContainerCount int
@@ -96,6 +100,9 @@ type ServiceSummary struct {
     CanPause bool
     CanResume bool
     CanEditInterval bool
+    CanEditWatch bool
+    CanResetWatch bool
+    CanCheckNow bool
 }
 
 // BuildImageSummaries groups monitored references using read-only stored
@@ -213,7 +220,8 @@ func BuildServiceSummaries(views []store.MonitorServiceView,containers []store.C
         s:=ServiceSummary{
             ServiceIdentity:id,Image:v.Image,Platform:v.Platform,
             Enrollment:v.EnrollmentSource,DiscoveryState:v.State,ValidationError:v.ValidationError,
-            GUIOverride:v.GUIOverride,LabelInterval:v.LabelInterval,LabelOptIn:v.LabelOptIn,Monitoring:"not_enrolled",
+            GUIOverride:v.GUIOverride,WatchImageOverride:v.WatchImageOverride,WatchSource:v.WatchSource,
+            LabelInterval:v.LabelInterval,LabelOptIn:v.LabelOptIn,Monitoring:"not_enrolled",
             IntervalSeconds:v.EffectiveInterval,IntervalSource:v.IntervalSource,
             Paused:v.Paused,HasPolicy:v.HasPolicy,NextCheckAt:v.NextCheckAt,
             Assessment:"unknown",ContainerHealth:"not_reported",
@@ -222,6 +230,8 @@ func BuildServiceSummaries(views []store.MonitorServiceView,containers []store.C
         }
         if p,ok:=byPolicy[id];ok{
             s.Image,s.Platform,s.LastCheckedAt,s.LastError=p.Image,p.Platform,p.LastCheckedAt,p.LastError
+            s.LastManualRequestAt=p.LastManualRequestAt
+            s.ConsecutiveFailures=p.ConsecutiveFailures
         }
         if a,ok:=byAssessment[id];ok{s.Assessment=a.State}
         health:=""
@@ -260,6 +270,18 @@ func BuildServiceSummaries(views []store.MonitorServiceView,containers []store.C
         case s.LastError!="":s.Monitoring="check_failed"
         default:s.Monitoring="monitoring"
         }
+        watchConflict := v.State=="conflict" &&
+            v.ValidationError=="watched image no longer matches Docker image repository" &&
+            v.WatchImageOverride!=nil
+        notBlocked := v.LabelOptIn==nil || *v.LabelOptIn
+        nonLegacy := !v.LegacyEnrolled
+        enrolled := v.EnrollmentSource!="Not monitored"
+        s.CanEditWatch = s.HasPolicy && nonLegacy && notBlocked && enrolled &&
+            v.State=="present" && s.RunningCount>0 && !s.MixedDiscoveredImages
+        s.CanResetWatch = s.HasPolicy && nonLegacy && notBlocked && v.WatchImageOverride!=nil &&
+            ((v.State=="present" && s.RunningCount>0 && !s.MixedDiscoveredImages) || watchConflict)
+        s.CanCheckNow = s.HasPolicy && notBlocked && !s.Paused && enrolled &&
+            v.State!="conflict" && (v.State=="present" || v.LegacyEnrolled)
         out=append(out,s)
     }
     sort.Slice(out,func(i,j int)bool{
