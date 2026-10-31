@@ -267,3 +267,69 @@ func TestLegacyWatchOverrideRejectedAndUpgradeDataPreserved(t *testing.T) {
         }
     }
 }
+
+func TestWatchRepositoryConflictCanBeResolvedByReset(t *testing.T) {
+    ctx:=context.Background()
+    s:=newLabelTestStore(t)
+    c:=testLabelContainer("app","web","nginx:1.2.3",map[string]string{labelMonitor:"true"})
+    doSnapshot(t,s,c)
+    watched:="nginx:stable"
+    if err:=s.SetServiceWatchOverride(ctx,"app","web",&watched);err!=nil{t.Fatal(err)}
+    old:=getOnePolicy(t,s)
+
+    // An external Compose rollout can change both repository and platform.
+    // The previous override must not keep polling a now-unrelated image.
+    c.Image="redis:latest"
+    c.ImageArchitecture="arm64"
+    doSnapshot(t,s,c)
+    if len(dueAt(t,s,time.Now().Add(time.Minute)))!=0{t.Fatal("drift still active")}
+    rows,err:=s.MonitoringServiceSettings(ctx)
+    if err!=nil||rows[0].DiscoveryState!="conflict"{t.Fatalf("missing conflict %+v %v",rows,err)}
+    if err:=s.SetServiceWatchOverride(ctx,"app","web",nil);err!=nil{
+        t.Fatalf("safe reset must recover the watch: %v",err)
+    }
+    restored:=getOnePolicy(t,s)
+    if restored.Image!="registry-1.docker.io/library/redis:latest"||
+        restored.Platform!="linux/arm64"||restored.Generation<=old.Generation{
+        t.Fatalf("reset failed to update identity: %+v",restored)
+    }
+    rows,err=s.MonitoringServiceSettings(ctx)
+    if err!=nil||rows[0].DiscoveryState!="present"||rows[0].WatchImageOverride!=nil||
+        rows[0].ValidationError!=""{t.Fatalf("conflict not cleared %+v %v",rows,err)}
+    if len(dueAt(t,s,time.Now().Add(time.Minute)))!=1{t.Fatal("eligible watch did not resume scheduling")}
+    if err:=s.FinishMonitorCheck(ctx,old,time.Now().UTC(),nil);err!=nil{t.Fatal(err)}
+    if p:=getOnePolicy(t,s);p.LastCheckedAt!=""{
+        t.Fatal("old image or platform check committed after recovery")
+    }
+}
+
+func TestDisabledGUIWatchCanClearStaleOverrideWithoutEnrolling(t *testing.T){
+    ctx:=context.Background()
+    s:=newLabelTestStore(t)
+    c:=testLabelContainer("app","web","nginx:latest",nil)
+    doSnapshot(t,s,c)
+    if err:=s.SetServiceGUIEnrollment(ctx,"app","web",true);err!=nil{t.Fatal(err)}
+    tag:="nginx:stable"
+    if err:=s.SetServiceWatchOverride(ctx,"app","web",&tag);err!=nil{t.Fatal(err)}
+    if err:=s.SetServiceGUIEnrollment(ctx,"app","web",false);err!=nil{t.Fatal(err)}
+    c.Image="redis:latest"
+    doSnapshot(t,s,c)
+    rows,err:=s.MonitoringServiceSettings(ctx)
+    if err!=nil||rows[0].DiscoveryState!="conflict"{t.Fatalf("missing watch drift %+v %v",rows,err)}
+    if err:=s.SetServiceWatchOverride(ctx,"app","web",&tag);err==nil{
+        t.Fatal("disabled service accepted a new watch")
+    }
+    if err:=s.SetServiceWatchOverride(ctx,"app","web",nil);err!=nil{
+        t.Fatalf("disabled service should be able to clear unsafe stale preference: %v",err)
+    }
+    if len(dueAt(t,s,time.Now().Add(time.Hour)))!=0{t.Fatal("reset implicitly enrolled service")}
+    rows,err=s.MonitoringServiceSettings(ctx)
+    if err!=nil||rows[0].GUIEnrolled||rows[0].WatchImageOverride!=nil||rows[0].DiscoveryState!="present"{
+        t.Fatalf("reset incorrectly modified enrollment %+v %v",rows,err)
+    }
+    if err:=s.SetServiceGUIEnrollment(ctx,"app","web",true);err!=nil{t.Fatal(err)}
+    p:=getOnePolicy(t,s)
+    if p.Image!="registry-1.docker.io/library/redis:latest"||p.Paused{
+        t.Fatalf("reenrollment did not track current Docker image %+v",p)
+    }
+}
