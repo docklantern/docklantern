@@ -4,9 +4,9 @@
 
 DockLantern is a lightweight Go web application that discovers Docker Compose services through a **restricted read-only Docker socket proxy** and checks tagged OCI registry manifests for changes. It presents registry observations, conservative deployed-image comparisons, image-scoped history, and service monitoring controls.
 
-> **Release status:** [v0.1.0-beta.3](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.3) is the published GitHub prerelease. An older `v0.1.0-beta.4` tag already published registry images from a pre-PR #58 commit without creating a GitHub prerelease; those images are **not** the fully accepted build. **`v0.1.0-beta.4.1` is the planned, untagged/unpublished release candidate.** The PR #58 test build was separately deployed and accepted on the test VPS. [Release deployment](https://github.com/docklantern/docklantern-deploy) still requires separate approval.
+> **Release status:** [v0.1.0-beta.4.1](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.4.1) is the published GitHub prerelease (October 28, 2026), and the operator confirmed the released image running and ready on the test VPS (October 31). The [deployment repository PR #5](https://github.com/docklantern/docklantern-deploy/pull/5) has since aligned its image pin to the published digest. The older `v0.1.0-beta.4` tag already published images from an earlier commit and must not be moved or overwritten; the PR #58 local test build was separate from the release. Future release publication and VPS deployment require new, separate operator approvals.
 
-## Beta.4: Image-first web interface (release candidate work)
+## Beta.4.1: Image-first web interface (released)
 
 The GUI has five primary destinations:
 
@@ -18,7 +18,7 @@ The GUI has five primary destinations:
 
 **A remote digest movement does not establish that a newer software version is available.** Registry status and running deployment status are independent, and insufficient evidence is reported as Unknown.
 
-Beta.4 remains monitoring-only. It does not add container pulls, automatic updates, Compose execution, container restarts, or Docker write permissions.
+Beta.4.1 remains monitoring-only. It does not add container pulls, automatic updates, Compose execution, container restarts, or Docker write permissions.
 
 ## Opt in a Compose service
 
@@ -43,17 +43,17 @@ For a discovered unlabeled service, use **Services → Service Details** to enro
 - Use a private, read-only, GET-only Docker proxy. Never publish its Docker API port or mount a writable Docker socket in the app.
 - Run the app behind approved TLS reverse proxy authentication, origin validation and CSRF controls; do not expose the plain HTTP listener publicly.
 - Remote digest differences and stored Docker image config digests are not, by themselves, proof of an update being available.
-- The scheduler currently uses **one configured registry credential host/account per process**, not per-service registry credentials. In-memory cache keys distinguish effective credential scope, but SQLite digest baselines and image grouping are keyed only by image reference and platform. **Multiple simultaneous credential scopes for one image, or scope-aware history across credential rotation, are not supported in beta.4.** See [registry monitoring limitations](docs/operations/beta3-registry-cache.md) and [phase-7 acceptance](docs/deployment/beta4-release-checklist.md).
+- The scheduler currently uses **one configured registry credential host/account per process**, not per-service registry credentials. In-memory cache keys distinguish effective credential scope, but SQLite digest baselines and image grouping are keyed only by image reference and platform. **Multiple simultaneous credential scopes for one image, or scope-aware history across credential rotation, are not supported in beta.4.1.** See [registry monitoring limitations](docs/operations/beta3-registry-cache.md), [beta.4.1 acceptance](docs/deployment/beta4-release-checklist.md), and [future issue #62](https://github.com/docklantern/docklantern/issues/62).
 - The UI is server-rendered, no JavaScript frontend framework is needed, and Docker mutations are explicitly outside beta.4.
 
 ## Guides, development and release
 
 - [Beta.4 workspace guide](docs/user-guide/beta4-workspaces.md).
-- [Beta.4 release validation checklist](docs/deployment/beta4-release-checklist.md).
-- [Beta.4.1 candidate release notes](docs/releases/v0.1.0-beta.4.1.md) and [historical beta.4 draft](docs/releases/v0.1.0-beta.4.md).
+- [Beta.4.1 acceptance record](docs/deployment/beta4-release-checklist.md).
+- [Beta.4.1 release notes](docs/releases/v0.1.0-beta.4.1.md) and [historical beta.4 draft](docs/releases/v0.1.0-beta.4.md).
 - [Label-based monitoring](docs/user-guide/beta3-label-monitoring.md) and [existing interval controls](docs/user-guide/beta3-live-monitor-settings.md).
 - [Deployment configuration](https://github.com/docklantern/docklantern-deploy) and [SQLite backup/upgrade guidance](docs/deployment/beta3-sqlite-upgrade.md).
-- [Development guide](docs/development/README.md), [roadmap](docs/product/roadmap.md), [contributing](CONTRIBUTING.md), and [security policy](SECURITY.md).
+- [Development guide](docs/development/README.md), [roadmap](docs/product/roadmap.md), [beta.5 planning (#63)](https://github.com/docklantern/docklantern/issues/63), [contributing](CONTRIBUTING.md), and [security policy](SECURITY.md).
 
 Run local Go checks:
 
