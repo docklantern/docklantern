@@ -279,7 +279,7 @@ func BuildServiceSummaries(views []store.MonitorServiceView,containers []store.C
         s.CanEditWatch = s.HasPolicy && nonLegacy && notBlocked && enrolled &&
             v.State=="present" && s.RunningCount>0 && !s.MixedDiscoveredImages
         s.CanResetWatch = s.HasPolicy && nonLegacy && notBlocked && v.WatchImageOverride!=nil &&
-            (s.CanEditWatch || watchConflict)
+            ((v.State=="present" && s.RunningCount>0 && !s.MixedDiscoveredImages) || watchConflict)
         s.CanCheckNow = s.HasPolicy && notBlocked && !s.Paused && enrolled &&
             v.State!="conflict" && (v.State=="present" || v.LegacyEnrolled)
         out=append(out,s)
