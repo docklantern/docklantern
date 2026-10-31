@@ -122,3 +122,17 @@ func(h Handler) imagesPage(w http.ResponseWriter,r *http.Request){h.renderImages
 func(h Handler) imageDetailsPage(w http.ResponseWriter,r *http.Request){h.renderImageWorkspaceDetails(w,r)}
 func(h Handler) servicesPage(w http.ResponseWriter,r *http.Request){h.renderServicesWorkspace(w,r)}
 func(h Handler) serviceDetailsPage(w http.ResponseWriter,r *http.Request){h.renderServiceWorkspaceDetails(w,r)}
+
+// checkNotice translates backend scheduling outcomes into safe, user-facing
+// status messages. Only known values are accepted in GET query parameters;
+// the redirect is NOT evidence that a registry check has completed.
+func checkNotice(code string)(string,bool){
+ switch code {
+ case "":return "",true
+ case "scheduled":return "Registry check scheduled. The background monitor will process it; no result is available yet.",true
+ case "already_due":return "A registry check is already due. No duplicate request was scheduled.",true
+ case "deferred_backoff":return "Check deferred: an existing registry failure or rate-limit backoff must expire first.",true
+ case "deferred_recent":return "Check deferred: this image was requested or checked recently.",true
+ default:return "",false
+ }
+}
