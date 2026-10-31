@@ -9,7 +9,7 @@ import (
 
 // schemaVersion is deliberately separate from the SQLite application_id.
 // beta.2 databases had user_version=0 and previously used ad-hoc column checks.
-const schemaVersion = 3
+const schemaVersion = 4
 
 // initializeSchema performs the entire schema upgrade within one SQLite
 // transaction. A failed upgrade leaves the old tables/version untouched.
@@ -116,11 +116,24 @@ func initializeSchema(ctx context.Context, db *sql.DB) error {
         if _,err:=tx.ExecContext(ctx,"PRAGMA user_version=3");err!=nil{return err}
     }
 
+    if version < 4 {
+        // A watch-tag override belongs to monitoring preferences, never
+        // Compose desired state or the Docker-observed image. NULL inherits
+        // the currently discovered image. Pre-existing rows are unchanged.
+        if err := addColumnIfMissing(ctx, tx, "monitor_service_settings",
+            "watch_image_override", "TEXT"); err != nil {
+            return err
+        }
+        if _, err := tx.ExecContext(ctx, "PRAGMA user_version=4"); err != nil {
+            return err
+        }
+    }
+
     // user_version alone does not prove a complete/correct migration if
     // someone copied or modified a database externally. Fail closed.
     for table, expected := range map[string][]string{
         "monitoring_defaults": {"id", "interval_seconds"},
-        "monitor_service_settings": {"project", "service", "legacy_enrolled", "gui_enrolled", "label_opt_in", "label_interval_seconds", "gui_interval_seconds", "discovery_state", "last_seen_at", "validation_error", "legacy_interval_seconds"},
+        "monitor_service_settings": {"project", "service", "legacy_enrolled", "gui_enrolled", "label_opt_in", "label_interval_seconds", "gui_interval_seconds", "discovery_state", "last_seen_at", "validation_error", "legacy_interval_seconds", "watch_image_override"},
     } {
         actual, err := tableColumns(ctx, tx, table)
         if err != nil {

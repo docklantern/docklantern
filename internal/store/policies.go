@@ -56,7 +56,7 @@ func (s *Store) SetMonitorPolicy(ctx context.Context,p MonitorPolicy) error {
  // A manually saved policy is explicitly legacy-enrolled, not label-enrolled.
  // The new metadata and old monitoring policy must commit together.
  _,err=tx.ExecContext(ctx,`INSERT INTO monitor_service_settings(project,service,legacy_enrolled,legacy_interval_seconds)
- VALUES(?,?,1,?) ON CONFLICT(project,service) DO UPDATE SET legacy_enrolled=1,legacy_interval_seconds=excluded.legacy_interval_seconds,gui_interval_seconds=NULL`,p.Project,p.Service,p.IntervalSeconds)
+ VALUES(?,?,1,?) ON CONFLICT(project,service) DO UPDATE SET legacy_enrolled=1,legacy_interval_seconds=excluded.legacy_interval_seconds,gui_interval_seconds=NULL,watch_image_override=NULL`,p.Project,p.Service,p.IntervalSeconds)
  if err!=nil{return err}
  return tx.Commit()
 }

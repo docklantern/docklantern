@@ -117,13 +117,28 @@ func (s *Store) reconcileMonitors(ctx context.Context,tx *sql.Tx,items []Contain
         if state!="present" {continue}
         var legacy,gui int
         var override sql.NullInt64
-        err=tx.QueryRowContext(ctx,`SELECT legacy_enrolled,gui_enrolled,gui_interval_seconds
+        var watchImage sql.NullString
+        err=tx.QueryRowContext(ctx,`SELECT legacy_enrolled,gui_enrolled,gui_interval_seconds,watch_image_override
          FROM monitor_service_settings WHERE project=? AND service=?`,k.project,k.service).
-            Scan(&legacy,&gui,&override)
+            Scan(&legacy,&gui,&override,&watchImage)
         if err!=nil{return err}
         // The explicit opt-out always wins over legacy and GUI enrollment.
         if desired.label!=nil&&!*desired.label {continue}
         if legacy!=0 {continue} // Never silently overwrite beta.2 policies.
+        // Never coerce an old GUI watch to a different image repository if
+        // an external Compose deployment changes the service's image.
+        // Mark it conflicting instead and retain both watch preference and
+        // history so the operator can review the deployment transition.
+        if watchImage.Valid {
+            requested,err:=explicitWatchReference(watchImage.String)
+            if err!=nil||!sameImageRepository(desired.image,requested) {
+                if _,err=tx.ExecContext(ctx,`UPDATE monitor_service_settings
+                    SET discovery_state='conflict',validation_error=?
+                    WHERE project=? AND service=?`,watchRepositoryConflict,k.project,k.service);err!=nil{return err}
+                continue
+            }
+            desired.image=requested.Key()
+        }
         if gui==0&&(desired.label==nil||!*desired.label){continue}
         interval:=defaultInterval
         if desired.interval!=nil{interval=*desired.interval}

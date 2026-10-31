@@ -19,6 +19,9 @@ type MonitorServiceSettings struct {
     LabelOptIn *bool
     LabelIntervalSeconds *int
     GUIIntervalSeconds *int
+    // Nil means inherit the Docker-observed image. Only label/GUI-enrolled
+    // services may use this explicit, canonical registry watch reference.
+    WatchImageOverride *string
     DiscoveryState string
     LastSeenAt string
     ValidationError string
@@ -59,8 +62,8 @@ func (s *Store) SetDefaultMonitorInterval(ctx context.Context,seconds int)error 
 func (s *Store) MonitoringServiceSettings(ctx context.Context) ([]MonitorServiceSettings, error) {
     rows, err := s.db.QueryContext(ctx,
         `SELECT project,service,legacy_enrolled,gui_enrolled,label_opt_in,
-            label_interval_seconds,gui_interval_seconds,discovery_state,last_seen_at,validation_error,legacy_interval_seconds
-            FROM monitor_service_settings ORDER BY project,service`)
+            label_interval_seconds,gui_interval_seconds,discovery_state,last_seen_at,validation_error,legacy_interval_seconds,
+            watch_image_override FROM monitor_service_settings ORDER BY project,service`)
     if err != nil {
         return nil, err
     }
@@ -70,8 +73,9 @@ func (s *Store) MonitoringServiceSettings(ctx context.Context) ([]MonitorService
         var p MonitorServiceSettings
         var legacy, gui int
         var labelOptIn, labelInterval, guiInterval, legacyInterval sql.NullInt64
+        var watchImage sql.NullString
         err := rows.Scan(&p.Project,&p.Service,&legacy,&gui,&labelOptIn,
-            &labelInterval,&guiInterval,&p.DiscoveryState,&p.LastSeenAt,&p.ValidationError,&legacyInterval)
+            &labelInterval,&guiInterval,&p.DiscoveryState,&p.LastSeenAt,&p.ValidationError,&legacyInterval,&watchImage)
         if err != nil {
             return nil, err
         }
@@ -90,6 +94,7 @@ func (s *Store) MonitoringServiceSettings(ctx context.Context) ([]MonitorService
             p.GUIIntervalSeconds = &value
         }
         if legacyInterval.Valid {v:=int(legacyInterval.Int64);p.LegacyIntervalSeconds=&v}
+        if watchImage.Valid {v:=watchImage.String;p.WatchImageOverride=&v}
         out = append(out,p)
     }
     return out,rows.Err()
