@@ -6,6 +6,7 @@ import (
  "net/url"
  "strings"
  "testing"
+ "time"
 
  "github.com/docklantern/docklantern/internal/presentation"
  "github.com/docklantern/docklantern/internal/store"
@@ -161,4 +162,32 @@ func TestBeta5WatchRecoveryAndLabelVetoInDetails(t *testing.T){
  // UI never contacts a registry. A request changes only the backend watch;
  // background monitor must still process its own interval/backoff schedule.
  if len(request(h,"GET","/services/site/web","",true).Body.String())==0{t.Fatal("empty details")}
+}
+
+func TestBeta5DisabledGUIServiceCanResetWithoutEnrollment(t *testing.T){
+ h,db,_,guard:=setup(t)
+ ctx:=context.Background()
+ c:=store.Container{ID:"app-web-1",Project:"app",Service:"web",Image:"nginx:latest",
+  State:"running",ImageOS:"linux",ImageArchitecture:"amd64"}
+ if err:=db.Snapshot(ctx,[]store.Container{c});err!=nil{t.Fatal(err)}
+ if err:=db.SetServiceGUIEnrollment(ctx,"app","web",true);err!=nil{t.Fatal(err)}
+ tag:="nginx:stable"
+ if err:=db.SetServiceWatchOverride(ctx,"app","web",&tag);err!=nil{t.Fatal(err)}
+ if err:=db.SetServiceGUIEnrollment(ctx,"app","web",false);err!=nil{t.Fatal(err)}
+ page:=request(h,"GET","/services/app/web","",true)
+ if page.Code!=200||!strings.Contains(page.Body.String(),"Reset watch to Docker-observed image")||
+  strings.Contains(page.Body.String(),"Save watched tag") ||
+  strings.Contains(page.Body.String(),`action="/settings/monitoring/check-now/service"`){
+  t.Fatal("disabled GUI service did not offer reset-only recovery")
+ }
+ f:=url.Values{"project":{"app"},"service":{"web"},"action":{"reset"},
+  "csrf_token":{guard.Token()}}
+ response:=request(h,"POST","/settings/monitoring/watch",f.Encode(),true)
+ if response.Code!=303{t.Fatalf("safe disabled watch reset: %d",response.Code)}
+ policies,err:=db.MonitorPolicies(ctx)
+ if err!=nil||len(policies)!=1||policies[0].Image!="registry-1.docker.io/library/nginx:latest"{
+  t.Fatalf("safe reset modified policy incorrectly %+v %v",policies,err)
+ }
+ due,err:=db.DueMonitorPolicies(ctx,time.Now().Add(time.Hour),20)
+ if err!=nil||len(due)!=0{t.Fatalf("reset enrolled disabled service %+v %v",due,err)}
 }
