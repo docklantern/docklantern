@@ -1,17 +1,17 @@
 # v0.1.0-beta.4.1 — Release validation and operator acceptance
 
-**Status: IN PROGRESS — v0.1.0-beta.4.1 is the selected release candidate; it is NOT tagged, published, or approved for a release deployment. PR #58 was separately authorized and successfully deployed to the test VPS.**  
-**Tracker:** [#51](https://github.com/docklantern/docklantern/issues/51)  
-**Scope:** monitoring-only image-first GUI. **Do not tag, publish or deploy on the basis of CI alone.**
+**Status: COMPLETED WITH ACCEPTED EXCEPTIONS — v0.1.0-beta.4.1 was published and subsequently operator-reported running on the test VPS.** Earlier checklists below retain historical unverified/deferred items; **unchecked does not mean passed**, and the operator explicitly accepted those gaps for this beta.
+**Tracker:** [#51](https://github.com/docklantern/docklantern/issues/51) — closed as completed on October 31, 2026  
+**Scope:** monitoring-only image-first GUI. Any **future** release tag, publication or VPS deployment requires separate explicit operator approval.
 
 The beta.3 predecessor gate [#34](https://github.com/docklantern/docklantern/issues/34) is closed. Its operator-deferred host safety checks should still be exercised during beta.4 acceptance where practical.
 
 ### Existing beta.4 tag and release-candidate provenance
 
 - **Preserve the existing `v0.1.0-beta.4` tag and registry artifacts:** the tag points to `fede82cef7f7fd802397be5121cde471f8a21fa1` before PRs #58–#60. Its [versioned release run](https://github.com/docklantern/docklantern/actions/runs/40418851278) successfully published GHCR and Docker Hub images but skipped creating a GitHub prerelease. **Do not move, reuse, or overwrite** that tag.
-- The candidate is `v0.1.0-beta.4.1`, untagged and unpublished as of this review. Matching notes are [here](../releases/v0.1.0-beta.4.1.md). Merged PR #60 ensures missing notes fail verification before any new image publication.
-- After PRs #59/#60, main commit `4de9b833b04140230e72aa81356345f3b00fb99b` passed [10/10 Go jobs](https://github.com/docklantern/docklantern/actions/runs/40628465289) and [3/3 security jobs](https://github.com/docklantern/docklantern/actions/runs/40628465280). Reverify CI for the exact final merge/tag target.
-- **Separate explicit operator approvals** are required for (1) release tagging/image publication and (2) subsequent digest-pinned release deployment. The local PR #58 test deployment is not beta.4.1 publication.
+- [v0.1.0-beta.4.1](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.4.1) was tagged and published on October 28, 2026 from commit `358f0d7e90082164b23c9df1c0b66dec48651f85`, using [version-matched release notes](../releases/v0.1.0-beta.4.1.md). Release workflow PR #60 required nonempty version-specific notes before publication.
+- Exact final release commit `358f0d7e90082164b23c9df1c0b66dec48651f85` passed [10/10 Go jobs](https://github.com/docklantern/docklantern/actions/runs/40629747695) and [3/3 security jobs](https://github.com/docklantern/docklantern/actions/runs/40629747668). [Release workflow 40630568959](https://github.com/docklantern/docklantern/actions/runs/40630568959) succeeded and logged GHCR and Docker Hub pushes for linux/amd64 and linux/arm64 with manifest index digest `sha256:54dcdfc315cf55738e26084baa2aff97dc8ea15fc3dcca8e895af922f58a0092`.
+- The operator separately approved release tagging/publication and later reported beta.4.1 deployed on the test VPS. The PR #58 local test deployment was a different build; separate approvals remain mandatory for future release/deployment operations.
 
 ## Gate 1 — Code and regression checks
 
@@ -56,7 +56,7 @@ Review at desktop (~1440px), tablet (~800px) and mobile (~390px). Capture screen
 - [ ] Mobile view has no clipped navigation/forms; tables scroll horizontally when necessary and do not conceal required actions.
 - [ ] High-contrast/status colors remain readable, especially failures, Unknown and disabled states.
 
-### PR #58 test-VPS acceptance — confirmed by operator (2026-10-27)
+### Historical PR #58 test-VPS acceptance — confirmed by operator (2026-10-27)
 
 [PR #58](https://github.com/docklantern/docklantern/pull/58) merged at `5d1bc5fa2af472cd604e69ac248fd3b86e0fe706`, with [10/10 Go checks](https://github.com/docklantern/docklantern/actions/runs/40601983136) and [3/3 security checks](https://github.com/docklantern/docklantern/actions/runs/40601983487). The operator authorized a **test-VPS-only** upgrade, verified the pre-upgrade SQLite snapshot (`integrity_check: ok`), and built/deployed `docklantern:beta4-pr58-5d1bc5fa` on amd64. Embedded version: `v0.1.0-beta.4+5d1bc5fa`.
 
@@ -66,23 +66,23 @@ Review at desktop (~1440px), tablet (~800px) and mobile (~390px). Capture screen
 - [x] Readiness PASS. Three idle app+proxy samples over ~24 seconds showed **32.53–32.73 MiB combined memory** and near-zero CPU. This is not a sustained/load or page-latency benchmark.
 - [x] Pause/resume tested on two hello services; operator confirmed monitoring active afterward. All three hello containers were running with zero restart counts in paused-state snapshot and no diff was reported across snapshots (no observed recreation/restart).
 - [x] Earlier beta.2 image display was traced to a legacy persisted watch policy and corrected; it was not proof of a stale running container.
-- [ ] Record or explicitly defer remaining targeted edge-case checks (mixed platform, stale/failing registry checks, explicit label opt-out, override/reset, API compatibility) in #51.
-- [ ] Confirm protected **off-host** backup custody and restore/rollback drill disposition; capture page latency if required for final sign-off.
+- [x] Remaining targeted edge-case checks (mixed platform, stale/failing registry checks, explicit label opt-out, override/reset and API compatibility) were **explicitly accepted as beta exceptions** in [#51](https://github.com/docklantern/docklantern/issues/51), not represented as completed tests.
+- [x] The operator explicitly accepted an **on-VPS-only** SQLite snapshot (integrity check `ok`) and deferred off-host custody, a full restore drill and representative page latency. Neither disaster recovery nor benchmark performance was established.
 
 Safe read-only host diagnostics are in the [running-image reference guide](../operations/beta4-running-image-reference.md). The assistant cannot certify live host or visual acceptance from passing CI alone.
 
 ## Gate 3 — VPS operating and data checks (only after explicit deployment authorization)
 
-The test-VPS checks below applied to the approved PR #58 local build, **not** a final digest-pinned release deployment:
+The older performance and proxy spot checks below were performed on the separate PR #58 test build. Final released beta.4.1 operator evidence is distinguished below; those earlier checks are **not** a sustained benchmark of the release:
 
-- [ ] Confirm the published beta.3 deployment is healthy; record the current pinned image digest, exact Compose overlays, proxy configuration, and SQLite schema.
-- [x] Pre-upgrade SQLite backup completed and integrity returned `ok`. **Still pending:** off-host copy and a recorded restore/rollback drill or an explicit operator-approved deferral.
-- [ ] Verify the deployment Compose config with the exact active overlays, network aliases and Traefik routing.
+- [ ] Full before/after baseline for beta.3, SQLite schema and complete production-equivalent proxy configuration was not independently recorded for final release deployment; accepted as a beta limitation.
+- [x] Pre-upgrade consistent SQLite backup passed integrity checking. The operator approved **deferring** an off-host copy and complete restore drill; the backup remained on the VPS.
+- [x] Operator reported active Compose files as `compose.yaml` and `compose.discovery.yaml` (old `compose.pr58.yaml` inactive); the full effective configuration, networking and Traefik mapping were not independently re-audited for the release.
 - [x] Private GET-only Docker proxy enforcement, network isolation, no app Docker socket mount and read-only legacy binds checked on test VPS (GET 200 / POST 403). This does not test every endpoint.
 - [x] Idle CPU/memory and `/readyz` baseline recorded; **page response time, SQLite file size and sustained/load behavior remain unmeasured**.
-- [ ] Only after `v0.1.0-beta.4.1` publication is separately approved/completed, review a digest-pinned deployment PR and obtain **new explicit deployment approval**; recreate DockLantern only.
-- [ ] Check authenticated Overview, Images, Image Details, Services, Service Details, Activity, Settings, `/readyz`, selected `/api/v1/*` endpoints and unchanged monitored target containers.
-- [ ] Compare CPU/memory/page responsiveness with beta.3. Log any unacceptable slowdown and revert the app using the previous verified image if needed.
+- [x] The operator reported installing and running published beta.4.1. **After** that deployment, [deploy repo PR #5](https://github.com/docklantern/docklantern-deploy/pull/5) aligned its image pin to the published digest; [merged-commit Compose CI](https://github.com/docklantern/docklantern-deploy/actions/runs/41230929425) succeeded. PR #5 was **not** a prerequisite applied before the operator-led VPS deployment.
+- [ ] On the released build, operator confirmed Docker image ID matching the release index digest, embedded version `DockLantern v0.1.0-beta.4.1`, `/readyz` PASS and all three hello services running. The hello-js restart was **intentional**. A complete authenticated page/API sweep and before/after target IDs were **not** independently verified.
+- [ ] Beta.4.1 versus beta.3 sustained resource usage, response latency and full rollback testing were **not** measured; explicitly accepted for this test beta.
 
 Never run disposable integration scripts against the actual VPS. Follow the separately managed [deployment repo](https://github.com/docklantern/docklantern-deploy) for controlled installation.
 
@@ -100,17 +100,17 @@ The beta.4 UI and SQLite historical key currently group by **canonical OCI refer
 
 **Beta.4 does not support multiple independent per-service credential scopes for the same image**, and persisted history cannot distinguish a credential-scope change over time. Do not claim scope isolation across a rotated credential identity. Before deploying under a new registry account with different visibility, verify/re-baseline observations; do not interpret change events across account contexts as unambiguous release changes.
 
-Track any future credential-scope-aware persistence as an architectural feature with its own migration and security acceptance, rather than a silent expansion in beta.4. Review [#45](https://github.com/docklantern/docklantern/issues/45).
+Credential-scope review issue [#45](https://github.com/docklantern/docklantern/issues/45) was closed after documenting the unsupported beta.4 case. Scope-aware persistent observations require a future architecture, migration and security review under [#62](https://github.com/docklantern/docklantern/issues/62), separately from planned [beta.5 #63](https://github.com/docklantern/docklantern/issues/63).
 
 ## Gate 6 — Explicit release authorization and rollback
 
 Only after Gates 1–5 are reviewed:
 
-- [ ] Resolve/document known exceptions and security findings on [#51](https://github.com/docklantern/docklantern/issues/51).
-- [ ] Obtain explicit operator approval **to create the new `v0.1.0-beta.4.1` tag and publish** its GHCR/Docker Hub images and GitHub prerelease from an accepted final-main commit. Never reuse or move the existing `v0.1.0-beta.4` tag.
-- [ ] Verify actual GHCR/Docker Hub manifest digests and `linux/amd64`, `linux/arm64` support; record SHA, provenance and scan evidence.
-- [ ] Obtain **separate explicit approval to deploy**, review a digest-pinned deployment PR and preserve current Traefik/target-service configuration.
+- [x] Operator reviewed and documented accepted exceptions in [closed issue #51](https://github.com/docklantern/docklantern/issues/51).
+- [x] Operator explicitly approved creating `v0.1.0-beta.4.1`; final-main tag published both registry images and the GitHub prerelease. Earlier `v0.1.0-beta.4` tag and image artifacts were preserved.
+- [x] The completed release workflow logged the same multiarch index digest at GHCR and Docker Hub for `linux/amd64` and `linux/arm64`, with successful security jobs. **Direct independent registry-resolved inspection was not separately recorded**.
+- [x] The operator reported running beta.4.1 on the test VPS. The deployment repo was then aligned to the published digest in merged [PR #5](https://github.com/docklantern/docklantern-deploy/pull/5); this does **not** mean PR #5 preceded the actual VPS update or that full effective-config validation was performed.
 - [ ] If monitoring/GUI regression occurs, stop the new app, restore prior pinned digest and verify existing SQLite schema compatibility. Do not downgrade blindly after any future schema migration; restore a matching snapshot if schema changes occurred.
-- [ ] Record post-deploy smoke evidence, operator disposition and final release notes.
+- [x] Operator recorded post-deploy binary version, image index ID, `/readyz` PASS and all three hello workloads running; accepted limitations and [final release gate #51](https://github.com/docklantern/docklantern/issues/51) were documented.
 
-**Current state:** Operator dashboard, mobile/tablet/keyboard, read-only socket proxy, idle resource, backup integrity, and basic pause/resume checks are recorded as accepted above. Off-host backup/restore disposition, remaining edge-case/API and page-latency evidence, and release approval still require sign-off in #51. **No `v0.1.0-beta.4.1` tag, prerelease, image publication or release deployment is authorized.**
+**Final disposition (2026-10-31):** The published beta.4.1 release is operator-reported ready on the test VPS, and [release gate #51](https://github.com/docklantern/docklantern/issues/51) is **closed with explicitly accepted beta exceptions**. Earlier PR #58 acceptance established browser/keyboard and read-only proxy spot checks on a **different** local test build. An off-host backup and full restore drill were **deferred**. Exhaustive registry edge cases, full API/browser sweep, sustained latency/performance, complete config re-audit and before/after target container identity verification were **not demonstrated**, and must not be called passed. [Deployment repo PR #5](https://github.com/docklantern/docklantern-deploy/pull/5) is merged; [beta.5 planning](https://github.com/docklantern/docklantern/issues/63) is future work requiring separate approvals.
