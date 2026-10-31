@@ -287,7 +287,11 @@ var imageExperienceDetailTemplate=workspaceTemplate("image-detail-v2",`<!doctype
 <section class="section" aria-labelledby="image-services-title"><div class="section-head"><div><h2 id="image-services-title">Associated services</h2><p class="helper">Service-specific monitoring and immutable deployed-image evidence.</p></div></div>
 <div class="panel table-scroll"><table><thead><tr><th>Compose service</th><th>Monitoring</th><th>Deployed assessment</th><th>Deployed digest evidence</th><th>Details</th></tr></thead><tbody>
 {{range .Evidence}}<tr><td><strong>{{.Service.Project}} / {{.Service.Service}}</strong></td>
-<td>{{status .Service.Monitoring}}</td>
+<td>{{status .Service.Monitoring}}
+<small class="subtext">Last attempt: {{when .Service.LastCheckedAt}}</small>
+{{if .Service.NextCheckAt}}<small class="subtext">Next: {{when .Service.NextCheckAt}}</small>{{end}}
+{{if .Service.ConsecutiveFailures}}<small class="subtext">Failures: {{.Service.ConsecutiveFailures}} (retry backoff may apply)</small>{{end}}
+</td>
 <td><span class="pill {{tone .Service.Assessment}}">{{status .Service.Assessment}}</span>{{if .Reason}}<small class="subtext">{{.Reason}}</small>{{end}}</td>
 <td>{{if .DeployedDigest}}<span class="mono" title="{{.DeployedDigest}}">{{shortDigest .DeployedDigest}}</span>{{else}}<span class="muted">Not verified</span>{{end}}</td>
 <td><a class="text-action" href="{{serviceURL .Service.Project .Service.Service}}">View service</a></td></tr>
