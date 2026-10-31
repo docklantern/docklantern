@@ -22,6 +22,7 @@ type MonitorPolicy struct {
  LastError string `json:"last_error,omitempty"`
  ConsecutiveFailures int `json:"consecutive_failures"`
  Generation int `json:"generation"`
+ LastManualRequestAt string `json:"last_manual_request_at,omitempty"`
 }
 
 func (s *Store) SetMonitorPolicy(ctx context.Context,p MonitorPolicy) error {
@@ -62,10 +63,10 @@ func (s *Store) SetMonitorPolicy(ctx context.Context,p MonitorPolicy) error {
 }
 
 func (s *Store) MonitorPolicies(ctx context.Context)([]MonitorPolicy,error){
- rows,err:=s.db.QueryContext(ctx,"SELECT project,service,image,platform,interval_seconds,paused,next_check_at,last_checked_at,last_error,consecutive_failures,generation FROM monitor_policies ORDER BY project,service")
+ rows,err:=s.db.QueryContext(ctx,"SELECT project,service,image,platform,interval_seconds,paused,next_check_at,last_checked_at,last_error,consecutive_failures,generation,last_manual_request_at FROM monitor_policies ORDER BY project,service")
  if err!=nil{return nil,err};defer rows.Close()
  out:=[]MonitorPolicy{}
- for rows.Next(){var p MonitorPolicy;if err=rows.Scan(&p.Project,&p.Service,&p.Image,&p.Platform,&p.IntervalSeconds,&p.Paused,&p.NextCheckAt,&p.LastCheckedAt,&p.LastError,&p.ConsecutiveFailures,&p.Generation);err!=nil{return nil,err};out=append(out,p)}
+ for rows.Next(){var p MonitorPolicy;if err=rows.Scan(&p.Project,&p.Service,&p.Image,&p.Platform,&p.IntervalSeconds,&p.Paused,&p.NextCheckAt,&p.LastCheckedAt,&p.LastError,&p.ConsecutiveFailures,&p.Generation,&p.LastManualRequestAt);err!=nil{return nil,err};out=append(out,p)}
  return out,rows.Err()
 }
 
