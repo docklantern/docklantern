@@ -5,6 +5,7 @@ import (
     "errors"
     "path/filepath"
     "strings"
+    "sync"
     "testing"
     "time"
 
@@ -215,5 +216,47 @@ func TestManualCheckGroupBackoffAndRecentAttemptsAreShared(t *testing.T){
     r,err=s.RequestServiceCheck(ctx,"b","web",now)
     if err!=nil||r.State!=CheckDeferredRecent{
         t.Fatalf("recent shared observation bypassed %+v %v",r,err)
+    }
+}
+
+func TestManualCheckConcurrentClicksCoalesce(t *testing.T){
+    ctx:=context.Background()
+    s:=newLabelTestStore(t)
+    c:=testLabelContainer("app","web","nginx:latest",map[string]string{labelMonitor:"true"})
+    doSnapshot(t,s,c)
+    now:=time.Now().UTC().Truncate(time.Second)
+    initial:=getOnePolicy(t,s)
+    if err:=s.FinishMonitorCheck(ctx,initial,now.Add(-2*time.Minute),nil);err!=nil{t.Fatal(err)}
+    before:=getOnePolicy(t,s)
+    var wg sync.WaitGroup
+    outcomes:=make(chan CheckRequestResult,20)
+    failures:=make(chan error,20)
+    for i:=0;i<20;i++{
+        wg.Add(1)
+        go func(){
+            defer wg.Done()
+            result,err:=s.RequestServiceCheck(ctx,"app","web",now)
+            if err!=nil{failures<-err;return}
+            outcomes<-result
+        }()
+    }
+    wg.Wait()
+    close(outcomes);close(failures)
+    for err:=range failures{t.Errorf("concurrent request error: %v",err)}
+    scheduled:=0
+    deferred:=0
+    for result:=range outcomes{
+        switch result.State{
+        case CheckScheduled:scheduled++
+        case CheckDeferredRecent:deferred++
+        default:t.Errorf("unexpected concurrent state %+v",result)
+        }
+    }
+    if scheduled!=1||deferred!=19{
+        t.Fatalf("20 requests scheduled %d and deferred %d",scheduled,deferred)
+    }
+    after:=getOnePolicy(t,s)
+    if after.Generation!=before.Generation+1{
+        t.Fatalf("duplicate request invalidated generation %+v",after)
     }
 }
