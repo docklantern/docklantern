@@ -3,6 +3,9 @@ on:
   workflow_call:
   pull_request:
     paths:
+      # A registry or HTML handler change can alter a released binary just
+      # as much as a Dockerfile change. Scan every Go source PR.
+      - '**/*.go'
       - 'go.mod'
       - 'go.sum'
       - 'Dockerfile'
