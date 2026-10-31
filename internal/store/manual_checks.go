@@ -123,6 +123,25 @@ func (s *Store) requestManualCheck(ctx context.Context, target checkRequestTarge
             return CheckRequestResult{State:CheckDeferredRecent,Eligible:len(watches)},nil
         }
     }
+    // A manual image check must not bypass a sister service's persistent
+    // retry window. An ordinary successful/recent group check also throttles
+    // POSTs, even when one of the group's services has a stale timestamp.
+    var groupFailed int
+    var groupChecked sql.NullString
+    err=tx.QueryRowContext(ctx,`SELECT
+        COALESCE(SUM(CASE WHEN consecutive_failures>0 AND next_check_at>? THEN 1 ELSE 0 END),0),
+        MAX(last_checked_at)
+        FROM monitor_policies WHERE image=? AND platform=?`,
+        stamp.Format(time.RFC3339),watches[0].image,watches[0].platform).
+        Scan(&groupFailed,&groupChecked)
+    if err!=nil{return CheckRequestResult{},err}
+    if groupFailed>0{return CheckRequestResult{State:CheckDeferredBackoff,Eligible:len(watches)},nil}
+    if groupChecked.Valid && groupChecked.String!="" {
+        last,valid:=checkTime(groupChecked.String)
+        if !valid || stamp.Sub(last)<manualCheckSpacing {
+            return CheckRequestResult{State:CheckDeferredRecent,Eligible:len(watches)},nil
+        }
+    }
 
     count:=0
     due:=false
