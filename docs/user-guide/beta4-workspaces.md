@@ -1,6 +1,6 @@
 # Using the beta.4 DockLantern interface
 
-**Status:** Documentation for the in-review v0.1.0-beta.4 release candidate. These pages are not available in the published beta.3 image.
+**Status:** Guide for the published [v0.1.0-beta.4.1 prerelease](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.4.1), operator-reported running on the test VPS on October 31, 2026. These image-first pages are not available in the older beta.3 release.
 
 DockLantern is a **monitor**, not an image updater. A different digest is a remote OCI observation or a verifiable deployed-image difference; it is not a claim that a newer application release exists.
 
@@ -72,4 +72,4 @@ Retained history is not automatically deleted merely by changing retention days.
 - Keep the Docker socket proxy private and GET-only.
 - The current scheduler provides one process-wide credential host/account tuple; the registry response cache protects the effective auth scope in memory, but persistent observation keys contain **only image reference and platform**. Multiple simultaneous credential scopes for a single image, or credential-scope history across credential rotation, are **not supported**.
 - Monitoring scheduling and registry checks happen in the background; refreshing a page does not force a remote request.
-- This guide documents the beta.4 candidate, **not proof of an operator-approved beta.4 production deployment**.
+- This guide documents beta.4.1 and [completed acceptance issue #51](https://github.com/docklantern/docklantern/issues/51), **not a production certification**. The released image was reported running and ready on the test VPS; off-host backup/restore, exhaustive edge-case/API checks and page-latency benchmarking were deferred or not independently verified. Future enhancements are planned under [beta.5 #63](https://github.com/docklantern/docklantern/issues/63), with multi-credential persistence separately deferred to [#62](https://github.com/docklantern/docklantern/issues/62).
