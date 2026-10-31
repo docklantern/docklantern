@@ -241,7 +241,7 @@ func TestLegacyWatchOverrideRejectedAndUpgradeDataPreserved(t *testing.T) {
     s,err:=Open(path)
     if err!=nil{t.Fatal(err)}
     defer s.Close()
-    if v:=versionOf(t,s.db);v!=4{t.Fatalf("expected schema v4, got %d",v)}
+    if v:=versionOf(t,s.db);v!=schemaVersion{t.Fatalf("expected current schema v%d, got %d",schemaVersion,v)}
     settings,err:=s.MonitoringServiceSettings(ctx)
     if err!=nil||len(settings)!=2{t.Fatalf("lost provenance %+v %v",settings,err)}
     for _,m:=range settings {

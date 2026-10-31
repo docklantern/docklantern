@@ -35,6 +35,8 @@ type Backend interface {
  SetServiceIntervalOverride(context.Context,string,string,*int)error
  SetServiceGUIEnrollment(context.Context,string,string,bool)error
  SetServicePaused(context.Context,string,string,bool)error
+ RequestServiceCheck(context.Context,string,string,time.Time)(store.CheckRequestResult,error)
+ RequestImageCheck(context.Context,string,string,time.Time)(store.CheckRequestResult,error)
 }
 type Handler struct {
  Backend Backend
@@ -180,6 +182,8 @@ func (h Handler) Routes(mux *http.ServeMux){
  mux.HandleFunc("GET /settings",h.index)
  mux.HandleFunc("POST /settings/monitoring/default",h.saveDefaultInterval)
  mux.HandleFunc("POST /settings/monitoring/service",h.saveServiceSettings)
+ mux.HandleFunc("POST /settings/monitoring/check-now/service",h.checkNowService)
+ mux.HandleFunc("POST /settings/monitoring/check-now/image",h.checkNowImage)
  mux.HandleFunc("POST /settings/notifications",h.notifications)
  mux.HandleFunc("POST /settings/retention",h.saveRetention)
  mux.HandleFunc("POST /settings/events/prune",h.prune)

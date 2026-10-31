@@ -9,7 +9,7 @@ import (
 
 // schemaVersion is deliberately separate from the SQLite application_id.
 // beta.2 databases had user_version=0 and previously used ad-hoc column checks.
-const schemaVersion = 4
+const schemaVersion = 5
 
 // initializeSchema performs the entire schema upgrade within one SQLite
 // transaction. A failed upgrade leaves the old tables/version untouched.
@@ -129,10 +129,24 @@ func initializeSchema(ctx context.Context, db *sql.DB) error {
         }
     }
 
+    if version < 5 {
+        // Manual check requests are durable scheduling hints. Timestamp-only
+        // throttling prevents repeated authenticated POSTs from continually
+        // invalidating in-flight work or defeating registry rate limits.
+        if err := addColumnIfMissing(ctx, tx, "monitor_policies",
+            "last_manual_request_at", "TEXT NOT NULL DEFAULT ''"); err != nil {
+            return err
+        }
+        if _, err := tx.ExecContext(ctx, "PRAGMA user_version=5"); err != nil {
+            return err
+        }
+    }
+
     // user_version alone does not prove a complete/correct migration if
     // someone copied or modified a database externally. Fail closed.
     for table, expected := range map[string][]string{
         "monitoring_defaults": {"id", "interval_seconds"},
+        "monitor_policies": {"project", "service", "image", "platform", "generation", "last_manual_request_at"},
         "monitor_service_settings": {"project", "service", "legacy_enrolled", "gui_enrolled", "label_opt_in", "label_interval_seconds", "gui_interval_seconds", "discovery_state", "last_seen_at", "validation_error", "legacy_interval_seconds", "watch_image_override"},
     } {
         actual, err := tableColumns(ctx, tx, table)
