@@ -183,3 +183,37 @@ func TestManualCheckRejectsMalformedScheduleWithoutMutation(t *testing.T){
     }
     if !errors.Is(ctx.Err(),nil){t.Fatal("unexpected context cancellation")}
 }
+
+func TestManualCheckGroupBackoffAndRecentAttemptsAreShared(t *testing.T){
+    ctx:=context.Background()
+    s:=newLabelTestStore(t)
+    a:=testLabelContainer("a","web","nginx:latest",map[string]string{labelMonitor:"true"})
+    b:=testLabelContainer("b","web","nginx:latest",map[string]string{labelMonitor:"true"})
+    doSnapshot(t,s,a,b)
+    now:=time.Now().UTC().Truncate(time.Second)
+    policies,err:=s.MonitorPolicies(ctx)
+    if err!=nil||len(policies)!=2{t.Fatal(err)}
+    if err:=s.FinishMonitorCheck(ctx,policies[0],now.Add(-4*time.Minute),
+        &registry.RetryableError{Status:429,RetryAfter:3*time.Hour});err!=nil{t.Fatal(err)}
+    if err:=s.FinishMonitorCheck(ctx,policies[1],now.Add(-3*time.Minute),nil);err!=nil{t.Fatal(err)}
+    // Service B is individually healthy and due in the future, but a
+    // sister service's registry 429 prevents a manual group bypass.
+    r,err:=s.RequestServiceCheck(ctx,policies[1].Project,"web",now)
+    if err!=nil||r.State!=CheckDeferredBackoff{
+        t.Fatalf("shared backoff bypassed %+v %v",r,err)
+    }
+    if len(dueAt(t,s,now))!=0{t.Fatal("shared rate limit caused early check")}
+    // Move A's backed-off schedule out of the future to emulate its
+    // retry window expiring; a recent ordinary check on B still throttles.
+    if _,err:=s.db.ExecContext(ctx,`UPDATE monitor_policies SET next_check_at=?
+        WHERE project='a' AND service='web'`,now.Add(-time.Second).Format(time.RFC3339));err!=nil{t.Fatal(err)}
+    // With a successful B check only 20 seconds ago, a manual request
+    // against A must be deferred as a shared-image cooldown.
+    if _,err:=s.db.ExecContext(ctx,`UPDATE monitor_policies SET
+        last_checked_at=? WHERE project='b' AND service='web'`,
+        now.Add(-20*time.Second).Format(time.RFC3339));err!=nil{t.Fatal(err)}
+    r,err=s.RequestServiceCheck(ctx,"b","web",now)
+    if err!=nil||r.State!=CheckDeferredRecent{
+        t.Fatalf("recent shared observation bypassed %+v %v",r,err)
+    }
+}
