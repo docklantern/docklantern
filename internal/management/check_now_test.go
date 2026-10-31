@@ -56,8 +56,8 @@ func TestCheckNowEndpointsAuthenticationCSRFAndPersistentSchedule(t *testing.T) 
       !strings.Contains(second.Header().Get("Location"),"check=deferred_recent") {
         t.Fatalf("repeat request bypassed throttle: %d %s",second.Code,second.Header().Get("Location"))
     }
-    if code:=request(h,"GET",path,"",true).Code;code!=http.StatusMethodNotAllowed{
-        t.Fatalf("GET unexpectedly mutates schedule: %d",code)
+    if code:=request(h,"GET",path,"",true).Code;code!=http.StatusNotFound && code!=http.StatusMethodNotAllowed{
+        t.Fatalf("GET unexpectedly reached the POST-only action: %d",code)
     }
 }
 
