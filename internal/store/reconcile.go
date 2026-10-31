@@ -133,8 +133,8 @@ func (s *Store) reconcileMonitors(ctx context.Context,tx *sql.Tx,items []Contain
             requested,err:=explicitWatchReference(watchImage.String)
             if err!=nil||!sameImageRepository(desired.image,requested) {
                 if _,err=tx.ExecContext(ctx,`UPDATE monitor_service_settings
-                    SET discovery_state='conflict',validation_error='watched image no longer matches Docker image repository'
-                    WHERE project=? AND service=?`,k.project,k.service);err!=nil{return err}
+                    SET discovery_state='conflict',validation_error=?
+                    WHERE project=? AND service=?`,watchRepositoryConflict,k.project,k.service);err!=nil{return err}
                 continue
             }
             desired.image=requested.Key()
