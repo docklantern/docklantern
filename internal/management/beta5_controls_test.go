@@ -7,7 +7,6 @@ import (
  "net/url"
  "strings"
  "testing"
- "time"
 
  "github.com/docklantern/docklantern/internal/presentation"
  "github.com/docklantern/docklantern/internal/store"
@@ -163,5 +162,4 @@ func TestBeta5WatchRecoveryAndLabelVetoInDetails(t *testing.T){
  // UI never contacts a registry. A request changes only the backend watch;
  // background monitor must still process its own interval/backoff schedule.
  if len(request(h,"GET","/services/site/web","",true).Body.String())==0{t.Fatal("empty details")}
- _=time.Second
 }
