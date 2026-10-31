@@ -22,6 +22,8 @@ type MonitorServiceView struct {
  EffectiveInterval int `json:"effective_interval_seconds"`
  LabelInterval *int `json:"label_interval_seconds"`
  GUIOverride *int `json:"gui_override_seconds"`
+ WatchImageOverride *string `json:"watch_image_override,omitempty"`
+ WatchSource string `json:"watch_source"`
  LegacyEnrolled bool `json:"legacy_enrolled"`
  GUIEnrolled bool `json:"gui_enrolled"`
  LabelOptIn *bool `json:"label_opt_in"`
@@ -46,8 +48,9 @@ func (s *Store) MonitorServiceViews(ctx context.Context) ([]MonitorServiceView,e
   v:=MonitorServiceView{Project:m.Project,Service:m.Service,State:m.DiscoveryState,
    ValidationError:m.ValidationError,LegacyEnrolled:m.LegacyEnrolled,GUIEnrolled:m.GUIEnrolled,
    LabelOptIn:m.LabelOptIn,GUIOverride:m.GUIIntervalSeconds,LabelInterval:m.LabelIntervalSeconds,
+   WatchImageOverride:m.WatchImageOverride,WatchSource:"Docker-observed image",
    EffectiveInterval:defaults,IntervalSource:"Global default",EnrollmentSource:"Not monitored"}
-  if m.LegacyEnrolled {v.EnrollmentSource="Legacy manual";if m.LegacyIntervalSeconds!=nil {
+  if m.LegacyEnrolled {v.EnrollmentSource="Legacy manual";v.WatchSource="Legacy manual";if m.LegacyIntervalSeconds!=nil {
    v.EffectiveInterval=*m.LegacyIntervalSeconds;v.IntervalSource="Legacy manual"
   }}
   if !m.LegacyEnrolled && m.LabelIntervalSeconds!=nil {
@@ -61,6 +64,7 @@ func (s *Store) MonitorServiceViews(ctx context.Context) ([]MonitorServiceView,e
    } else if m.GUIEnrolled {v.EnrollmentSource="GUI"}
   }
   if m.LabelOptIn!=nil&&!*m.LabelOptIn {v.EnrollmentSource="Disabled by Docker label"}
+  if m.WatchImageOverride!=nil&&!m.LegacyEnrolled {v.WatchSource="GUI watch override"}
   if p,ok:=byID[serviceIdentity{m.Project,m.Service}];ok {
    v.Image=p.Image;v.Platform=p.Platform;v.HasPolicy=true
    v.Paused=p.Paused;v.NextCheckAt=p.NextCheckAt
@@ -153,13 +157,21 @@ func(s *Store) SetServiceGUIEnrollment(ctx context.Context,project,service strin
    WHERE project=? AND service=?`,project,service)
   if err!=nil{return err}
   var override,labelInt sql.NullInt64
+  var watchImage sql.NullString
   var global int
-  err=tx.QueryRowContext(ctx,`SELECT gui_interval_seconds,label_interval_seconds
-   FROM monitor_service_settings WHERE project=? AND service=?`,project,service).Scan(&override,&labelInt)
+  err=tx.QueryRowContext(ctx,`SELECT gui_interval_seconds,label_interval_seconds,watch_image_override
+   FROM monitor_service_settings WHERE project=? AND service=?`,project,service).Scan(&override,&labelInt,&watchImage)
   if err!=nil{return err}
   if err=tx.QueryRowContext(ctx,"SELECT interval_seconds FROM monitoring_defaults WHERE id=1").Scan(&global);err!=nil{return err}
   if labelInt.Valid{global=int(labelInt.Int64)}
   if override.Valid{global=int(override.Int64)}
+  if watchImage.Valid {
+   requested,e:=explicitWatchReference(watchImage.String)
+   if e!=nil||!sameImageRepository(candidate.image,requested){
+    return errors.New("watched image no longer matches Docker image repository")
+   }
+   candidate.image=requested.Key()
+  }
   stamp:=time.Now().UTC().Format(time.RFC3339)
   _,err=tx.ExecContext(ctx,`INSERT INTO monitor_policies
    (project,service,image,platform,interval_seconds,paused,next_check_at)
