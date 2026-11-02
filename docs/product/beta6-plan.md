@@ -183,23 +183,23 @@ Proposed Phase 0 decisions and open validation evidence are tracked in the [Phas
 
 The accepted beta.5 test VPS backups were integrity-checked locally but **not restored**, and off-host custody was deferred. Those exceptions do **not** carry over as acceptable beta.6 executor-release exceptions.
 
-## Proposed GitHub tracking breakdown (NOT YET CREATED)
+## GitHub tracking breakdown (created; implementation not authorized)
 
-One beta.6 umbrella issue plus focused implementation issues, ideally one or two reviewable PRs each:
+[Umbrella #79](https://github.com/docklantern/docklantern/issues/79) and nine implementation-planning issues [#80–#88](https://github.com/docklantern/docklantern/issues/80) were created for dependency tracking only. Each implementation phase/PR, merge, release and VPS action still requires separate explicit approval.
 
 | Proposed ticket | Depends on | Proposed ownership/scope |
 |---|---|---|
-| B6-00 — Close security design/open contract decisions | ADR 0008 and PR #77 documents | Support matrix, Compose allowlist, source stability, host ownership, readiness/backup policy |
-| B6-01 — Standalone Go executor skeleton and artifact packaging | B6-00 | Host-local CLI, fixed Docker environment, protection boundary, binary scan |
-| B6-02 — Protected registrations, strict proposals and CLI approval | B6-01 | Untrusted handoff, typed contracts, allowlist, expiry, TTY |
-| B6-03 — Durable journal, locks and inspect-only reconciliation | B6-01/B6-02 | SQLite migrations, fsync, sanitized receipts, crash tests |
-| B6-04 — Immutable OCI + read-only Compose preflight | B6-02/B6-03 | Source validation, image-only effective diff, runtime drift detection |
-| B6-05 — Scoped Compose apply and manually confirmed recovery | B6-03/B6-04 | First authorized Docker mutations on disposable fixtures |
-| B6-06 — GUI proposals, Service/Image Details and Activity | B6-02/B6-03 and stable receipt contract | No privileged web execution, image-first accessible UI |
-| B6-07 — Adversarial/compatibility and exact-artifact CI security | All features | SEC-01–SEC-16, actual host binary audit, regression and release checks |
-| B6-08 — Release, backup restore and test-VPS operator acceptance | All prior phases and separate approvals | Runbooks, off-host backup+restore, service test, version/release gates |
+| [B6-00](https://github.com/docklantern/docklantern/issues/80) — Close security design/open contract decisions | ADR 0008 and PR #77 documents | Support matrix, Compose allowlist, source stability, host ownership, readiness/backup policy |
+| [B6-01](https://github.com/docklantern/docklantern/issues/81) — Standalone Go executor skeleton and artifact packaging | B6-00 | Host-local CLI, fixed Docker environment, protection boundary, binary scan |
+| [B6-02](https://github.com/docklantern/docklantern/issues/82) — Protected registrations, strict proposals and CLI approval | B6-01 | Untrusted handoff, typed contracts, allowlist, expiry, TTY |
+| [B6-03](https://github.com/docklantern/docklantern/issues/83) — Durable journal, locks and inspect-only reconciliation | B6-01/B6-02 | SQLite migrations, fsync, sanitized receipts, crash tests |
+| [B6-04](https://github.com/docklantern/docklantern/issues/84) — Immutable OCI + read-only Compose preflight | B6-02/B6-03 | Source validation, image-only effective diff, runtime drift detection |
+| [B6-05](https://github.com/docklantern/docklantern/issues/85) — Scoped Compose apply and manually confirmed recovery | B6-03/B6-04 | First authorized Docker mutations on disposable fixtures |
+| [B6-06](https://github.com/docklantern/docklantern/issues/86) — GUI proposals, Service/Image Details and Activity | B6-02/B6-03 and stable receipt contract | No privileged web execution, image-first accessible UI |
+| [B6-07](https://github.com/docklantern/docklantern/issues/87) — Adversarial/compatibility and exact-artifact CI security | All features | SEC-01–SEC-16, actual host binary audit, regression and release checks |
+| [B6-08](https://github.com/docklantern/docklantern/issues/88) — Release, backup restore and test-VPS operator acceptance | All prior phases and separate approvals | Runbooks, off-host backup+restore, service test, version/release gates |
 
-Issue numbers and assignments are deliberately omitted: **no GitHub issues have been created**. If approved, create the umbrella first, then child issues with explicit dependencies, security-test mappings and separate PR/merge permission boundaries.
+These links are cross-referenced issue-tracking records, not GitHub native sub-issue relationships. Issue creation authorizes **neither implementation nor merges, releases, or host operations**.
 
 ## Release definition of done
 
