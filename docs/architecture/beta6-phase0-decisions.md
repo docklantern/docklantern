@@ -13,7 +13,7 @@ These are deliberately conservative first-release decisions for **one host-nativ
 | Area | Proposed initial beta.6 decision | Evidence / remaining gate |
 |---|---|---|
 | Host and Engine | Linux **amd64**, local rootful Docker Engine using a fixed Unix socket; no remote, rootless, Windows, macOS, or Swarm support | Capture actual test-VPS Engine/API and Compose versions **read-only**, then validate the exact combination in disposable CI before claiming support |
-| Compose | **Compose V2 plugin**, host-installed trusted binary and plugin; explicit project/options; no Compose V1, SDK, or loose minimum-version promise | Pin/test an exact plugin version per supported matrix row; reject untested versions |
+| Compose | **Compose V2 or V5 CLI/plugin only at individually tested exact versions**; the observed test VPS reports v5.5.1. Use trusted host binary/plugin and explicit project/options; no Compose V1, SDK, or loose minimum-version promise | Docker states v5 retains the `docker compose` interface; **v5.5.1 is observed, not validated for executor execution**. Pin/test each accepted CLI version and reject untested versions |
 | Operator | Local/SSH authenticated host administrator via trusted `sudo` and interactive TTY; no executor setuid binary, docker-group requirement, web launcher, or `--yes` | Verify real OS user/UID/GID and authorized invocation in disposable boundary tests |
 | Monitor | Remains monitoring-only with private GET-only Docker proxy and no direct Docker socket or executor in the image | Regression SEC-01/03/14 |
 | Files | Root/trusted-admin-owned ancestors; three nonoverlapping handoff/trusted-state mounts; protected source inputs, stable Compose execution | Owner/mount validation and TOCTOU fixture SEC-02/03/16 |
@@ -23,7 +23,7 @@ These are deliberately conservative first-release decisions for **one host-nativ
 | Journal | Protected SQLite and stable override generations, journal intent before side effects, manual inspect-only reconciliation | Crash/restore fault injection SEC-08/09/13 |
 | Backups | Encrypted/access-controlled **off-host** monitor/executor backup plus witnessed restore before live executor testing | Beta.5 same-VPS backups are insufficient; SEC-13 |
 
-**Unresolved data, not a hidden default:** exact Engine and Compose V2 plugin versions installed on the target VPS; permitted host deploy account and ownership of its Compose roots; actual Compose effective-config behavior for the current `hello-go` fixture. Do not close #80 or authorize Phase 1 until these are verified or an explicitly bounded substitute CI support target is approved.
+**Recorded operator evidence, not a compatibility endorsement:** the test VPS reports Linux/x86_64, Docker client/server **29.8.1**, API **1.56**, Compose **v5.5.1**, default context on the local Unix socket. Remaining checks include an exact tested disposable support row, trusted host deploy-account/Compose ancestry, rootful daemon confirmation, and `hello-go` `pull_policy`/digest semantics. Do not close #80 or claim VPS executor support merely from version output; Phase 1 may instead be explicitly approved for a pinned **CI-only** scope.
 
 ## 1. Supported platform and toolchain contract
 
@@ -31,7 +31,7 @@ These are deliberately conservative first-release decisions for **one host-nativ
 
 - Linux AMD64 only for the first **host-executor** implementation and release claim. The monitoring image's existing AMD64/ARM64 support is unaffected; host-executor ARM64 may be added only after a dedicated integration and artifact audit.
 - One **local rootful** Docker Engine, addressed explicitly at its trusted Unix socket; no user-defined/remote Docker context, daemon TCP endpoint, rootless Docker, alternate runtime or multi-host.
-- Host Docker CLI + Compose **V2 plugin**, both installed and secured by the host administrator. The executor uses configured absolute binary paths, inspects executable/plugin identity, and rejects unsupported versions.
+- Host Docker CLI with Compose **V2 or V5 plugin at an individually approved exact version**, installed and secured by the host administrator. The executor uses configured absolute binary paths, inspects executable/plugin identity, and rejects unsupported versions. [Docker's Compose FAQ](https://docs.docker.com/compose/support-and-feedback/faq/) documents v5's `docker compose` compatibility with v2; this does not substitute for tested semantics. [Compose v5.5.0](https://github.com/docker/compose/releases/tag/v5.5.0) changed digest reconciliation and warns that the first `compose up` after upgrade can recreate containers, which must be exercised only in disposable fixtures.
 - The Go build uses the repository's pinned/reviewed release toolchain, with a separately audited statically linked/bounded-dependency executor artifact. `go.mod` currently declares Go 1.23; this is not proof of an independently patched/acceptable runtime or compiler.
 - Compose CLI command construction is typed, with explicit `--project-directory`, `-p`, ordered `-f` and controlled `--env-file` and `--profile` options. No arbitrary appended flags.
 
@@ -41,8 +41,8 @@ A **version family alone** is not support evidence. Support is exact tested rows
 
 | Linux/arch | Engine/server/API | Docker CLI | Compose plugin | Evidence |
 |---|---|---|---|---|
-| Linux/amd64, disposable CI | **Pending recorded versions** | **Pending** | **Pending** | Exact version output and end-to-end security test run |
-| Linux/amd64, approved IPv6-only test VPS | **Not yet captured** | **Not yet captured** | **Not yet captured** | Operator-provided read-only inventory + CI parity review |
+| Linux/amd64, disposable CI | **Pending exact tested Engine/API** | **Pending** | **Pending Compose V5.5.1 parity or separately approved supported version** | Exact version output and disposable security/Compose behavior test run |
+| Linux/amd64, approved IPv6-only test VPS | **Observed 29.8.1 / API 1.56** | **Observed 29.8.1** | **Observed v5.5.1** | Read-only operator inventory **received**; not an approved support row until disposable CI parity and security review |
 | Linux/arm64 | Not in initial executor scope | N/A | N/A | Explicitly unsupported until independently tested |
 
 Before any executable implementation is treated as supported, record the full `docker version` client/server/API details, `docker compose version`, architecture, selected Unix socket, tested lifecycle flags, and relevant actual Compose rendering. Freeze the accepted version(s) in the support document and CI. Upgrades to new major/minor CLI behavior are review-triggering, not automatically allowed.
@@ -88,8 +88,20 @@ A poisoned `PATH` must not change the Docker executable or plugin. If plugin ide
 - The monitor container currently runs with a read-only root filesystem and removed Linux capabilities, but its current Compose declaration does **not** set a dedicated nonroot `user`. Do not assume root inside a container is a safe writer to host-backed filesystem. A dedicated monitor UID is a **proposed Phase 1 hardening change**, requiring a compatible `/data` volume permissions/migration test. Mount separation and no host Docker socket remain mandatory regardless of UID.
 - Executor private registration, SQLite/WAL, locks, overrides and executable are root/trusted-admin owned and inaccessible for monitor writes. The receipt directory is executor-writable but **read-only from the monitor container**; do not put receipts under a writable parent mounted by the monitor.
 - Use host OS account authentication and narrowly controlled `sudo` for interactive executor launch; never install a setuid executable or open a web-triggered sudo bridge. Do not require or recommend adding the web service user to the Docker group.
-- A host admin who can invoke a rootful Docker executor already has host-administrative authority. The security goal is to prevent **monitoring compromise alone** from using that authority.
+- The operator-provided host inventory shows the deploy account already belongs to the **`docker` group** and Docker context `default` points at `unix:///var/run/docker.sock`. That grants Docker administrative authority on common rootful installations; the rootful Engine security configuration itself still needs confirmation. Never add the monitoring container/user to this group or give it the raw socket. Do not require any new operator Docker-group membership. The security goal is to prevent **monitoring compromise alone** from using that authority.
 - A Compose source owner may be an approved nonroot deploy user; source files, interpolation inputs and **all parent directories** must be protected against modifications by monitor/untrusted principals. Project roots in a normal operator home directory may be eligible if this can be proven; root ownership is not automatically required.
+
+### Operator-reported source permissions (read-only evidence)
+
+For the initial `hello-go` candidate, the operator reports **one effective `web` service**, prebuilt `davidslusser/hello-go:latest`, `pull_policy: always`, no declared build, dependencies, Docker HEALTHCHECK, privileged/host networking or volumes in the inspected subset. The effective-config inspection was intentionally limited and **does not establish absence of all unsupported keys**.
+
+- Both the explicit source file **`docker-compose.yaml`** and the project `.env` file are **`0600`**, owned by the authorized local operator.
+- The home directory is operator-owned `0750`, its `deployments/` parent is operator/group-owned **`0775`**, and the `hello-go/` directory itself is private `0700`. The parent is group-writable, allowing another trusted-group principal to replace directory entries if it has suitable permissions; this is **not automatically an acceptable executor trust root**.
+- A group lookup listed the operator explicitly but does not exclude other accounts sharing the same primary GID. Approve the ancestor only after trusted-group membership and write capability have been evaluated; alternatively move the registered source to a protected location or obtain separate approval before adjusting permissions.
+- The monitoring container has no approved write mount of this source tree. Source immutability still requires executor-side ownership validation and safe rechecks; a user account already trusted for Docker administration is outside the monitoring-compromise-only threat model.
+- Avoid publishing account names, UID/GID numbers, private home paths or contents of interpolation files in public issues or logs.
+
+**Eligibility:** This is a promising stateless single-service fixture, **not** an approved executable target. `pull_policy: always` must not cause a mutable tag pull when candidate is pinned by digest; test Compose v5.5.1's `up --pull never` and image-only override behavior on disposable hosts. No HEALTHCHECK means explicit `allow_running_only` opt-in would be required. If safe exact-image semantics cannot be proven, reject this service instead of weakening ADR 0008.
 
 ### Proposal handoff and TOCTOU policy
 
@@ -200,7 +212,7 @@ The existing disposable Compose POC is useful evidence that multi-file overrides
 ### Proposed design decisions ready for review
 
 - Host-native Go CLI with **host admin + interactive TTY** approval, never web execution.
-- Linux/amd64 and local rootful Engine only for initial executor claims; exact Engine/Compose V2 versions **must be evidenced** before claiming support.
+- Linux/amd64 and local rootful Engine only for initial executor claims; host Engine 29.8.1/API 1.56 and Compose v5.5.1 have been **observed but not compatibility-tested**. Exact Engine/Compose CLI and image-digest semantics must be evidenced on disposable hosts before claiming support.
 - Strict monitor/executor filesystem separation and no inherited Docker/Compose environment control.
 - Stateful/writable-volume and complex Compose targets off by default; first eligible service should be simple, prebuilt, trusted, single-replica and preferably stateless.
 - Exact immutable repository/platform candidate; no auto fallback; no automatic rollback.
@@ -211,7 +223,8 @@ The existing disposable Compose POC is useful evidence that multi-file overrides
 ### Evidence still required to close issue #80
 
 - [ ] Operator reviews/accepts the above security defaults and any intentional exceptions.
-- [ ] Record the actual target Engine/CLI/Compose versions and tested disposable support row (or explicitly bound Phase 1 to a pinned **CI-only** row with VPS support still blocked).
+- [x] Record the actual target Engine/CLI/Compose versions from operator-provided read-only inventory: Docker Engine/client 29.8.1, API 1.56, Compose v5.5.1. **Observation only.**
+- [ ] Validate an exact compatible disposable support row or explicitly bind Phase 1 to a pinned **CI-only** row with VPS execution blocked.
 - [ ] Confirm trusted target Compose owner/project-root stability and whether the chosen initial hello service is eligible under the feature denylist and `pull_policy` test.
 - [ ] Confirm implementation-time monitor UID/mount permissions and backup custody plan can be tested without changing the current VPS.
 - [ ] Review this document against SEC-01–SEC-16, record reviewer disposition and approve a separate Phase 1 start.
