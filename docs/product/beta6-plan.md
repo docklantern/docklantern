@@ -41,6 +41,8 @@ Dependencies are a **hard gate**, not just suggested PR order. Every phase can b
 
 ## Phase 0 — Decisions to lock before coding
 
+Proposed Phase 0 decisions and open validation evidence are tracked in the [Phase 0 executor security and compatibility record](../architecture/beta6-phase0-decisions.md) ([issue #80](https://github.com/docklantern/docklantern/issues/80)). This proposal does not claim the target VPS Engine/Compose versions have been verified or authorize implementation.
+
 ### Deliverables
 
 - A versioned **support matrix** with Docker Engine, Docker Compose CLI/plugin, Go toolchain, Linux architecture(s) and supported local Engine configuration. For first real-host validation, prefer the already-tested Linux/amd64 IPv6-only VPS; do not claim linux/arm64 runtime parity from a cross-compiled artifact alone. Monitoring image keeps its existing multi-architecture support.
