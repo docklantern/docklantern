@@ -30,15 +30,17 @@ Beta.3 is published; [issue #34](https://github.com/docklantern/docklantern/issu
 
 Beta.4 adds **no** Docker write permission or deployment executor.
 
-### Beta.5 — Actionable image monitoring (planned; not released)
+### v0.1.0-beta.5 — Actionable image monitoring (released and test-VPS accepted)
 
-[Umbrella issue #63](https://github.com/docklantern/docklantern/issues/63) defines the approved planning scope: documentation cleanup ([#64](https://github.com/docklantern/docklantern/issues/64)), persistent registry watch target separate from deployed Compose image ([#65](https://github.com/docklantern/docklantern/issues/65)), bounded background Check Now ([#66](https://github.com/docklantern/docklantern/issues/66)), Image/Service Details controls and diagnostics ([#67](https://github.com/docklantern/docklantern/issues/67)), reliability and VPS acceptance ([#68](https://github.com/docklantern/docklantern/issues/68)), and release gates ([#69](https://github.com/docklantern/docklantern/issues/69)). This plan does **not** authorize code merges, publishing or deployment. Credential-scope persistence [#62](https://github.com/docklantern/docklantern/issues/62) remains separately deferred.
+[v0.1.0-beta.5](https://github.com/docklantern/docklantern/releases/tag/v0.1.0-beta.5) was published October 31, 2026 and is reported healthy on the IPv6-only test VPS. [Umbrella #63](https://github.com/docklantern/docklantern/issues/63), [regression/acceptance #68](https://github.com/docklantern/docklantern/issues/68), and [release gate #69](https://github.com/docklantern/docklantern/issues/69) closed after operator acceptance. The release adds watched-tag override/reset, durable background Check Now and clearer monitoring diagnostics. Accepted **test-only** limitations include on-VPS-only verified schema-v5 backups, no restore drill, untested older v3 snapshot recovery, and deferred extended security/performance checks. This is not production certification. Credential-scope persistence [#62](https://github.com/docklantern/docklantern/issues/62) remains separately deferred.
 
 Beta.5 preserves monitoring-only behavior, with no automatic/manual Compose updates or new Docker write privileges.
 
-## Stage 2 — Controlled deployment (future; not authorized)
+## Stage 2 — v0.1.0-beta.6 Controlled Compose deployment (architecture accepted; not implemented)
 
-Potential work: deliberate executor design, Compose override generation, validation and image pulls, opt-in/manual deployment, journaling, readiness checks, rollback and failure recovery. This requires its own threat model and user authorization; monitoring enrollment alone is never sufficient.
+[ADR 0008](../architecture/decisions/0008-on-demand-compose-executor.md) establishes an **on-demand host-native Go CLI executor**, independent host-local operator approval, explicit executor-owned project/service registration, immutable candidates, controlled image-only Compose overrides, a durable journal and manually approved recovery. Monitoring remains GET-only and cannot invoke the executor. This is a design decision, not authorization to implement, merge, publish or modify the VPS.
+
+Initial beta.6 scope: one explicitly registered project/service, public prebuilt OCI image with verified digest/platform, GUI proposal + terminal confirmation, scoped Compose replacement, verification and sanitized Activity receipt. Defer automatic updates, private registry deployment, broad Compose compatibility, multi-service management and automatic rollback. Require executor-specific threat modeling, off-host backups with restore drill, disposable integration tests and separate operator release/VPS gates.
 
 ## Stage 3 — Cooperative management (future)
 

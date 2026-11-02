@@ -17,11 +17,11 @@ A compiled Go binary supports straightforward Linux AMD64/ARM64 distribution, lo
 
 ## Consequences
 
-- Favor a single Go process and single container, with clear logical web/controller/executor boundaries.
-- Use bounded registry-check workers, a serialized-per-project deployment queue and context timeouts.
+- Keep the always-on monitoring web/controller in a single lightweight Go application, but isolate deployment in an **on-demand host-native Go CLI** per [ADR 0008](0008-on-demand-compose-executor.md).
+- Use bounded registry-check workers; serialize host executor operations per Compose project with durable locks/journals and context timeouts.
 - Define typed command/state interfaces to make privileged operations testable.
 - No Go performance/footprint benchmark is claimed yet; measure with realistic Compose/registry workloads.
-- Do not add Redis, Celery, Node runtime services or additional databases just for scheduling/GUI functionality.
-- Evaluate official Docker Compose Go SDK with realistic integration tests; pin versions and retain fallback options.
+- Do not add Redis, Celery, Node runtime services or server databases just for scheduling/GUI functionality. A small, protected executor-owned SQLite journal is allowed by ADR 0008.
+- Use a validated host Docker Compose CLI backend for beta.6 per ADR 0008; Go SDK research remains exploratory.
 
 This decision does **not** settle the authenticated frontend, exact Compose executor backend or credentials design.

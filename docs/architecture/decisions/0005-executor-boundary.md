@@ -1,9 +1,9 @@
 # ADR 0005 — Compose Execution Boundary
 
-**Status:** Accepted as initial design; integration validation required  
+**Status:** Historical initial design; executor topology superseded by [ADR 0008](0008-on-demand-compose-executor.md)  
 **Date:** 2026-10-21
 
-## Context
+**Historical notice:** This ADR preserves the original in-container proposal, including its privileged-socket example, as design history. It is **not** the approved beta.6 execution architecture; do not implement or deploy that example. Use ADR 0008 for current executor topology and authorization.\n\n## Context
 
 DockLantern manages existing Docker Compose projects on Linux hosts without changing their source files. Operators expect a lightweight self-hosted deployment. Compose resolves paths using the first Compose file or explicit project directory, while bind mount source paths are interpreted by the Docker daemon on the host. A manager running in a separate container can therefore misresolve files or ask Docker to mount the wrong host directory.
 
