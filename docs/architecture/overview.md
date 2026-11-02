@@ -12,6 +12,8 @@ Monitoring enrollment via Docker label or GUI does **not** authorize deployment.
 
 ## Accepted beta.6 architecture — not yet implemented
 
+A beta.6-specific [executor threat model](../security/beta6-executor-threat-model.md) and [deployment contract](beta6-deployment-contract.md) propose concrete controls and data interfaces. They are documentation for review, not evidence that the executor exists.
+
 - **Monitoring GUI/controller:** may produce bounded untrusted single-service deployment proposals and display sanitized execution receipts; cannot invoke the executor or mutate Docker.
 - **On-demand host-native `docklantern-executor` CLI (Go):** a separate host artifact requiring local/SSH operator invocation, independently protected project/service allowlists, validated Docker Compose CLI, targeted immutable-image replacement, durable journal and manual recovery.
 - **Filesystem handoff:** monitor-writable proposal inbox, executor-only trusted state, executor-written sanitized results read-only to the monitor. No privileged RPC or always-running executor service.

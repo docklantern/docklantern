@@ -2,6 +2,8 @@
 
 **Status:** beta.5 monitoring boundary implemented and accepted on a test VPS; beta.6 executor design accepted but **not implemented or production-hardened**. See [ADR 0008](decisions/0008-on-demand-compose-executor.md).
 
+Detailed proposed beta.6 controls: [executor threat model](../security/beta6-executor-threat-model.md) and [deployment contract](beta6-deployment-contract.md). Neither document grants implementation or deployment approval.
+
 ## Existing monitoring boundary
 
 - The dashboard is authenticated, served behind trusted HTTPS, and uses origin/CSRF checks for mutations to monitoring settings.
