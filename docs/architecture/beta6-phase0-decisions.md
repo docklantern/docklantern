@@ -99,7 +99,7 @@ docker compose version
 docker info --format 'OSType={{.OSType}} Architecture={{.Architecture}}'
 ```
 
-Do not run a pull, up, install, backup, or other host-changing command just to complete Phase 0. If exact target versions cannot be observed yet, Phase 1 is limited to a separately approved and pinned disposable-host matrix and must **not** claim VPS compatibility.
+Do not run a pull, up, install, backup, or other host-changing command just to complete Phase 0. The host versions have now been **observed but not functionally tested**. Phase 1 is limited to separately approved CI-only, no-write scaffolding with fakes/read-only observations and must **not** claim VPS compatibility. Exact Docker/Compose support rows are a B6-04 and pre-B6-05 gate.
 
 ### Environment isolation
 
