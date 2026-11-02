@@ -1,6 +1,6 @@
 # Beta.6 Phase 0 — Executor Security and Compatibility Decisions
 
-**Status:** Proposed Phase 0 decision record; review/approval pending. No executor has been implemented or deployed.  
+**Status:** Proposed Phase 0 **CI-only exit policy** for review; executable implementation and real-host execution are not authorized. No executor has been implemented or deployed.  
 **Tracking:** [#80 — B6-00](https://github.com/docklantern/docklantern/issues/80) under [beta.6 umbrella #79](https://github.com/docklantern/docklantern/issues/79)  
 **Architecture:** [ADR 0008](../architecture/decisions/0008-on-demand-compose-executor.md)  
 **Security:** [Executor threat model](../security/beta6-executor-threat-model.md) and [deployment contract](../architecture/beta6-deployment-contract.md)  
@@ -23,7 +23,50 @@ These are deliberately conservative first-release decisions for **one host-nativ
 | Journal | Protected SQLite and stable override generations, journal intent before side effects, manual inspect-only reconciliation | Crash/restore fault injection SEC-08/09/13 |
 | Backups | Encrypted/access-controlled **off-host** monitor/executor backup plus witnessed restore before live executor testing | Beta.5 same-VPS backups are insufficient; SEC-13 |
 
-**Recorded operator evidence, not a compatibility endorsement:** the test VPS reports Linux/x86_64, Docker client/server **29.8.1**, API **1.56**, Compose **v5.5.1**, default context on the local Unix socket. Remaining checks include an exact tested disposable support row, trusted host deploy-account/Compose ancestry, rootful daemon confirmation, and `hello-go` `pull_policy`/digest semantics. Do not close #80 or claim VPS executor support merely from version output; Phase 1 may instead be explicitly approved for a pinned **CI-only** scope.
+**Recorded operator evidence, not a compatibility endorsement:** the test VPS reports Linux/x86_64, Docker client/server **29.8.1**, API **1.56**, Compose **v5.5.1**, default context on the local Unix socket. Remaining checks include an exact tested disposable support row, trusted host deploy-account/Compose ancestry, rootful daemon confirmation, and `hello-go` `pull_policy`/digest semantics. Do not claim VPS executor support merely from version output. Phase 0 may close on a documented **CI-only design exit** after reviewed acceptance of D0-A/B/C; Phase 1 still requires separate authorization.
+
+## Phase 0 finalization — narrow design exit, not an executor acceptance
+
+**Decision D0-A — fail-closed source authorization.** The initial executor registration policy SHALL reject any Compose source, interpolation file or directory ancestor that fails one of these conditions:
+
+- File and every ancestor resolve under a separately authorized canonical local root with a stable identity, without symlink traversal or unexpected mount/path substitution. A directory path being readable is not enough.
+- Every relevant source and ancestor is owned by **root or an explicitly registered trusted host administrator/source-owner UID**; unexpected owners, group-/other-writable directories, nonregular files and mutable/untrusted inputs fail closed. **For beta.6's first executable version do not introduce a group-writable-parent exception**, even if a group lookup appears to list only one user.
+- Canonical path, ownership, mode, inode/content fingerprints and relevant registered file order/env/profile inputs are revalidated using safe file-opening semantics during preflight and before any mutation. If the Compose CLI cannot be made to consume the validated stable snapshot (including relative-path semantics), refuse execution. A last-minute hash alone is not considered race proof.
+- The monitor has neither a writable mount of these sources nor a path to executor private storage or the Docker socket. The trusted local deploy account may have Docker authority; **that authority is not inherited by the monitor**.
+
+**Specific fixture implication:** the operator-reported `deployments/` parent of `hello-go` is mode **0775** and therefore **does not qualify** for beta.6 executor source registration under D0-A. No chmod/chown, project migration or VPS operation is requested. Prior to any live test, independently approve a trusted non-group-writable source-root arrangement and validate the full Compose inputs. The original source files (`docker-compose.yaml` and `.env`) are already operator-owned 0600, which is necessary but not sufficient.
+
+**Decision D0-B — Phase 1 can be CI-only.** The approved Phase 0 *design exit* may enable a **separately authorized** B6-01 host-native Go CLI scaffold on isolated CI/disposable environments, using fakes or read-only inspection only. For this narrow scope:
+
+- No `pull`, `up`, `restart`, `exec`, `down`, image mutation or Docker-API write capability; no privileged daemon, host agent, GUI-to-executor channel or test-VPS install.
+- No claimed supported Docker/Compose runtime row; CI-only development can proceed with deterministic fakes and explicitly identified, disposable, read-only tool observations. The observed VPS **Engine 29.8.1 / API 1.56 / Compose v5.5.1** is not proof of executable compatibility.
+- The B6-01 artifact is **not** part of the monitoring container and is not publishable/deployable until later reviewed packaging/security gates. Every implementation PR and merge still needs its own explicit approval.
+- Under no circumstances does this CI-only exception waive B6-04's tested CLI/Compose preflight and image-only diff rules, the **pre-B6-05 Docker-write hard gate**, or B6-08's off-host backup + restore drill and test-VPS signoff.
+
+**Decision D0-C — readiness and disaster recovery stay restrictive.** Any target without a Docker HEALTHCHECK needs independently protected `allow_running_only` registration plus explicit terminal disclosure; stable `running` is not application readiness. The executor retains a separate durable journal and protected override generations. Failed/ambiguous operations block new updates pending manual reconciliation. Off-host backups and a completed restore drill are mandatory **before test-VPS executor execution**, not a prerequisite for creating the no-write CLI skeleton.
+
+### Security design review and verification ownership
+
+| Security concern | Design disposition at Phase 0 | Test/implementation owner |
+|---|---|---|
+| Compromised monitor, remote executor invocation or Docker proxy expansion | No monitor privilege path; strict isolated mounts; GET-only regression | B6-01/B6-02/B6-06/B6-07, SEC-01/03/14 |
+| Untrusted inbox bytes and file replacement | Descriptor-relative proposal parsing, bounded schemas, fail-closed ownership | B6-02/B6-07, SEC-02/12 |
+| Untrusted source roots, dangerous Compose features, TOCTOU | **D0-A deny group/other-writable ancestors** and unstable input; image-only semantic diff; no host source exception | B6-04/B6-07, SEC-04/07/16 |
+| CLI path/env/daemon identity and immutable OCI platform | Fixed executable and local Unix socket, no inherited controls, independently pinned candidate | B6-01/B6-04/B6-07, SEC-05/06/11 |
+| Concurrency, interrupted operations, secret leakage | Per-project lock, durable intent, redacted receipts, manual reconciliation | B6-03/B6-05/B6-07, SEC-08/09/10 |
+| Restore mismatch and health ambiguity | Off-host verified restore; explicit running-only grade; no automatic rollback | B6-03/B6-05/B6-07/B6-08, SEC-13/15 |
+
+This is a **documentary threat-model mapping**, not an independent penetration test or confirmation that the controls work. Phase 0 can close as **design-complete with deferred runtime gates** once this reviewed decision is merged and accepted; document closure evidence in #80. In particular, the absence of test evidence for Compose v5.5.1 is not misrepresented as a pass.
+
+### Gates that remain blocked after the Phase 0 design exit
+
+1. **B6-01 implementation:** separate operator authorization; CI-only, read-only/fake CLI; no executor Docker writes, no VPS work.
+2. **B6-04 compatibility:** exact disposable Engine/Compose V5.5.1 behavior, `pull_policy: always` + immutable override, relative Compose path/env preservation, source stability and digest/actual-image checks. No claim of host parity without evidence.
+3. **B6-05 mutation:** explicit new operator approval after prior phase security gates; disposable host **only**; no direct VPS action.
+4. **B6-08 VPS acceptance:** approved trusted source root (current `0775` parent remains ineligible), platform version parity, protected monitor/executor mounts and UID, off-host backup and completed restore drill, explicit authorization before each real-host operation.
+5. **Release:** full SEC-01 through SEC-16 adversarial tests, actual standalone executor binary audit, no unresolved unsafe state, separate merge/tag/publication approvals.
+
+---
 
 ## 1. Supported platform and toolchain contract
 
@@ -220,13 +263,15 @@ The existing disposable Compose POC is useful evidence that multi-file overrides
 - Bounded proposal/receipt/log quotas and deadlines; durable journal retained, failure closes writes.
 - Off-host backup **and tested restore** required before VPS executor execution.
 
-### Evidence still required to close issue #80
+### Design-exit evidence and deferred execution gates
 
-- [ ] Operator reviews/accepts the above security defaults and any intentional exceptions.
-- [x] Record the actual target Engine/CLI/Compose versions from operator-provided read-only inventory: Docker Engine/client 29.8.1, API 1.56, Compose v5.5.1. **Observation only.**
-- [ ] Validate an exact compatible disposable support row or explicitly bind Phase 1 to a pinned **CI-only** row with VPS execution blocked.
-- [ ] Confirm trusted target Compose owner/project-root stability and whether the chosen initial hello service is eligible under the feature denylist and `pull_policy` test.
-- [ ] Confirm implementation-time monitor UID/mount permissions and backup custody plan can be tested without changing the current VPS.
-- [ ] Review this document against SEC-01–SEC-16, record reviewer disposition and approve a separate Phase 1 start.
+- [x] Observe the target Engine/CLI/Compose versions read-only: Docker Engine/client 29.8.1, API 1.56, Compose v5.5.1. **Observation is not support validation.**
+- [x] Adopt a **proposed CI-only Phase 1 policy** (D0-B) that cannot mutate Docker; supported execution versions remain unclaimed.
+- [x] Define **fail-closed path policy** (D0-A): group-/other-writable ancestors are denied, including the current hello-go parent; no live file changes.
+- [x] Trace proposed design controls to SEC-01–SEC-16 and their test/implementation issue owners; no tests represented as run.
+- [ ] Review/accept the Phase 0 design-exit document and merge it through the existing separate-approval PR workflow; record disposition on #80.
+- [ ] **Deferred blocker B6-04/B6-05:** establish exact Docker/Compose version compatibility, safe source snapshots/config diff/immutable digest and trusted target eligibility before any Docker-mutating executor work.
+- [ ] **Deferred blocker B6-08:** validate real-host source/monitor/UID/mount isolation and off-host backups plus a completed restore drill before any VPS executor work.
+- [ ] **Separate decision:** authorize Phase 1 code/PRs after the design exit; no automatic authorization from issue closure.
 
-**Approval policy:** A documentation-only PR may be proposed under this issue. Merging it, starting Phase 1 implementation, adding Docker write code, installing binaries, taking live backups, changing Compose files or touching the VPS all require **separate explicit operator approval**.
+**Approval policy:** A documentation-only PR may be proposed under this issue. Even once the reviewed Phase 0 CI-only design is accepted and #80 is closed, **each** Phase 1 implementation PR and merge, any Docker-writing code, real-host inspection/change, binary installation, backup, Compose action, tag or release still requires separate explicit operator approval.
