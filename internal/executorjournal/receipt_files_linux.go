@@ -143,7 +143,9 @@ func boundedReceiptNames(dirfd int) (int,int,error) {
 	d:=os.NewFile(uintptr(dup),"receipt-directory-scan")
 	entries,err:=d.ReadDir(MaxReceiptEntries+1)
 	_ = d.Close()
-	if err!=nil || len(entries)>MaxReceiptEntries{return 0,0,ErrReceiptUnavailable}
+	if (err!=nil && !errors.Is(err,io.EOF)) || len(entries)>MaxReceiptEntries {
+		return 0,0,ErrReceiptUnavailable
+	}
 	published:=0
 	for _,e:=range entries {
 		allowed,final:=receiptFilenameAllowed(e.Name())
@@ -164,8 +166,8 @@ func publishOrVerifyReceiptFile(dirfd int,name string,data []byte,hash string) e
 	// only byte-for-byte exact, owner/mode/inode-verified replay succeeds.
 	if err:=verifyReceiptFile(dirfd,name,hash);err==nil {return nil}
 	// An existing untrusted/conflicting final file must fail; never replace.
-	var st syscall.Stat_t
-	if err:=syscall.Fstatat(dirfd,name,&st,syscall.AT_SYMLINK_NOFOLLOW);err==nil {
+	var st unix.Stat_t
+	if err:=unix.Fstatat(dirfd,name,&st,unix.AT_SYMLINK_NOFOLLOW);err==nil {
 		return ErrReceiptUnavailable
 	}else if !errors.Is(err,syscall.ENOENT) {return ErrReceiptUnavailable}
 	count,total,err:=boundedReceiptNames(dirfd)
