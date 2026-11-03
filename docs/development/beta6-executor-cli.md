@@ -29,3 +29,44 @@ These commands only compile and run the inert CLI; they perform no Docker action
 - **B6-08:** off-host backup and actual restore drill plus separate explicit permission before any test-VPS execution.
 
 **Governance:** no PR merges, tags, release publication, Docker write-capable code or VPS changes without separate operator approval.
+
+## Phase 1b — Host trust and executable artifact checks (in review)
+
+The new `internal/executorhost` library provides read-only checks for a
+future trusted host runtime. `ValidateTrustedExecutable` rejects binaries
+that are not root-owned regular executables beneath root-owned, nonwritable,
+nonsymlink ancestors. `ValidateTrustedSource` rejects group-/world-writable
+Compose-source ancestors (including the current `hello-go` parent at `0775`)
+or unexpected owners. `Layout.Validate` checks protected, root-owned journal,
+registration, override and receipt directories, requiring a distinct
+unprivileged monitor owner for the proposal inbox. No host directories are
+created or permissions modified.
+
+`MinimalChildEnvironment` ignores caller environment variables and specifies
+a fixed local Docker socket, isolated Docker configuration directory, and
+no inherited `DOCKER_CONTEXT`, `COMPOSE_FILE`, `LD_PRELOAD` or credentials.
+**It is not yet used to run any executable.** CLI help/version and disabled
+deployment commands remain exactly as in Phase 1a.
+
+These `Lstat` checks are **preflight-only**: they do not defend against
+concurrent replacement of trusted files, guarantee stable Compose source
+resolution, verify runtime Docker/Compose versions, or establish actual
+monitor bind-mount isolation. Those controls remain prerequisites for later
+phases; this library is not authorization to perform Docker mutations.
+
+The Go POC CI workflow now includes a disposable nonroot Unix ownership
+fixture proving a monitor identity can write its isolated inbox but cannot
+write executor journal or receipt paths. That fixture does **not** test
+real monitoring-container bind mounts. Existing GET-only Docker proxy tests
+remain required.
+
+The security workflow builds the standalone Linux/amd64 executor from the
+same digest-pinned Go builder as the monitor image, records its checksum/build
+metadata, and runs `govulncheck -mode=binary` on that exact executable.
+The output remains ephemeral inside CI: no artifact upload, release, host
+installation, or copy into the monitoring Docker image.
+
+**Still blocked:** secure descriptor-relative opens and snapshot/TOCTOU
+proof, fully verified Docker and Compose binaries/plugins and supported
+versions, protected registration and TTY authorization, journaling,
+reconciliation, update/recovery operations, and VPS acceptance.
