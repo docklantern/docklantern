@@ -69,6 +69,12 @@ func TestReadInboxRootFixture(t *testing.T) {
 	if err := os.Chmod(file, 0o640); err != nil { t.Fatal(err) }
 	expectRejected("group-readable proposal")
 	write(valid)
+	if err := os.Chmod(file, 0o700); err != nil { t.Fatal(err) }
+	expectRejected("owner-executable proposal")
+	write(valid)
+	if err := os.Chmod(file, 0o400); err != nil { t.Fatal(err) }
+	expectRejected("non-0600 proposal")
+	write(valid)
 	if err := os.Chown(file, 0, -1); err != nil { t.Fatal(err) }
 	expectRejected("root-owned proposal must not be spoofed as monitor")
 	write(valid)
