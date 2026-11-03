@@ -116,6 +116,20 @@ func ValidateTrustedExecutable(reader Reader, path string) error {
 	return validate(reader, path, []uint32{0}, []uint32{0}, regularFile, true)
 }
 
+// ValidatePrivateDirectory validates a pre-existing, root-owned 0700
+// directory. Diagnostics never create or change trusted host directories.
+// This remains a pathname check and does not guarantee inode stability.
+func ValidatePrivateDirectory(reader Reader, path string) error {
+	if err := validate(reader, path, []uint32{0}, []uint32{0}, directory, false); err != nil {
+		return err
+	}
+	entry, err := reader.Lstat(path)
+	if err != nil || entry.Mode.Perm()&0o077 != 0 {
+		return fmt.Errorf("%w: directory must be private", ErrUntrusted)
+	}
+	return nil
+}
+
 // ValidateTrustedSource checks an operator-approved source path without
 // following symlinks or trusting group-writable ancestors. It is a policy
 // preflight only: the executor must still implement stable file descriptors
