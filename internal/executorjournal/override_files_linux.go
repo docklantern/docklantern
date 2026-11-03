@@ -145,13 +145,11 @@ func verifyManifest(dirfd int,gen int64,hash string) error {
 	fd,err:=syscall.Openat(dirfd,overrideFilename(gen),syscall.O_RDONLY|
 		syscall.O_NOFOLLOW|syscall.O_NONBLOCK|syscall.O_CLOEXEC,0)
 	if err!=nil{return ErrOverrideStage}
-	defer syscall.Close(fd)
+	file:=os.NewFile(uintptr(fd),"override-manifest-verify")
+	defer file.Close()
 	var before,after syscall.Stat_t
 	if syscall.Fstat(fd,&before)!=nil || !trustedJournalFile(fd) ||
 		before.Size<1 || before.Size>1024 {return ErrOverrideStage}
-	file:=os.NewFile(uintptr(fd),"override-manifest-verify")
-	// Ownership stays with deferred syscall.Close; the temporary os.File is
-	// never closed separately to avoid double-close of the descriptor.
 	data,readErr:=io.ReadAll(io.LimitReader(file,1025))
 	if readErr!=nil || int64(len(data))!=before.Size ||
 		syscall.Fstat(fd,&after)!=nil || before.Dev!=after.Dev ||
