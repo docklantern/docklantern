@@ -137,6 +137,11 @@ func trustedInputPath(path string) bool {
 			return false
 		}
 	}
+	for _, ch := range path {
+		if ch < 0x20 || ch == 0x7f {
+			return false
+		}
+	}
 	return true
 }
 
