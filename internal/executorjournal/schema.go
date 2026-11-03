@@ -42,6 +42,12 @@ CREATE TABLE operations (
 CREATE UNIQUE INDEX one_unresolved_operation_per_project
     ON operations(project_id)
     WHERE outcome IN ('pending', 'needs_reconciliation');
+CREATE TRIGGER operations_immutable_identity BEFORE UPDATE OF
+    operation_id, operation_kind, project_id, registration_id, service_id,
+    proposal_id, proposal_sha256, candidate_digest, created_ns ON operations
+    BEGIN SELECT RAISE(ABORT, 'immutable operation identity'); END;
+CREATE TRIGGER operations_no_delete BEFORE DELETE ON operations
+    BEGIN SELECT RAISE(ABORT, 'append-only operation history'); END;
 
 CREATE TABLE phase_events (
     operation_id TEXT NOT NULL REFERENCES operations(operation_id),
@@ -145,6 +151,20 @@ func migrate(ctx context.Context, db *sql.DB) error {
 		var kind string
 		if err := db.QueryRowContext(ctx,
 			"SELECT type FROM sqlite_master WHERE name = ?", name).Scan(&kind); err != nil || kind != "table" {
+			return ErrUnsupportedSchema
+		}
+	}
+	// A forged user_version must not bypass required append-only triggers.
+	for _, trigger := range []string{
+		"operations_immutable_identity", "operations_no_delete",
+		"phase_events_no_update", "phase_events_no_delete",
+		"baselines_no_update", "baselines_no_delete",
+		"override_records_no_update", "override_records_no_delete",
+		"receipt_publications_no_update", "receipt_publications_no_delete",
+	} {
+		var kind string
+		if err := db.QueryRowContext(ctx,
+			"SELECT type FROM sqlite_master WHERE name = ?", trigger).Scan(&kind); err != nil || kind != "trigger" {
 			return ErrUnsupportedSchema
 		}
 	}
