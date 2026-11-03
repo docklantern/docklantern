@@ -8,6 +8,9 @@ import (
 
 const SchemaVersion = 1
 
+// SQLite application_id identifies this file as executor-owned state.
+const journalApplicationID = 1145851988
+
 var (
 	ErrUnavailable = errors.New("protected executor journal unavailable")
 	ErrUnsupportedSchema = errors.New("unsupported executor journal schema")
@@ -125,11 +128,28 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	if err := tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&version); err != nil {
 		return ErrUnavailable
 	}
+	var appID int
+	if err := tx.QueryRowContext(ctx,"PRAGMA application_id").Scan(&appID);err!=nil {
+		return ErrUnavailable
+	}
 	switch version {
 	case SchemaVersion:
-		// Existing versions are never mutated by the migration path.
+		// Existing schema must belong to this journal, not a foreign DB.
+		if appID != journalApplicationID { return ErrUnsupportedSchema }
 	case 0:
+		if appID != 0 { return ErrUnsupportedSchema }
+		// A file with unrelated tables must not be adopted as a journal.
+		var otherObjects int
+		if err := tx.QueryRowContext(ctx,`SELECT count(*) FROM sqlite_master
+			WHERE name NOT LIKE 'sqlite_%'
+			AND type IN ('table','view','index','trigger')`).Scan(&otherObjects);err!=nil {
+			return ErrUnavailable
+		}
+		if otherObjects != 0 { return ErrUnsupportedSchema }
 		if _, err := tx.ExecContext(ctx, schemaV1); err != nil {
+			return ErrUnavailable
+		}
+		if _, err := tx.ExecContext(ctx, "PRAGMA application_id = 1145851988"); err != nil {
 			return ErrUnavailable
 		}
 		if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
