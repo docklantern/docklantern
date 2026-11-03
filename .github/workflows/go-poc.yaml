@@ -178,6 +178,27 @@ jobs:
             "$(command -v go)" test ./internal/executorpreview \
             -run '^TestProtectedMonitorUIDRootFixture$' -count=1 -v
 
+  protected-journal-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify root-owned executor SQLite journal on disposable CI runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Only private /root test fixtures; no production journal, Docker
+          # writes, Compose sources, secrets or test VPS.
+          sudo env -i HOME=/root PATH=/usr/bin:/bin \
+            DOCKLANTERN_JOURNAL_ROOT_FIXTURE=1 \
+            "$(command -v go)" test ./internal/executorjournal \
+            -run '^(TestProtectedJournalRootFixture|TestProtectedJournalCorruptionAndFutureSchemaRootFixture)$' -count=1 -v
+
   secure-proposal-fixture:
     runs-on: ubuntu-latest
     timeout-minutes: 10
