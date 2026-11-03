@@ -73,6 +73,7 @@ type ledgerView struct {
 	Override recordedOverride
 	HasOverride bool
 	AmbiguousPromotions int
+	UncommittedGenerationEvents int
 }
 
 // readLedger obtains ONE read-only SQLite transaction snapshot over the
@@ -121,6 +122,12 @@ func (s *Store) readLedger(ctx context.Context, id string) (ledgerView, error) {
 		 OR (promotion_intent_ns IS NOT NULL
 		 AND promotion_complete_ns < promotion_intent_ns))`,
 		snapshot.Operation.ProjectID).Scan(&result.AmbiguousPromotions)
+	if err != nil { return empty, ErrUnavailable }
+	// Any Phase 3c stage/promotion intent is protected metadata, NOT a
+	// committed override. This slice cannot certify promotion completion;
+	// both an old restored DB and a half-staged generation must fail closed.
+	err = tx.QueryRowContext(ctx, `SELECT count(*) FROM override_generation_events
+		WHERE project_id=?`, snapshot.Operation.ProjectID).Scan(&result.UncommittedGenerationEvents)
 	if err != nil || ctx.Err() != nil { return empty, ErrUnavailable }
 	return result, nil
 }
@@ -160,6 +167,9 @@ func (s *Store) ReconcileReadOnly(ctx context.Context, id string, src ActualRead
 	op := first.Snapshot.Operation
 	if first.Snapshot.EffectiveOutcome == OutcomeNeedsReconciliation {
 		return uncertain(op, "journal_unresolved"), nil
+	}
+	if first.UncommittedGenerationEvents != 0 {
+		return uncertain(op,"override_generation_incomplete"),nil
 	}
 	if !first.HasBaseline { return uncertain(op, "baseline_missing"), nil }
 	if !first.HasOverride { return uncertain(op, "override_missing"), nil }
