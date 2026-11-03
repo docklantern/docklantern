@@ -59,3 +59,7 @@ Go unit/fuzz seeds cover unknown/duplicate fields, escaped keys, malformed and e
 **Deferred gates:** Phase 2c independent TTY confirmation and rehash, Phase 3 durable journal, Phase 4 stable Compose/OCI/current state, Phase 5 separately approved disposable Docker mutation, and Phase 6 actual monitor bind mounts, publishing/cleanup, full security audit and off-host backup/restore. The current hello-go source parent remains group-writable (`0775`) and ineligible for real-host executor registration.
 
 **Governance:** This code may be reviewed as a separate PR. Do not merge, publish a release, install a binary, change VPS permissions or execute Docker updates without the user’s separate explicit approval.
+
+## Follow-up Phase 2 publication/retention library (review proposed)
+
+A separately reviewed [proposal publication and retention slice](beta6-proposal-publication.md) adds monitor-side, fixed-inbox `PublishProposal` and `CleanupExpired` primitives with atomic no-overwrite files, capacity checks and guarded expiration cleanup. The original Phase 2b reader described above remains independently authoritative **only about syntax and untrusted-file safety**, not Docker approval. **These new primitives are not connected to the monitoring web app or scheduler, and no production bind-mount/UID is configured by the PR.** Read-only monitor architecture and all executor write protections remain unchanged.

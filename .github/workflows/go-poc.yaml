@@ -196,4 +196,4 @@ jobs:
           sudo env -i HOME=/root PATH=/usr/bin:/bin \
             DOCKLANTERN_PROPOSAL_ROOT_FIXTURE=1 \
             "$(command -v go)" test ./internal/executorproposal \
-            -run '^TestReadInboxRootFixture$' -count=1 -v
+            -run '^(TestReadInboxRootFixture|TestProposalPublicationRootFixture|TestProposalQuotaAndConcurrentPublicationRootFixture|TestProposalUnsafeFilesAndFailClosedRetentionRootFixture|TestProposalTemporaryFilesAreBoundedAndOnlyCleanedWhenOld|TestActualUnprivilegedMonitorPublisherRootFixture)$' -count=1 -v
