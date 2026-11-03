@@ -293,6 +293,19 @@ func TestUnprivilegedMonitorPublisherChild(t *testing.T) {
 		t.Fatal("child did not run as distinct nonroot UID")
 	}
 	dir:=os.Getenv("DOCKLANTERN_PROPOSAL_TEST_INBOX")
+	// Exercise the separately validated path/lock preconditions first, so
+	// failures in an actual nonroot filesystem are diagnosable in CI without
+	// exposing private host state or weakening production fail-closed errors.
+	fd, openErr := openMonitorInbox(dir, 65534)
+	if openErr != nil {
+		t.Fatalf("nonroot protected inbox open rejected: %v", openErr)
+	}
+	if lockErr := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB); lockErr != nil {
+		syscall.Close(fd)
+		t.Fatalf("nonroot inbox directory lock rejected: %v", lockErr)
+	}
+	_ = syscall.Flock(fd, syscall.LOCK_UN)
+	_ = syscall.Close(fd)
 	now:=time.Now().UTC().Truncate(time.Second)
 	switch os.Getenv("DOCKLANTERN_PROPOSAL_ACTION"){
 	case "publish":
