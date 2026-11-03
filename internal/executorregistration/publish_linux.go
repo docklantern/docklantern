@@ -19,8 +19,15 @@ import (
 
 // PublishProtected is a host-root + controlling-TTY-only operation. It
 // creates/updates a REGISTRATION FILE, never a Docker image, container,
-// Compose source, journal, or override. No CLI/web route invokes it yet.
+// Compose source, journal, or override. Only the host-root register CLI and trusted host code may invoke it; never web.
 func PublishProtected(reg Registration, expectedOldHash string) (Record, error) {
+	return publishProtectedWithVerifier(reg, expectedOldHash, nil)
+}
+
+// publishProtectedWithVerifier binds separately loaded root-owned input bytes
+// to the TTY confirmation when called from RegisterFromFile. It is intentionally
+// internal: callers cannot omit the trusted file recheck via CLI flags.
+func publishProtectedWithVerifier(reg Registration, expectedOldHash string, verifyInput func() error) (Record, error) {
 	var empty Record
 	if os.Geteuid() != 0 || reg.Validate() != nil ||
 		reg.ValidateTrustedSources(executorhost.RealFS{}) != nil {
@@ -70,6 +77,7 @@ func PublishProtected(reg Registration, expectedOldHash string) (Record, error) 
 	// Ensure the typed confirmation still covers the exact bytes being saved.
 	confirmed, err := json.Marshal(reg)
 	if err != nil || sha256.Sum256(confirmed) != hash { return empty, ErrUntrustedStore }
+	if verifyInput != nil && verifyInput() != nil { return empty, ErrUntrustedStore }
 	return publishProtected(ProtectedRegistrationDirectory, reg, expectedOldHash)
 }
 
