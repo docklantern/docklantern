@@ -157,6 +157,11 @@ func TestEveryInterruptedPhaseIsDurableAndBlocksReplay(t *testing.T) {
 			if err:=reopened.Intent(ctx,op.ID,phase,fixedTime.Add(time.Hour));!errors.Is(err,ErrInvalidTransition){
 				t.Fatalf("crashed %s intent replayed: %v",phase,err)
 			}
+			// A different process may not manufacture a completion for an
+			// intent owned by a now-dead session.
+			if err:=reopened.Complete(ctx,op.ID,phase,fixedTime.Add(time.Hour));!errors.Is(err,ErrInvalidTransition){
+				t.Fatalf("crashed %s intent falsely completed: %v",phase,err)
+			}
 			if err:=reopened.MarkUncertain(ctx,op.ID,phase,"interrupted",fixedTime.Add(time.Hour));err!=nil {
 				t.Fatalf("crash outcome could not be made durable: %v",err)
 			}
