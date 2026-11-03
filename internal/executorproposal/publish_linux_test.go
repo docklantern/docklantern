@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"encoding/json"
+	"io"
+	"os/exec"
 	"os"
 	"path/filepath"
 	"strings"
@@ -229,4 +231,77 @@ func marshalProposal(t *testing.T, p Proposal) []byte {
 func marshalProposalValue(p Proposal) []byte {
 	b, _ := json.Marshal(p)
 	return b
+}
+
+// TestActualUnprivilegedMonitorPublisherRootFixture verifies the *monitor*
+// publisher code with EUID 65534 on an isolated tree under /opt, while a
+// separate root process reads the published record as the future executor
+// would. No production file or Docker socket is accessed.
+func TestActualUnprivilegedMonitorPublisherRootFixture(t *testing.T) {
+	if os.Getenv("DOCKLANTERN_PROPOSAL_ROOT_FIXTURE") != "1" || os.Geteuid() != 0 {
+		t.Skip("requires root-owned disposable fixture on isolated CI")
+	}
+	base, err := os.MkdirTemp("/opt", "docklantern-monitor-publisher-")
+	if err != nil {t.Fatal(err)}
+	t.Cleanup(func(){_ = os.RemoveAll(base)})
+	if err:=os.Chmod(base,0o755);err!=nil {t.Fatal(err)}
+	dir:=filepath.Join(base,"inbox")
+	if err:=os.Mkdir(dir,0o700);err!=nil {t.Fatal(err)}
+	if err:=os.Chown(dir,65534,65534);err!=nil {t.Fatal(err)}
+	original,err:=os.Executable()
+	if err!=nil {t.Fatal(err)}
+	from,err:=os.Open(original)
+	if err!=nil {t.Fatal(err)}
+	defer from.Close()
+	binary:=filepath.Join(base,"proposal-fixture-test")
+	to,err:=os.OpenFile(binary,os.O_WRONLY|os.O_CREATE|os.O_EXCL,0o700)
+	if err!=nil {t.Fatal(err)}
+	if _,err:=io.Copy(to,from);err!=nil {to.Close();t.Fatal(err)}
+	if err:=to.Close();err!=nil {t.Fatal(err)}
+	if err:=os.Chmod(binary,0o755);err!=nil {t.Fatal(err)}
+	perform:=func(action string){
+		t.Helper()
+		cmd:=exec.Command(binary,"-test.run=^TestUnprivilegedMonitorPublisherChild$","-test.count=1")
+		cmd.Dir="/"
+		cmd.Env=[]string{
+			"PATH=/usr/bin:/bin",
+			"DOCKLANTERN_PROPOSAL_CHILD=1",
+			"DOCKLANTERN_PROPOSAL_ACTION="+action,
+			"DOCKLANTERN_PROPOSAL_TEST_INBOX="+dir,
+		}
+		cmd.SysProcAttr=&syscall.SysProcAttr{Credential:&syscall.Credential{Uid:65534,Gid:65534}}
+		if out,err:=cmd.CombinedOutput();err!=nil {
+			t.Fatalf("nonroot monitor child %s failed: %v, output=%s",action,err,out)
+		}
+	}
+	perform("publish")
+	record,err:=readInbox(dir,65534,time.Now())
+	if err!=nil || record.Proposal.ProposalID!="nonroot-demo" {
+		t.Fatalf("root could not inspect nonroot proposal: %v %#v",err,record)
+	}
+	perform("cleanup")
+	if _,err:=os.Lstat(filepath.Join(dir,"nonroot-demo.json"));!os.IsNotExist(err){
+		t.Fatal("monitor cleanup did not remove expired proposal")
+	}
+}
+
+func TestUnprivilegedMonitorPublisherChild(t *testing.T) {
+	if os.Getenv("DOCKLANTERN_PROPOSAL_CHILD")!="1" {
+		t.Skip("only executed as isolated nonroot subprocess")
+	}
+	if os.Geteuid()!=65534 {
+		t.Fatal("child did not run as distinct nonroot UID")
+	}
+	dir:=os.Getenv("DOCKLANTERN_PROPOSAL_TEST_INBOX")
+	now:=time.Now().UTC().Truncate(time.Second)
+	switch os.Getenv("DOCKLANTERN_PROPOSAL_ACTION"){
+	case "publish":
+		_,err:=publishInbox(dir,65534,marshalProposalValue(proposalForPublish(now,"nonroot-demo")),now)
+		if err!=nil {t.Fatal(err)}
+	case "cleanup":
+		removed,err:=cleanupInbox(dir,65534,now.Add(11*time.Minute))
+		if err!=nil || removed!=1 {t.Fatalf("nonroot expiry cleanup: %d %v",removed,err)}
+	default:
+		t.Fatal("invalid isolated child action")
+	}
 }
