@@ -154,7 +154,7 @@ func TestProposalUnsafeFilesAndFailClosedRetentionRootFixture(t *testing.T) {
 	}
 	if err := os.Remove(target); err != nil { t.Fatal(err) }
 	if err := os.WriteFile(target, payload, 0o600); err != nil { t.Fatal(err) }
-	hard := filepath.Join(dir, ".proposal-hardlink-check")
+	hard := filepath.Join(dir, ".proposal-"+strings.Repeat("f",32)+".tmp")
 	if err := os.Link(target, hard); err != nil { t.Fatal(err) }
 	if _, err := cleanupInbox(dir, 0, now.Add(11*time.Minute)); err == nil {
 		t.Fatal("hardlinked file accepted for cleanup")
