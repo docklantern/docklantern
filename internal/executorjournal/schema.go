@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // SQLite application_id identifies this file as executor-owned state.
 const journalApplicationID = 1145851988
@@ -115,6 +115,34 @@ CREATE TRIGGER receipt_publications_no_delete BEFORE DELETE ON receipt_publicati
     BEGIN SELECT RAISE(ABORT, 'append-only receipt history'); END;
 `
 
+// schemaV2 records immutable generation staging and promotion intent
+// independently of v1 committed override_records. A pending intent is NEVER
+// interpreted as committed desired state. The future promotion completion
+// must verify filesystem + actual state before inserting any committed record.
+const schemaV2 = `
+CREATE TABLE override_generation_events (
+    project_id TEXT NOT NULL,
+    generation INTEGER NOT NULL CHECK (generation >= 1),
+    operation_id TEXT NOT NULL REFERENCES operations(operation_id),
+    event_sequence INTEGER NOT NULL CHECK (event_sequence BETWEEN 1 AND 3),
+    event_kind TEXT NOT NULL CHECK (event_kind IN
+        ('stage_intent', 'staged', 'promotion_intent')),
+    manifest_sha256 TEXT NOT NULL,
+    candidate_digest TEXT NOT NULL,
+    previous_generation INTEGER NOT NULL CHECK (previous_generation >= 0),
+    previous_committed_sha256 TEXT NOT NULL,
+    recorded_ns INTEGER NOT NULL CHECK (recorded_ns > 0),
+    PRIMARY KEY (project_id, generation, event_sequence),
+    UNIQUE (operation_id, event_sequence)
+);
+CREATE INDEX override_generation_events_by_project
+    ON override_generation_events(project_id, generation, event_sequence);
+CREATE TRIGGER override_generation_events_no_update BEFORE UPDATE ON override_generation_events
+    BEGIN SELECT RAISE(ABORT, 'append-only generation history'); END;
+CREATE TRIGGER override_generation_events_no_delete BEFORE DELETE ON override_generation_events
+    BEGIN SELECT RAISE(ABORT, 'append-only generation history'); END;
+`
+
 // migrate is transactionally versioned; unknown newer DBs always fail closed.
 // Version zero on a pre-populated unrelated database fails at CREATE TABLE
 // rather than silently adopting or overwriting its schema.
@@ -134,25 +162,30 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	}
 	switch version {
 	case SchemaVersion:
-		// Existing schema must belong to this journal, not a foreign DB.
 		if appID != journalApplicationID { return ErrUnsupportedSchema }
+	case 1:
+		if appID != journalApplicationID { return ErrUnsupportedSchema }
+		// Fail rather than adopting a damaged v1 schema before upgrading.
+		if !requiredSchemaObjects(ctx, tx, false) { return ErrUnsupportedSchema }
+		if _, err := tx.ExecContext(ctx, schemaV2); err != nil { return ErrUnavailable }
+		if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 2"); err != nil {
+			return ErrUnavailable
+		}
 	case 0:
 		if appID != 0 { return ErrUnsupportedSchema }
-		// A file with unrelated tables must not be adopted as a journal.
 		var otherObjects int
 		if err := tx.QueryRowContext(ctx,`SELECT count(*) FROM sqlite_master
 			WHERE name NOT LIKE 'sqlite_%'
-			AND type IN ('table','view','index','trigger')`).Scan(&otherObjects);err!=nil {
+			AND type IN ('table','view','index','trigger')`).Scan(&otherObjects); err != nil {
 			return ErrUnavailable
 		}
 		if otherObjects != 0 { return ErrUnsupportedSchema }
-		if _, err := tx.ExecContext(ctx, schemaV1); err != nil {
-			return ErrUnavailable
-		}
+		if _, err := tx.ExecContext(ctx, schemaV1); err != nil { return ErrUnavailable }
+		if _, err := tx.ExecContext(ctx, schemaV2); err != nil { return ErrUnavailable }
 		if _, err := tx.ExecContext(ctx, "PRAGMA application_id = 1145851988"); err != nil {
 			return ErrUnavailable
 		}
-		if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 1"); err != nil {
+		if _, err := tx.ExecContext(ctx, "PRAGMA user_version = 2"); err != nil {
 			return ErrUnavailable
 		}
 	default:
@@ -165,28 +198,36 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	if err := db.QueryRowContext(ctx, "PRAGMA quick_check").Scan(&quickCheck); err != nil || quickCheck != "ok" {
 		return ErrUnavailable
 	}
-	// An unexpected/missing migration table must not masquerade as a
-	// compatible user_version set by some unrelated SQLite application.
-	for _, name := range []string{"operations", "phase_events", "baselines", "override_records", "receipt_publications"} {
-		var kind string
-		if err := db.QueryRowContext(ctx,
-			"SELECT type FROM sqlite_master WHERE name = ?", name).Scan(&kind); err != nil || kind != "table" {
-			return ErrUnsupportedSchema
-		}
-	}
-	// A forged user_version must not bypass required append-only triggers.
-	for _, trigger := range []string{
-		"operations_immutable_identity", "operations_no_delete",
-		"phase_events_no_update", "phase_events_no_delete",
-		"baselines_no_update", "baselines_no_delete",
-		"override_records_no_update", "override_records_no_delete",
-		"receipt_publications_no_update", "receipt_publications_no_delete",
-	} {
-		var kind string
-		if err := db.QueryRowContext(ctx,
-			"SELECT type FROM sqlite_master WHERE name = ?", trigger).Scan(&kind); err != nil || kind != "trigger" {
-			return ErrUnsupportedSchema
-		}
-	}
+	if !requiredSchemaObjects(ctx, db, true) { return ErrUnsupportedSchema }
 	return nil
+}
+
+// schemaQuerier supports live transactional upgrade preflight and final
+// consistency validation.
+type schemaQuerier interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func requiredSchemaObjects(ctx context.Context, q schemaQuerier, v2 bool) bool {
+	tables:=[]string{"operations","phase_events","baselines","override_records","receipt_publications"}
+	triggers:=[]string{
+		"operations_immutable_identity","operations_no_delete",
+		"phase_events_no_update","phase_events_no_delete",
+		"baselines_no_update","baselines_no_delete",
+		"override_records_no_update","override_records_no_delete",
+		"receipt_publications_no_update","receipt_publications_no_delete",
+	}
+	if v2 {
+		tables=append(tables,"override_generation_events")
+		triggers=append(triggers,"override_generation_events_no_update","override_generation_events_no_delete")
+	}
+	for _,name:=range tables{
+		var kind string
+		if err:=q.QueryRowContext(ctx,"SELECT type FROM sqlite_master WHERE name=?",name).Scan(&kind);err!=nil||kind!="table"{return false}
+	}
+	for _,name:=range triggers{
+		var kind string
+		if err:=q.QueryRowContext(ctx,"SELECT type FROM sqlite_master WHERE name=?",name).Scan(&kind);err!=nil||kind!="trigger"{return false}
+	}
+	return true
 }
