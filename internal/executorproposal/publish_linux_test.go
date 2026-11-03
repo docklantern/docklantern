@@ -241,7 +241,7 @@ func TestActualUnprivilegedMonitorPublisherRootFixture(t *testing.T) {
 	if os.Getenv("DOCKLANTERN_PROPOSAL_ROOT_FIXTURE") != "1" || os.Geteuid() != 0 {
 		t.Skip("requires root-owned disposable fixture on isolated CI")
 	}
-	base, err := os.MkdirTemp("/opt", "docklantern-monitor-publisher-")
+	base, err := os.MkdirTemp("/var/lib", "docklantern-monitor-publisher-")
 	if err != nil {t.Fatal(err)}
 	t.Cleanup(func(){_ = os.RemoveAll(base)})
 	if err:=os.Chmod(base,0o755);err!=nil {t.Fatal(err)}
@@ -298,7 +298,7 @@ func TestUnprivilegedMonitorPublisherChild(t *testing.T) {
 	// exposing private host state or weakening production fail-closed errors.
 	fd, openErr := openMonitorInbox(dir, 65534)
 	if openErr != nil {
-		for _, component := range []string{"/", "/opt", filepath.Dir(dir), dir} {
+		for _, component := range []string{"/", "/var", "/var/lib", filepath.Dir(dir), dir} {
 			info, err := os.Lstat(component)
 			if err != nil {
 				t.Logf("fixture component unavailable: %v", err)
