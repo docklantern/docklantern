@@ -264,7 +264,7 @@ func TestMigrationRejectsUnknownVersionAndForeignSchema(t *testing.T) {
 	if err!=nil {t.Fatal(err)}
 	if _,err:=db.Exec("CREATE TABLE operations (bad_column TEXT)");err!=nil {t.Fatal(err)}
 	db.Close()
-	if _,err:=openSQLite(foreign);!errors.Is(err,ErrUnavailable) {
+	if _,err:=openSQLite(foreign);!errors.Is(err,ErrUnsupportedSchema) {
 		t.Fatalf("foreign SQLite database silently adopted: %v",err)
 	}
 }
