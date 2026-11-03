@@ -52,3 +52,7 @@ Pure SQLite tests verify v1→v2 transactional migration without losing journal 
 Phase 3c next includes sanitized idempotent receipt publication and WAL-consistent backup/controlled restore with generation divergence tests. B6-04 still gates the true real-state authorization path, B6-05 gates Docker mutations, and B6-08 gates off-host backup and host acceptance. Live `hello-go` group-writable parent `0775` remains ineligible.
 
 **Governance:** This PR itself does not create production override directories, journal files or Compose overrides. Do not merge, publish, install, change real host permissions, deploy an executor, enable Docker writes or tag a release without explicit separate operator approval.
+
+## Phase 3c-b — Public status reporting follow-up
+
+The [sanitized receipt outbox](beta6-receipt-outbox.md) publishes only **pending** or **needs_reconciliation** from journal state, with atomic no-overwrite files and separate `receipt_publications` events. A receipt never declares an override generation committed, confirms Docker state, or closes an uncommitted promotion intent. No production monitor mount or CLI action is enabled.
