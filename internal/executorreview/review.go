@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"time"
 
@@ -106,13 +105,15 @@ func Review(ctx context.Context, id string, source Source, tty Terminal, isAdmin
 		second.baselineHash != first.baselineHash {
 		return empty, ErrReviewDenied
 	}
+	confirmedAt := now()
+	if second.plan.Proposal.Validate(confirmedAt) != nil { return empty, ErrReviewDenied }
 	return Receipt{
 		RegistrationID: first.plan.Proposal.RegistrationID,
 		ProposalID: id, ProposalSHA256: first.plan.SHA256,
 		RegistrationSHA256: first.registration.SHA256,
 		CandidateDigest: first.plan.Proposal.Candidate.Digest,
 		BaselineSHA256: first.baselineHash,
-		ReviewedAt: now(), ReviewOnly: true,
+		ReviewedAt: confirmedAt, ReviewOnly: true,
 	}, nil
 }
 
@@ -216,8 +217,3 @@ func renderReview(s reviewSnapshot, challenge string) string {
 	)
 }
 
-// Ensure the only production use of terminal output is a printable channel.
-func WriteOnlyTerminalMessage(w io.Writer, message string) error {
-	_, err := io.WriteString(w, message)
-	return err
-}
