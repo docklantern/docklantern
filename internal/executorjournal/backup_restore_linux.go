@@ -144,6 +144,11 @@ func (s *Store) backupJournalAt(ctx context.Context,dir string,at time.Time, che
  s.mu.Unlock()
  if e!=nil{return "",errBackup}
  if checkpoint!=nil&&checkpoint("after_snapshot")!=nil{return "",errBackup}
+ chmodFD,chErr:=syscall.Openat(dirfd,tmp,syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC,0)
+ if chErr!=nil{return "",errBackup}
+ chErr=syscall.Fchmod(chmodFD,0o600)
+ syscall.Close(chmodFD)
+ if chErr!=nil{return "",errBackup}
  hash,size,e:=hashBackupFile(dirfd,tmp)
  if e!=nil{return "",errBackup}
  if e=verifyBackupDB(ctx,filepath.Join(dir,tmp));e!=nil{return "",errBackup}
