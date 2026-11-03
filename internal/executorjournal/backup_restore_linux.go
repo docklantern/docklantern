@@ -235,5 +235,7 @@ func stageRestoreAt(ctx context.Context,backupDir,quarantineDir,id string,checkp
  if e!=nil||n!=size{return errBackup}
  copied,copiedSize,e:=hashBackupFile(target,restore)
  if e!=nil||copied!=h||copiedSize!=size{return errBackup}
+ // Revalidate the protected source manifest after cross-directory copying.
+ if e=verifyBackupBundle(ctx,source,backupDir,id);e!=nil{return errBackup}
  return verifyBackupDB(ctx,filepath.Join(quarantineDir,restore))
 }
