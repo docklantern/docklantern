@@ -2,12 +2,12 @@ package executorproposal
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -89,8 +89,8 @@ func publishInbox(directory string, uid uint32, data []byte, now time.Time) (Rec
 	}
 	defer syscall.Unlinkat(fd, temp) // only ever remove our own random temp
 	file := os.NewFile(uintptr(tempfd), "monitor-proposal-temporary")
-	_, writeErr := file.Write(data)
-	if writeErr != nil {
+	written, writeErr := file.Write(data)
+	if writeErr != nil || written != len(data) {
 		file.Close()
 		return empty, ErrUnsafePublication
 	}
@@ -146,7 +146,13 @@ func cleanupInbox(directory string, uid uint32, now time.Time) (int, error) {
 	if err != nil {
 		return 0, ErrUnsafePublication
 	}
-	toDelete := make([]string, 0)
+	type deletion struct {
+		name string
+		stat syscall.Stat_t
+		contentHash [32]byte
+		proposal bool
+	}
+	toDelete := make([]deletion, 0)
 	for _, name := range names {
 		if strings.HasSuffix(name, ".json") {
 			if !validOpaqueID(strings.TrimSuffix(name, ".json")) {
@@ -180,7 +186,8 @@ func cleanupInbox(directory string, uid uint32, now time.Time) (int, error) {
 				if err := verifyStillSameFile(fd, name, uid, before); err != nil {
 					return 0, ErrUnsafePublication
 				}
-				toDelete = append(toDelete, name)
+				toDelete = append(toDelete, deletion{name: name, stat: before,
+					contentHash: sha256.Sum256(data), proposal: true})
 			}
 		} else if validTempName(name) {
 			// A crashed publisher may leave an unfinished temp. Never delete
@@ -190,7 +197,7 @@ func cleanupInbox(directory string, uid uint32, now time.Time) (int, error) {
 				return 0, ErrUnsafePublication
 			}
 			if oldEnough(now, st.Mtim) && oldEnough(now, st.Ctim) {
-				toDelete = append(toDelete, name)
+				toDelete = append(toDelete, deletion{name: name, stat: st})
 			}
 		} else {
 			// Reject unexpected files rather than removing or following
@@ -200,29 +207,29 @@ func cleanupInbox(directory string, uid uint32, now time.Time) (int, error) {
 	}
 
 	deleted := 0
-	for _, name := range toDelete {
+	for _, target := range toDelete {
 		if !trustedDirectory(fd, uid, true) {
 			return deleted, ErrUnsafePublication
 		}
-		// One final descriptor identity check minimizes races between scan
-		// and unlink. A hostile process with the SAME monitor UID can still
-		// race names; its files are untrusted and never execution authority.
-		if strings.HasSuffix(name, ".json") {
-			_, st, err := readMonitorFile(fd, name, uid)
-			if err != nil {
-				return deleted, ErrUnsafePublication
-			}
-			// A changed timestamp/content can invalidate cleanup: re-read
-			// and validate freshness immediately below.
-			if st.Size == 0 {
+		// Reopen and compare the exact inode metadata and bytes against the
+		// earlier scan before unlinking any selected name. For old temp files,
+		// recheck the inode, mode and BOTH age timestamps.
+		if target.proposal {
+			data, latest, err := readMonitorFile(fd, target.name, uid)
+			if err != nil || !sameSnapshot(target.stat, latest) ||
+				sha256.Sum256(data) != target.contentHash {
 				return deleted, ErrUnsafePublication
 			}
 		} else {
-			if _, err := openTempStat(fd, name, uid); err != nil {
+			latest, err := openTempStat(fd, target.name, uid)
+			if err != nil || !sameSnapshot(target.stat, latest) ||
+				!oldEnough(now, latest.Mtim) || !oldEnough(now, latest.Ctim) {
 				return deleted, ErrUnsafePublication
 			}
 		}
-		if err := syscall.Unlinkat(fd, name); err != nil {
+		// Same-UID adversarial name races cannot be completely excluded by
+		// unlinkat; this directory contains only untrusted monitor data.
+		if err := syscall.Unlinkat(fd, target.name); err != nil {
 			return deleted, ErrUnsafePublication
 		}
 		deleted++
@@ -369,6 +376,3 @@ func oldEnough(now time.Time, ts syscall.Timespec) bool {
 	return now.After(then) && now.Sub(then) > OrphanTempAge
 }
 
-// safeInboxPath is only used by test fixture paths. Production always uses
-// InboxDirectory and disallows caller-supplied location parameters.
-var _ = filepath.Clean
