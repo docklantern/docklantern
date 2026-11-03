@@ -145,7 +145,10 @@ func (s *Store) ensure() bool { return s != nil && s.db != nil }
 // operations for the same project via a DB-level unique partial index.
 // This is NOT a host lock and it has no path to Docker or files.
 func (s *Store) Begin(ctx context.Context, op Operation) error {
-	if !s.ensure() || ctx == nil || !validInput(op) { return ErrInvalidOperation }
+	if s == nil || ctx == nil || !validInput(op) { return ErrInvalidOperation }
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.ensure() { return ErrUnavailable }
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil { return ErrUnavailable }
 	defer tx.Rollback()
@@ -273,7 +276,12 @@ func (s *Store) MarkUncertain(ctx context.Context, id, phase, code string, at ti
 
 func (s *Store) Inspect(ctx context.Context, id string) (Snapshot, error) {
 	var empty Snapshot
-	if !s.ensure() || ctx == nil || !executorregistration.ValidID(id) {
+	if s == nil || ctx == nil || !executorregistration.ValidID(id) {
+		return empty, ErrInvalidOperation
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.ensure() {
 		return empty, ErrInvalidOperation
 	}
 	var op Operation
