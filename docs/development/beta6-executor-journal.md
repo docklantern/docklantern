@@ -34,7 +34,7 @@ A newly initialized database is migrated transactionally. Unknown future version
 PREPARE → AUTHORIZE → PREFLIGHT → PULL → STAGE → APPLY → VERIFY → COMMIT
 ```
 
-Duplicate, skipped, reordered or replayed intents/completions are rejected. Arbitrary raw errors, credentials, Compose paths, child stdout or JSON are never stored in event codes; uncertainty uses a strict small allowlist (`interrupted`, `state_ambiguous`, `external_change`, `storage_uncertain`).
+Duplicate, skipped, reordered or replayed intents/completions are rejected. **A completion also requires the same live Store session that recorded its matching intent**; reopening after a crash discards this in-memory completion eligibility, even though the earlier intent remains durable. This does not replace future cross-process project locks. Arbitrary raw errors, credentials, Compose paths, child stdout or JSON are never stored in event codes; uncertainty uses a strict small allowlist (`interrupted`, `state_ambiguous`, `external_change`, `storage_uncertain`).
 
 When a process stops after intent but before completion, `Inspect` conservatively exposes **`needs_reconciliation`** even when the operation row is still `pending`. `MarkUncertain` appends an explicit durable marker and locks the operation in `needs_reconciliation`; it cannot be reset to pending or silently replayed by any Phase 3a API. Other operations in the same project remain blocked. Operations in unrelated projects may create separate journal records, but **cross-process OS project locks** are deferred to Phase 3b.
 
