@@ -275,7 +275,7 @@ func TestActualUnprivilegedMonitorPublisherRootFixture(t *testing.T) {
 		}
 	}
 	perform("publish")
-	record,err:=readInbox(dir,65534,time.Now())
+	record,err:=readInbox(dir,"nonroot-demo",65534,time.Now())
 	if err!=nil || record.Proposal.ProposalID!="nonroot-demo" {
 		t.Fatalf("root could not inspect nonroot proposal: %v %#v",err,record)
 	}
