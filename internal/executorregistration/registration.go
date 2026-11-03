@@ -64,6 +64,10 @@ var repositoryComponentRE = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
 // descriptor-relative filename. Never accept a filename or relative path.
 func ValidID(id string) bool { return nameRE.MatchString(id) }
 
+// ValidRepository exposes the strict initial public Docker Hub repository
+// policy to the untrusted proposal parser. It does not grant deployment rights.
+func ValidRepository(repository string) bool { return validRepository(repository) }
+
 func validRepository(repository string) bool {
 	// First beta.6 host executor supports only public Docker Hub repositories
 	// explicitly approved in an executor-owned record. Other registries can be
