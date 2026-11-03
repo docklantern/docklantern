@@ -118,6 +118,11 @@ func readTrustedRegistrationInput(path string) (RegistrationInput, error) {
 
 // An operator-chosen path must be absolute, already canonical, and never a
 // dash, /dev/stdin, a proc-fd alias or a relative directory traversal.
+// ValidInputPath checks a CLI-supplied root registration input filename.
+// It does not establish that the file exists, has trusted ownership, or is
+// safe to open; RegisterFromFile performs independent descriptor checks.
+func ValidInputPath(path string) bool { return trustedInputPath(path) }
+
 func trustedInputPath(path string) bool {
 	if len(path) == 0 || len(path) > MaxInputPathBytes || !filepath.IsAbs(path) ||
 		path == "/" || filepath.Clean(path) != path || strings.IndexByte(path, 0) != -1 {
