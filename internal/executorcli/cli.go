@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/docklantern/docklantern/internal/executorhost"
+	"github.com/docklantern/docklantern/internal/executorpreview"
 	"github.com/docklantern/docklantern/internal/executorregistration"
 )
 
@@ -25,6 +26,10 @@ type DiagnoseFunc func(context.Context, executorhost.DiagnosticConfig) (executor
 // the executor-owned registration. It never contacts Docker.
 type RegisterFunc func(path, previousSHA256 string) (executorregistration.Record, error)
 
+// PreviewFunc displays only registered candidate metadata; it has no Docker
+// baseline inspection and cannot return any deployment authorization.
+type PreviewFunc func(proposalID string) (executorpreview.View, error)
+
 // Run is invoked only by the host CLI and never by the monitoring web service.
 // It does not provide apply/recover or any Docker mutation capability.
 func Run(args []string, stdout, stderr io.Writer, version string) int {
@@ -39,6 +44,12 @@ func RunWithDiagnostics(args []string, stdout, stderr io.Writer, version string,
 // RunWithActions isolates registration and diagnostics effects behind
 // injectable dependencies, so rejected flags cannot trigger host changes.
 func RunWithActions(args []string, stdout, stderr io.Writer, version string, diagnose DiagnoseFunc, register RegisterFunc) int {
+	return RunWithPreview(args, stdout, stderr, version, diagnose, register, executorpreview.PreviewLocal)
+}
+
+// RunWithPreview permits no-filesystem unit tests and keeps preview segregated
+// from registration writes and the unavailable deployment/recovery commands.
+func RunWithPreview(args []string, stdout, stderr io.Writer, version string, diagnose DiagnoseFunc, register RegisterFunc, preview PreviewFunc) int {
 	if len(args) == 0 {
 		usage(stderr)
 		return ExitUsage
@@ -79,6 +90,20 @@ func RunWithActions(args []string, stdout, stderr io.Writer, version string, dia
 			record.Registration.RegistrationID, record.SHA256)
 		return ExitOK
 	}
+	if args[0] == "preview" {
+		if len(args) != 2 || !executorregistration.ValidID(args[1]) || preview == nil {
+			fmt.Fprintln(stderr, "docklantern-executor: invalid preview arguments")
+			return ExitUsage
+		}
+		view, err := preview(args[1])
+		if err != nil {
+			// No raw proposal payload, path, credential or trusted host error.
+			fmt.Fprintln(stderr, "docklantern-executor: read-only preview could not verify protected inputs")
+			return ExitUnavailable
+		}
+		fmt.Fprint(stdout, view.Render())
+		return ExitOK
+	}
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "docklantern-executor: unexpected arguments")
 		return ExitUsage
@@ -91,7 +116,7 @@ func RunWithActions(args []string, stdout, stderr io.Writer, version string, dia
 	case "version", "-version", "--version":
 		fmt.Fprintf(stdout, "DockLantern Executor %s\n", version)
 		return ExitOK
-	case "status", "preview", "apply", "reconcile", "recover":
+	case "status", "apply", "reconcile", "recover":
 		fmt.Fprintf(stderr, "docklantern-executor: %s unavailable (executor backend not implemented)\n", args[0])
 		return ExitUnavailable
 	default:
@@ -173,7 +198,7 @@ func parseDiagnosticArgs(args []string) (executorhost.DiagnosticConfig, bool) {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprintln(w, `DockLantern Executor (Phase 2 host registration, no Docker write capability)
+	fmt.Fprintln(w, `DockLantern Executor (Phase 2 read-only preview, no Docker write capability)
 Usage: docklantern-executor <command>
 
 Available:
@@ -186,9 +211,12 @@ Available:
              --file ABSOLUTE_ROOT_OWNED_JSON [--expect-sha256 sha256:OLD_HASH]
              Creates a new registration when --expect-sha256 is omitted;
              a change to an existing record requires its exact previous hash.
+  preview    Host-root + controlling-TTY informational candidate preview
+             <proposal-id> (requires pre-existing protected monitor.uid)
+             No actual Docker/Compose/OCI inspection or deployment approval.
 
 Reserved (unavailable until later reviewed phases):
-  status, preview, apply, reconcile, recover
+  status, apply, reconcile, recover
 
 No deployment, Docker writes, or unattended execution is available.`)
 }
