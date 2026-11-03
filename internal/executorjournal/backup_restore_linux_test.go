@@ -9,6 +9,7 @@ import (
  "strings"
  "syscall"
  "testing"
+ "time"
 )
 
 func backupFixture(t *testing.T) (*Store,string,string,string) {
