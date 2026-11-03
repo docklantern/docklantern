@@ -65,6 +65,13 @@ func (s *Store) publishReceiptAt(ctx context.Context, lock *ProjectLock, dir, id
 	previous,err:=s.reserveReceipt(ctx,id,hash,at)
 	if err!=nil{return zero,ErrReceiptUnavailable}
 	if checkpoint!=nil && checkpoint("after_pending")!=nil{return zero,ErrReceiptUnavailable}
+	// Catch a changed journal state BEFORE exposing a new public file. The
+	// final published-event transaction rechecks again across this separate
+	// SQLite/filesystem durability boundary.
+	latest,err:=s.receiptForOperation(ctx,id)
+	if err!=nil{return zero,ErrReceiptUnavailable}
+	latestData,err:=latest.canonical()
+	if err!=nil || receiptHash(latestData)!=hash{return zero,ErrReceiptUnavailable}
 	filename:=receipt.OperationID+"-v1.json"
 	if err:=publishOrVerifyReceiptFile(fd,filename,data,hash);err!=nil{return zero,ErrReceiptUnavailable}
 	if checkpoint!=nil && checkpoint("after_file_sync")!=nil{return zero,ErrReceiptUnavailable}
