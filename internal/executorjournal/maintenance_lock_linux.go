@@ -29,6 +29,7 @@ type MaintenanceLease struct {
  fd int
  exclusive bool
  released bool
+ held bool
 }
 
 // AcquireMaintenanceLease only obtains a lock; it does not restore or mutate
@@ -46,7 +47,7 @@ func acquireMaintenanceLeaseAt(directory string, exclusive bool) (*MaintenanceLe
  if len(parts)<2||len(parts)>32{return nil,ErrMaintenanceUnavailable}
  dirfd,err:=syscall.Open("/",syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC,0)
  if err!=nil{return nil,ErrMaintenanceUnavailable}
- defer syscall.Close(dirfd)
+ defer func(){_ = syscall.Close(dirfd)}()
  if !trustedJournalDir(dirfd,false){return nil,ErrMaintenanceUnavailable}
  for i,p:=range parts {
   if p==""||p=="."||p==".."{return nil,ErrMaintenanceUnavailable}
@@ -84,16 +85,14 @@ func acquireMaintenanceLeaseAt(directory string, exclusive bool) (*MaintenanceLe
  }
  if created&&(syscall.Fsync(fd)!=nil||syscall.Fsync(dirfd)!=nil){return nil,ErrMaintenanceUnavailable}
  keep=true
- return &MaintenanceLease{fd:fd,exclusive:exclusive},nil
+ return &MaintenanceLease{fd:fd,exclusive:exclusive,held:true},nil
 }
 
 func (l *MaintenanceLease) Release() error {
  if l==nil{return ErrMaintenanceUnavailable}
  l.mu.Lock()
  defer l.mu.Unlock()
- if l.released||l.fd<0{return ErrMaintenanceUnavailable}
- // A zero-value lease must never release descriptor 0.
- if l.fd==0{return ErrMaintenanceUnavailable}
+ if l.released||!l.held||l.fd<0{return ErrMaintenanceUnavailable}
  l.released=true
  unlock:=syscall.Flock(l.fd,syscall.LOCK_UN)
  closeErr:=syscall.Close(l.fd)
