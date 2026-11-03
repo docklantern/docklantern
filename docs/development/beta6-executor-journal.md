@@ -51,3 +51,7 @@ This is a **3a schema and operation-event foundation** only. Phase 3b/3c still r
 ## Follow-up v2 generation staging foundation
 
 The separate [Phase 3c-a override generation PR](beta6-override-generations.md) migrates the executor journal from v1 to v2 **without deleting v1 operations**, and adds immutable `override_generation_events` for stage and promotion intent. Protected 0600 metadata manifests do **not** contain Compose configuration, and **no promotion completion or Docker write** is enabled. Prior v1 statements above describe the original Phase 3a checkpoint, not a bypass of the v2 migration or its reconciliation blocks.
+
+## Phase 3c-b — Receipt outbox follow-up
+
+The [sanitized receipt publication foundation](beta6-receipt-outbox.md) uses the existing append-only `receipt_publications` table for deterministic, bounded v1 pending/uncertain status. It **does not** enable verified success, monitor UI integration, receipt pruning, or Docker writes. The pending and published events are two independent, idempotent journal/file durability boundaries.
