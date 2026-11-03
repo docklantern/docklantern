@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docklantern/docklantern/internal/executorregistration"
@@ -25,7 +26,13 @@ const (
 
 var phases = []string{"PREPARE", "AUTHORIZE", "PREFLIGHT", "PULL", "STAGE", "APPLY", "VERIFY", "COMMIT"}
 
-type Store struct { db *sql.DB }
+// Store retains non-persistent phase ownership: a process that restarts
+// cannot complete a side-effect phase started before that restart.
+type Store struct {
+	db *sql.DB
+	mu sync.Mutex
+	inFlight map[string]string
+}
 
 type Operation struct {
 	ID string
@@ -87,12 +94,18 @@ func openSQLite(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Store{db:db}, nil
+	return &Store{db:db,inFlight:make(map[string]string)}, nil
 }
 
 func (s *Store) Close() error {
-	if s == nil || s.db == nil { return ErrUnavailable }
-	if err := s.db.Close(); err != nil { return ErrUnavailable }
+	if s == nil { return ErrUnavailable }
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.db == nil { return ErrUnavailable }
+	db:=s.db
+	s.db=nil
+	s.inFlight=nil
+	if err := db.Close(); err != nil { return ErrUnavailable }
 	return nil
 }
 
@@ -226,17 +239,36 @@ func (s *Store) eventTx(ctx context.Context, id, phase, kind, code string, at ti
 // Intent MUST be committed before an independently approved side effect.
 // Phase 3a offers NO effect-runner and no ability to finalize as succeeded.
 func (s *Store) Intent(ctx context.Context, id, phase string, at time.Time) error {
-	return s.eventTx(ctx,id,phase,EventIntent,"none",at)
+	if s == nil { return ErrUnavailable }
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.db == nil { return ErrUnavailable }
+	if _,exists:=s.inFlight[id];exists { return ErrInvalidTransition }
+	if err:=s.eventTx(ctx,id,phase,EventIntent,"none",at);err!=nil {return err}
+	s.inFlight[id]=phase
+	return nil
 }
 
 // Complete is a journal fact about a phase, NOT proof of Docker success.
 // No method in Phase 3a can set an operation to "succeeded"/"recovered".
 func (s *Store) Complete(ctx context.Context, id, phase string, at time.Time) error {
-	return s.eventTx(ctx,id,phase,EventCompleted,"none",at)
+	if s == nil { return ErrUnavailable }
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.db == nil || s.inFlight[id]!=phase { return ErrInvalidTransition }
+	if err:=s.eventTx(ctx,id,phase,EventCompleted,"none",at);err!=nil {return err}
+	delete(s.inFlight,id)
+	return nil
 }
 
 func (s *Store) MarkUncertain(ctx context.Context, id, phase, code string, at time.Time) error {
-	return s.eventTx(ctx,id,phase,EventUncertain,code,at)
+	if s == nil { return ErrUnavailable }
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.db == nil { return ErrUnavailable }
+	if err:=s.eventTx(ctx,id,phase,EventUncertain,code,at);err!=nil {return err}
+	delete(s.inFlight,id)
+	return nil
 }
 
 func (s *Store) Inspect(ctx context.Context, id string) (Snapshot, error) {
