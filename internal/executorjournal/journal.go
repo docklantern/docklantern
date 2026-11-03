@@ -284,16 +284,22 @@ func (s *Store) Inspect(ctx context.Context, id string) (Snapshot, error) {
 	if !s.ensure() {
 		return empty, ErrInvalidOperation
 	}
+	// Read operation and its immutable events in ONE SQLite snapshot.
+	// Otherwise a separate process could change the operation between the
+	// two SELECTs and create a misleading view for future reconciliation.
+	tx, txErr := s.db.BeginTx(ctx, nil)
+	if txErr != nil { return empty, ErrUnavailable }
+	defer tx.Rollback()
 	var op Operation
 	var createdNS, updatedNS int64
-	err := s.db.QueryRowContext(ctx, `SELECT operation_id,operation_kind,project_id,
+	err := tx.QueryRowContext(ctx, `SELECT operation_id,operation_kind,project_id,
 		registration_id,service_id,proposal_id,proposal_sha256,candidate_digest,
 		created_ns,updated_ns,current_phase,outcome FROM operations WHERE operation_id=?`,id).
 		Scan(&op.ID,&op.Kind,&op.ProjectID,&op.RegistrationID,&op.ServiceID,&op.ProposalID,
 			&op.ProposalSHA256,&op.CandidateDigest,&createdNS,&updatedNS,&op.CurrentPhase,&op.Outcome)
 	if err != nil { return empty, ErrUnavailable }
 	op.CreatedAt,op.UpdatedAt=time.Unix(0,createdNS).UTC(),time.Unix(0,updatedNS).UTC()
-	rows, err := s.db.QueryContext(ctx, `SELECT event_sequence,phase,event_kind,event_ns,message_code
+	rows, err := tx.QueryContext(ctx, `SELECT event_sequence,phase,event_kind,event_ns,message_code
 		FROM phase_events WHERE operation_id=? ORDER BY event_sequence`,id)
 	if err != nil { return empty, ErrUnavailable }
 	defer rows.Close()
