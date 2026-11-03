@@ -2,6 +2,7 @@ package executorreview
 
 import (
 	"bufio"
+	"io"
 	"context"
 	"os"
 	"strings"
@@ -56,7 +57,7 @@ func (t *LocalTerminal) ReadLine(ctx context.Context) (string, error) {
 	go func() {
 		// 96 bytes is enough for REVIEW + 12-hex token; reject anything
 		// larger instead of truncating and accepting a crafted prefix.
-		reader := bufio.NewReaderSize(t.file, 128)
+		reader := bufio.NewReaderSize(io.LimitReader(t.file, 97), 128)
 		line, err := reader.ReadString('\n')
 		if len(line) > 96 { err = ErrReviewDenied }
 		done <- answer{text: strings.TrimSuffix(strings.TrimSuffix(line, "\n"), "\r"), err: err}
