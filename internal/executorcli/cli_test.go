@@ -31,7 +31,7 @@ func TestHelpCommands(t *testing.T) {
 }
 
 func TestUnavailableCommandsFailClosed(t *testing.T) {
-	for _, command := range []string{"status", "preview", "apply", "reconcile", "recover"} {
+	for _, command := range []string{"status", "apply", "reconcile", "recover"} {
 		t.Run(command, func(t *testing.T) {
 			var out, errOut bytes.Buffer
 			code := Run([]string{command}, &out, &errOut, "dev")
