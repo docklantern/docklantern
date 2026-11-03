@@ -155,7 +155,7 @@ func trustedProposalFile(fd int, owner uint32) (syscall.Stat_t, bool) {
 	var st syscall.Stat_t
 	if syscall.Fstat(fd, &st) != nil ||
 		st.Mode&syscall.S_IFMT != syscall.S_IFREG || st.Uid != owner ||
-		st.Nlink != 1 || st.Mode&0o077 != 0 || st.Mode&0o400 == 0 ||
+		st.Nlink != 1 || st.Mode&0o7777 != 0o600 ||
 		st.Size < 1 || st.Size > MaxProposalBytes {
 		return st, false
 	}
