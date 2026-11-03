@@ -40,11 +40,25 @@ func PublishProtected(reg Registration, expectedOldHash string) (Record, error) 
 	}
 	if _, err := fmt.Fprintf(tty,
 		"HOST-LOCAL REGISTRATION CHANGE (NO DOCKER UPDATE)\n"+
-			"Registration: %s\nProject: %s\nServices: %d\n"+
-			"New registration SHA-256: sha256:%x\n"+
-			"Type REGISTER %s %s to confirm this host-owned file change:\n",
-		reg.RegistrationID, reg.ProjectName, len(reg.Services), hash,
-		reg.RegistrationID, token); err != nil { return empty, ErrUntrustedStore }
+			"Registration: %s\nProject: %s\nProject directory: %s\n"+
+			"Ordered Compose sources: %v\nEnvironment sources: %v\nProfiles: %v\n"+
+			"Existing registration SHA-256 (empty means create only): %s\n",
+		reg.RegistrationID, reg.ProjectName, reg.ProjectDirectory,
+		reg.ComposeFiles, reg.EnvFiles, reg.Profiles, expectedOldHash); err != nil {
+		return empty, ErrUntrustedStore
+	}
+	for _, service := range reg.Services {
+		if _, err := fmt.Fprintf(tty,
+			"Service: %s | enabled=%t | repository=%s | platform=%s/%s | running-only=%t\n",
+			service.Name, service.DeploymentEnabled, service.ApprovedRepository,
+			service.Platform.OS, service.Platform.Architecture, service.AllowRunningOnly); err != nil {
+			return empty, ErrUntrustedStore
+		}
+	}
+	if _, err := fmt.Fprintf(tty,
+		"New registration SHA-256: sha256:%x\n"+
+			"Type REGISTER %s %s to confirm this exact registration change:\n",
+		hash, reg.RegistrationID, token); err != nil { return empty, ErrUntrustedStore }
 	reply, err := bufio.NewReader(io.LimitReader(tty, 128)).ReadString('\n')
 	if err != nil || strings.TrimSuffix(strings.TrimSuffix(reply, "\n"), "\r") !=
 		"REGISTER "+reg.RegistrationID+" "+token {
@@ -53,6 +67,9 @@ func PublishProtected(reg Registration, expectedOldHash string) (Record, error) 
 	// Do not trust a long-lived registration/source approval; recheck after
 	// the operator finishes typing.
 	if reg.ValidateTrustedSources(executorhost.RealFS{}) != nil { return empty, ErrUntrustedStore }
+	// Ensure the typed confirmation still covers the exact bytes being saved.
+	confirmed, err := json.Marshal(reg)
+	if err != nil || sha256.Sum256(confirmed) != hash { return empty, ErrUntrustedStore }
 	return publishProtected(ProtectedRegistrationDirectory, reg, expectedOldHash)
 }
 
