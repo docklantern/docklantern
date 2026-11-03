@@ -36,3 +36,7 @@ Phase 3c must still implement independently protected override-generation writer
 Existing `register` and informational `preview` behavior is unchanged. `status`, `reconcile`, `apply` and `recover` CLI commands **remain disabled**; no real backend is wired. The accepted beta.5 monitoring-only deployment remains untouched.
 
 **Do not merge this PR, publish a release, create host directories/locks, change VPS permissions, install the executor or perform Docker mutations without separate explicit operator approval.** Issue #83 stays open for the remaining Phase 3 acceptance gates.
+
+## Follow-up Phase 3c-a generation safety
+
+The separate [protected override generation foundation](beta6-override-generations.md) introduces durable v2 `override_generation_events` without treating them as committed `override_records`. `ReconcileReadOnly` now reports **`override_generation_incomplete`** for any outstanding stage or promotion intent, while real backend inspection and operational CLI reconciliation remain blocked. A matching fake baseline never grants success or clears the journal.
