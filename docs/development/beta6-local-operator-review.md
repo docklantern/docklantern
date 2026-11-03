@@ -39,3 +39,7 @@ The older `Lstat` source trust preflight remains **not TOCTOU-proof**. No test-V
 - Go race tests, vet, existing proxy/integration regressions and actual executor binary security scanning remain CI gates. A root-owned CI fixture is **not evidence** of real VPS UID or mount isolation; an actual disposable host/PTY exercise must be approved before shipping this for host use.
 
 **Governance:** PR open for review only. Do not merge, publish, install, change VPS permissions or deploy Docker workloads without the user's explicit separate permission. Keep Phase 2 issue #82 open until the remaining host-local CLI integration and full acceptance are evidenced.
+
+## Read-only local preview follow-up
+
+The separate [candidate preview integration](beta6-local-preview.md) provides an informational root/TTY CLI display of matched protected registration plus untrusted proposal. It **does not** invoke the approval gate, does not inspect Docker actual state, and does not grant a deployment capability. B6-04 actual-state/Compose/OCI inspection remains a hard gate; `apply` and `recover` remain disabled.
