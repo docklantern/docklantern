@@ -290,6 +290,13 @@ func (s *Store) Inspect(ctx context.Context, id string) (Snapshot, error) {
 	tx, txErr := s.db.BeginTx(ctx, nil)
 	if txErr != nil { return empty, ErrUnavailable }
 	defer tx.Rollback()
+	return inspectJournalTx(ctx, tx, id)
+}
+
+// inspectJournalTx is shared by status and the read-only reconciliation
+// transaction; all journal tables must be read from the SAME snapshot.
+func inspectJournalTx(ctx context.Context, tx *sql.Tx, id string) (Snapshot, error) {
+	var empty Snapshot
 	var op Operation
 	var createdNS, updatedNS int64
 	err := tx.QueryRowContext(ctx, `SELECT operation_id,operation_kind,project_id,
