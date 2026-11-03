@@ -172,7 +172,7 @@ jobs:
           sudo env -i HOME=/root PATH=/usr/bin:/bin \
             DOCKLANTERN_REGISTRATION_ROOT_FIXTURE=1 \
             "$(command -v go)" test ./internal/executorregistration \
-            -run '^TestProtectedStoreRootFixture$' -count=1 -v
+            -run '^(TestProtectedStoreRootFixture|TestPublishProtectedRootFixture)$' -count=1 -v
 
   secure-proposal-fixture:
     runs-on: ubuntu-latest
