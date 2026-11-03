@@ -298,6 +298,15 @@ func TestUnprivilegedMonitorPublisherChild(t *testing.T) {
 	// exposing private host state or weakening production fail-closed errors.
 	fd, openErr := openMonitorInbox(dir, 65534)
 	if openErr != nil {
+		for _, component := range []string{"/", "/opt", filepath.Dir(dir), dir} {
+			info, err := os.Lstat(component)
+			if err != nil {
+				t.Logf("fixture component unavailable: %v", err)
+				continue
+			}
+			stat := info.Sys().(*syscall.Stat_t)
+			t.Logf("fixture component mode=%o uid=%d euid=%d", info.Mode().Perm(), stat.Uid, os.Geteuid())
+		}
 		t.Fatalf("nonroot protected inbox open rejected: %v", openErr)
 	}
 	if lockErr := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB); lockErr != nil {
