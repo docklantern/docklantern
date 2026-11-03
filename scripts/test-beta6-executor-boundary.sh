@@ -28,7 +28,7 @@ sudo chown nobody "$root/handoff/proposals"
 sudo chmod 0700 "$root/handoff/proposals"
 
 sudo -u nobody touch "$root/handoff/proposals/submitted.json"
-[[ -f "$root/handoff/proposals/submitted.json" ]] || exit 1
+sudo -u nobody test -f "$root/handoff/proposals/submitted.json" || { echo "monitor could not read its own proposal" >&2; exit 1; }
 if sudo -u nobody touch "$root/handoff/receipts/forged.json" 2>/dev/null; then
   echo 'monitor identity unexpectedly modified receipts' >&2; exit 1
 fi
