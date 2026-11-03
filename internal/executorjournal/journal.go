@@ -259,6 +259,16 @@ func (s *Store) Complete(ctx context.Context, id, phase string, at time.Time) er
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.db == nil || s.inFlight[id]!=phase { return ErrInvalidTransition }
+	if phase=="COMMIT" {
+		// Phase 3c stages only metadata; no independently verified filesystem
+		// promotion-complete API exists. A journal COMMIT cannot be closed
+		// while ANY staged/promoting generation is still uncommitted.
+		var n int
+		if err:=s.db.QueryRowContext(ctx,`SELECT count(*) FROM override_generation_events
+			WHERE operation_id=?`,id).Scan(&n);err!=nil || n!=0 {
+			return ErrInvalidTransition
+		}
+	}
 	if err:=s.eventTx(ctx,id,phase,EventCompleted,"none",at);err!=nil {return err}
 	delete(s.inFlight,id)
 	return nil
