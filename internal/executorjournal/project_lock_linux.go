@@ -102,7 +102,7 @@ func (l *ProjectLock) Release() error {
 	if l == nil { return ErrLockUnavailable }
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.released { return ErrLockUnavailable }
+	if l.released || l.projectID == "" || l.fd < 0 { return ErrLockUnavailable }
 	l.released = true
 	unlockErr := syscall.Flock(l.fd, syscall.LOCK_UN)
 	closeErr := syscall.Close(l.fd)
