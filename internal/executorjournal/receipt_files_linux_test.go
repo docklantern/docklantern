@@ -76,10 +76,10 @@ func TestReceiptOutboxRootFixture(t *testing.T) {
 	still,err:=os.ReadFile(target)
 	if err!=nil||!bytes.Equal(body,still){t.Fatal("retry overwrote immutable receipt")}
 	var pending,published int
-	if err:=s.db.QueryRow(§SELECT count(*) FROM receipt_publications
-		WHERE operation_id=? AND publication_state='pending'§,"sanitized-demo").Scan(&pending);err!=nil{t.Fatal(err)}
-	if err:=s.db.QueryRow(§SELECT count(*) FROM receipt_publications
-		WHERE operation_id=? AND publication_state='published'§,"sanitized-demo").Scan(&published);err!=nil{t.Fatal(err)}
+	if err:=s.db.QueryRow(`SELECT count(*) FROM receipt_publications
+		WHERE operation_id=? AND publication_state='pending'`,"sanitized-demo").Scan(&pending);err!=nil{t.Fatal(err)}
+	if err:=s.db.QueryRow(`SELECT count(*) FROM receipt_publications
+		WHERE operation_id=? AND publication_state='published'`,"sanitized-demo").Scan(&published);err!=nil{t.Fatal(err)}
 	if pending!=1||published!=1{t.Fatalf("repeated publish appended events: %d/%d",pending,published)}
 	view,err:=s.Inspect(ctx,"sanitized-demo")
 	if err!=nil||view.Operation.Outcome!=OutcomeNeedsReconciliation||!view.BlocksNewWork{
