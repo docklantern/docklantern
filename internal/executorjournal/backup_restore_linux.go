@@ -208,9 +208,9 @@ func stageRestoreAt(ctx context.Context,backupDir,quarantineDir,id string,checkp
  // Refuse nonempty restore quarantine; no wildcard cleanup is performed.
  dup,e:=syscall.Openat(target,".",syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC,0)
  if e!=nil{return errBackup}
- entries,e:=os.NewFile(uintptr(dup),"restore-quarantine").ReadDir(1)
- // Explicit close for the duplicate descriptor, independent of parent fd.
- syscall.Close(dup)
+ directoryFile:=os.NewFile(uintptr(dup),"restore-quarantine")
+ entries,e:=directoryFile.ReadDir(1)
+ _ = directoryFile.Close()
  if e!=nil && !errors.Is(e,io.EOF){return errBackup}
  if len(entries)!=0{return errBackup}
  in,e:=syscall.Openat(source,"snapshot-"+id+".sqlite",syscall.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_CLOEXEC,0)
