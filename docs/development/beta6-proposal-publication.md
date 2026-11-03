@@ -37,7 +37,7 @@ Expiration is evaluated against the executor/monitor host clock supplied by the 
 
 The standard Go unit/race/vet suite plus a **root-owned disposable filesystem fixture** checks: same-ID no-overwrite; 16 KiB and 64-pending limits; expired-only removal; quota recovery; concurrent publishing; adversarial symlink/hardlink/FIFO/mode/invalid-content rejection; orphan temporary retention; forged old mtime; no accidental deletion outside the private directory; and root-EUID rejection by production monitor API.
 
-A second CI fixture runs the publisher/cleanup **as a real nonroot UID (65534)** in an isolated root-owned subtree under `/opt` and independently reads the resulting proposal from a root process. This tests the ownership boundary but **does not** certify container bind mounts, host UID mapping or real VPS security.
+A second CI fixture runs the publisher/cleanup **as a real nonroot UID (65534)** in an isolated root-owned subtree under `/var/lib` and independently reads the resulting proposal from a root process. This tests the ownership boundary but **does not** certify container bind mounts, host UID mapping or real VPS security.
 
 **Not provided:** a monitoring GUI button or polling worker that calls these functions, actual inbox/monitor-UID provisioning, real executor installation, Docker/Compose/OCI baseline inspection, approved TTY deployment confirmation, durable journal, read-only reconcile, Docker writes, release tags or VPS operations. Those remain separately reviewed B6-02/B6-03/B6-04/B6-05 and later security/backup gates. The observed live `hello-go` source parent mode `0775` remains ineligible under the protected-source policy.
 
