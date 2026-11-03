@@ -30,7 +30,7 @@ func openProtectedJournal(directory string) (*Store, error) {
 	if len(parts) < 2 || len(parts) > 32 { return nil, ErrUnavailable }
 	fd, err := syscall.Open("/",syscall.O_RDONLY|syscall.O_DIRECTORY|syscall.O_CLOEXEC,0)
 	if err != nil { return nil, ErrUnavailable }
-	defer syscall.Close(fd)
+	defer func() { _ = syscall.Close(fd) }()
 	if !trustedJournalDir(fd,false) { return nil, ErrUnavailable }
 	for i, component := range parts {
 		if component == "" || component == "." || component == ".." { return nil, ErrUnavailable }
