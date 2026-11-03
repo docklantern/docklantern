@@ -138,6 +138,13 @@ func ValidateTrustedSource(reader Reader, path string, trustedUID uint32) error 
 	return validate(reader, path, []uint32{0, trustedUID}, []uint32{0, trustedUID}, regularFile, false)
 }
 
+// ValidateTrustedSourceDirectory verifies an approved Compose directory and all
+// its ancestors without accepting group/world writable components. This is
+// a pathname preflight, not the race-proof source snapshot required at B6-04.
+func ValidateTrustedSourceDirectory(reader Reader, path string, trustedUID uint32) error {
+	return validate(reader, path, []uint32{0, trustedUID}, []uint32{0, trustedUID}, directory, false)
+}
+
 // Layout uses an executor-private root. Only the proposal directory may
 // belong to the unprivileged monitor, with no shared writable ancestor.
 // The caller must ensure the monitor does not mount the private/receipt
