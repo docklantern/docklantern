@@ -65,6 +65,15 @@ func TestSQLiteV1MigrationWALConstraintsAndAppendOnly(t *testing.T) {
 	} {
 		if _,err:=s.db.Exec(stmt);err==nil {t.Fatalf("DB accepted append-only/foreign-key bypass: %s",stmt)}
 	}
+	for _, stmt:=range []string{
+		"UPDATE operations SET proposal_sha256='sha256:forged' WHERE operation_id='operation-a'",
+		"UPDATE operations SET project_id='forged' WHERE operation_id='operation-a'",
+		"DELETE FROM operations WHERE operation_id='operation-a'",
+	} {
+		if _,err:=s.db.Exec(stmt);err==nil {
+			t.Fatalf("database accepted mutation of executor authority: %s",stmt)
+		}
+	}
 	// Reopening version 1 must not rerun destructive migrations.
 	if err:=s.Close();err!=nil {t.Fatal(err)}
 	reopened,err:=openSQLite(path)
