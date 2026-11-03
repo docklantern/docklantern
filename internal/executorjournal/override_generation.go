@@ -130,18 +130,18 @@ func (s *Store) appendFollowUp(ctx context.Context, m OverrideManifest, hash, ki
 	if err!=nil || project!=m.ProjectID || candidate!=m.CandidateImageDigest ||
 		outcome!=OutcomePending || at.UnixNano()<updatedNS { return ErrOverrideStage }
 	var lastSeq int
-	var lastKind,lastHash,lastCandidate,lastPreviousHash string
+	var lastKind,lastHash,lastCandidate,lastPreviousHash,lastOperation string
 	var prevGeneration,lastNS int64
 	err=tx.QueryRowContext(ctx,`SELECT event_sequence,event_kind,manifest_sha256,
-		candidate_digest,previous_generation,previous_committed_sha256,recorded_ns
+		candidate_digest,previous_generation,previous_committed_sha256,recorded_ns,operation_id
 		FROM override_generation_events WHERE project_id=? AND generation=?
 		ORDER BY event_sequence DESC LIMIT 1`,m.ProjectID,m.Generation).
 		Scan(&lastSeq,&lastKind,&lastHash,&lastCandidate,
-			&prevGeneration,&lastPreviousHash,&lastNS)
+			&prevGeneration,&lastPreviousHash,&lastNS,&lastOperation)
 	expected:="stage_intent"
 	if kind=="promotion_intent" {expected="staged"}
 	if err!=nil || lastSeq!=seq-1 || lastKind!=expected ||
-		lastHash!=hash || lastCandidate!=m.CandidateImageDigest ||
+		lastOperation!=m.OperationID || lastHash!=hash || lastCandidate!=m.CandidateImageDigest ||
 		prevGeneration!=m.PreviousGeneration ||
 		lastPreviousHash!=m.PreviousCommittedSHA256 ||
 		lastNS>at.UnixNano() {
