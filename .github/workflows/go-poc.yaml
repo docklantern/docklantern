@@ -172,28 +172,7 @@ jobs:
           sudo env -i HOME=/root PATH=/usr/bin:/bin \
             DOCKLANTERN_REGISTRATION_ROOT_FIXTURE=1 \
             "$(command -v go)" test ./internal/executorregistration \
-            -run '^(TestProtectedStoreRootFixture|TestPublishProtectedRootFixture)
-
-  secure-proposal-fixture:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-      - name: Exercise untrusted proposal inbox on disposable root-owned fixture
-        shell: bash
-        run: |
-          set -euo pipefail
-          # No real DockLantern paths, Docker writes, credentials, or VPS.
-          sudo env -i HOME=/root PATH=/usr/bin:/bin \
-            DOCKLANTERN_PROPOSAL_ROOT_FIXTURE=1 \
-            "$(command -v go)" test ./internal/executorproposal \
-            -run '^TestReadInboxRootFixture$' -count=1 -v
- -count=1 -v
+            -run '^(TestProtectedStoreRootFixture|TestPublishProtectedRootFixture)$' -count=1 -v
 
   secure-proposal-fixture:
     runs-on: ubuntu-latest
