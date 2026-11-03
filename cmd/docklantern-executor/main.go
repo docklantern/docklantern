@@ -1,5 +1,6 @@
 // docklantern-executor is a host-native, operator-invoked CLI.
-// Phase 1c provides only read-only diagnostics, help and version reporting.
+// The Phase 2 host-only registration command edits protected registrations;
+// Docker deployment and recovery remain disabled.
 package main
 
 import (
