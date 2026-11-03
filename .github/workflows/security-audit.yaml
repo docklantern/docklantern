@@ -46,6 +46,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build exact beta monitoring image (no publish)
         run: docker build --build-arg VERSION=security-audit -t docklantern-audit:ci .
+      - name: Verify monitor image excludes executor and Docker CLI
+        run: |
+          docker run --rm --entrypoint sh docklantern-audit:ci -ec '
+            test ! -e /usr/local/bin/docklantern-executor
+            ! command -v docklantern-executor
+            ! command -v docker
+          '
       - name: Scan OS and library vulnerabilities in release image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -74,3 +81,32 @@ jobs:
           ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL,HIGH
+
+  executor-binary-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and vulnerability-scan standalone Linux/amd64 executor (no publishing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          builder="$(sed -n 's/^FROM \(golang:[^ ]*\) AS build$/\1/p' Dockerfile)"
+          [[ "$builder" == golang:*@sha256:* ]] || exit 1
+          out="$(mktemp -d)"
+          trap 'rm -rf -- "$out"' EXIT
+          docker run --rm \
+            --mount "type=bind,source=$PWD,target=/src,readonly" \
+            --mount "type=bind,source=$out,target=/out" \
+            -w /src "$builder" sh -ec '
+              CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+                -trimpath -buildvcs=false \
+                -ldflags="-s -w -X github.com/docklantern/docklantern/internal/buildinfo.Version=security-audit" \
+                -o /out/docklantern-executor ./cmd/docklantern-executor
+              go install golang.org/x/vuln/cmd/govulncheck@latest
+              "$(go env GOPATH)/bin/govulncheck" -mode=binary /out/docklantern-executor
+              go version -m /out/docklantern-executor
+            '
+          test -s "$out/docklantern-executor"
+          sha256sum "$out/docklantern-executor"
+          # Do not upload, publish, or install the ephemeral binary.
