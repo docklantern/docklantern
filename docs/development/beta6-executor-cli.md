@@ -4,7 +4,7 @@
 
 The independent Go executable `cmd/docklantern-executor` is an **inert shell** for ADR 0008. It imports the shared `internal/buildinfo` version and the new `internal/executorcli` command dispatcher; it does **not** import `internal/poc`, run subprocesses, access the Docker socket, open Compose files, listen on any port, or call the Docker Engine.
 
-Only `help` and `version` are implemented. `status`, `register`, `preview`, `apply`, `reconcile` and `recover` are intentionally reserved and exit nonzero with an unambiguous unavailable message; they do **not** attempt any IO. Unknown or extra arguments also fail. There is no `--yes` or background operation.
+Only `help` and `version` are implemented. `status`, `register`, `preview`, `apply`, `reconcile` and `recover` are intentionally reserved and exit nonzero with an unambiguous unavailable message; they do **not** attempt any filesystem, network or Docker IO (apart from printing the error). Unknown or extra arguments also fail. There is no `--yes` or background operation.
 
 ## Local development only
 
