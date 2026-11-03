@@ -145,3 +145,11 @@ jobs:
         env:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-beta3-onboarding.sh
+
+  executor-host-boundary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify nonroot monitor cannot modify executor journal or receipts
+        run: bash scripts/test-beta6-executor-boundary.sh
