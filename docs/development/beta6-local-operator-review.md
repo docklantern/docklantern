@@ -22,9 +22,11 @@ The new `internal/executorreview` library supports a **review-only**, host-local
 6. **After** local input, rereads and revalidates the registration, proposal and freshly inspected baseline, compares all three fingerprints and checks the deadline again. Changed, stale, expired, non-TTY, nonroot or unauthorized inputs fail closed with generic errors.
 7. Emits only a `ReviewOnly` informational receipt. **It cannot authorize `apply`, `recover` or any Docker write.** Approval is not reusable or passed to any execution layer.
 
+**Follow-up integration:** The separately reviewed Phase 2 register-CLI slice enables only root/TTY host registration publication. See [host registration CLI](beta6-register-cli.md). `preview`, `apply`, `recover` and `reconcile` remain disabled. The Phase 2c implementation described below originally shipped only internal library functions.
+
 ## Explicit restrictions and deferred gates
 
-The current standalone executor CLI keeps `register`, `preview`, `apply`, `recover` and `reconcile` **disabled**. This PR introduces **internal primitives only**; they have fake-driven unit tests but are not exposed as operator commands. Enabling registration management and host-local preview through the CLI requires a further reviewed integration slice, with independently protected host UID/operator configuration.
+At the original Phase 2c merge, all five commands were disabled; the follow-up [register-CLI integration](beta6-register-cli.md) enables only trusted host-local registration publication. `preview`, `apply`, `recover` and `reconcile` remain disabled, and protected operator/monitor-UID configuration for preview is a separate future gate.
 
 There is no qualified production `InspectActual` implementation: passing a fake baseline in CI does not establish trusted Docker or Compose state. Full interactive execution approval requires **B6-04 stable source snapshots, exact supported Engine/Compose compatibility, immutable OCI evidence and image-only changes**, plus B6-03 durable journal/locks. Only then may a subsequent separately approved Phase 5 introduce Docker mutations.
 
