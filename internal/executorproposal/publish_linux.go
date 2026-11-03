@@ -71,8 +71,11 @@ func publishInbox(directory string, uid uint32, data []byte, now time.Time) (Rec
 		return empty, ErrUnsafePublication
 	}
 	defer syscall.Flock(fd, syscall.LOCK_UN)
-	count, _, err := listInboxNames(fd)
-	if err != nil || count >= MaxPending || !trustedDirectory(fd, uid, true) {
+	count, existing, err := listInboxNames(fd)
+	// Leave one slot for the temporary file, so even readers active during
+	// publication never see more than the 128-entry hard limit.
+	if err != nil || count >= MaxPending || len(existing) >= MaxInboxEntries ||
+		!trustedDirectory(fd, uid, true) {
 		return empty, ErrUnsafePublication
 	}
 
