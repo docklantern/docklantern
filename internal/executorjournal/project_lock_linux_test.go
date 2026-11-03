@@ -159,6 +159,13 @@ func TestProjectLockSubprocess(t *testing.T) {
 	}
 }
 
+func TestZeroValueProjectLockFailsClosed(t *testing.T) {
+	var lock ProjectLock
+	if err := lock.Release(); !errors.Is(err, ErrLockUnavailable) {
+		t.Fatalf("zero-value project lock affected an unrelated descriptor: %v", err)
+	}
+}
+
 func TestProjectLockGoroutinesNeverOverlapRootFixture(t *testing.T) {
 	if os.Getenv("DOCKLANTERN_JOURNAL_ROOT_FIXTURE") != "1" || os.Geteuid() != 0 {
 		t.Skip("requires root-owned disposable fixture")
