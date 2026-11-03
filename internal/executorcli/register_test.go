@@ -116,7 +116,7 @@ func TestRegisterNeverEnablesDeploymentCommands(t *testing.T) {
 		return executorregistration.Record{}, errors.New("should not be called")
 	}
 	for _, args := range [][]string{
-		{"preview", "hello-demo"}, {"apply", "hello-demo"}, {"recover", "hello-demo"},
+		{"apply", "hello-demo"}, {"recover", "hello-demo"},
 		{"apply", "--yes"}, {"reconcile", "hello-demo"}, {"status", "hello-demo"},
 	} {
 		var out, stderr bytes.Buffer

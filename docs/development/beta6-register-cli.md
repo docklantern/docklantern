@@ -13,7 +13,7 @@ docklantern-executor register --file /root/docklantern/registration.json \
 - **Create:** `--expect-sha256` absent. Fails if the protected record already exists.
 - **Update:** `--expect-sha256` required and must match the existing protected registration's *exact* record hash. Rejects blind overwrite and stale hashes.
 - The CLI strictly requires `--file` and only the optional `--expect-sha256` pair. Duplicate/unknown flags, implicit `--yes`, stdin (`-`), relative/unclean/control-character paths, remote Docker options, unexpected arguments, and malformed hashes fail **before** a host action is attempted.
-- No shell, Docker CLI subprocess, monitoring server integration, web route, or arbitrary Docker command is exposed. The `preview`, `apply`, `recover`, `status`, and `reconcile` CLI commands **remain unavailable**.
+- No shell, Docker CLI subprocess, monitoring server integration, web route, or arbitrary Docker command is exposed. In the subsequent [read-only preview slice](beta6-local-preview.md), `preview` becomes an **informational candidate display**, requiring protected monitor UID and host-root TTY; it never grants authorization. `apply`, `recover`, `status`, and `reconcile` **remain unavailable**.
 
 ## Host security preconditions
 

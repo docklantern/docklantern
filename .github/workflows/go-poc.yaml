@@ -173,6 +173,10 @@ jobs:
             DOCKLANTERN_REGISTRATION_ROOT_FIXTURE=1 \
             "$(command -v go)" test ./internal/executorregistration \
             -run '^(TestProtectedStoreRootFixture|TestPublishProtectedRootFixture|TestTrustedRegistrationInputRootFixture)$' -count=1 -v
+          sudo env -i HOME=/root PATH=/usr/bin:/bin \
+            DOCKLANTERN_PREVIEW_ROOT_FIXTURE=1 \
+            "$(command -v go)" test ./internal/executorpreview \
+            -run '^TestProtectedMonitorUIDRootFixture$' -count=1 -v
 
   secure-proposal-fixture:
     runs-on: ubuntu-latest
