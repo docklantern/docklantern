@@ -60,7 +60,7 @@ func TestBeta4WorkspaceRoutesAndDeepLinks(t *testing.T) {
   t.Fatalf("shared image should be one row; got %d: %s",count,img)
  }
  detail:=request(h,"GET","/images/"+id,"",true).Body.String()
- if !strings.Contains(detail,`href="/services/site/web"`) || !strings.Contains(detail,`href="/services/site/worker"`){
+ if !strings.Contains(detail,`href="/services/site/web#deployment-review"`) || !strings.Contains(detail,`href="/services/site/worker#deployment-review"`){
   t.Fatalf("image detail missing associated service links: %s",detail)
  }
  service:=request(h,"GET","/services/site/web","",true).Body.String()
