@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/docklantern/docklantern/internal/executorhost"
+ "github.com/docklantern/docklantern/internal/executorapply"
 	"github.com/docklantern/docklantern/internal/executorpreview"
  "github.com/docklantern/docklantern/internal/executorpreflight"
 	"github.com/docklantern/docklantern/internal/executorregistration"
@@ -37,7 +38,22 @@ type QualifyFunc func(context.Context,string)(executorpreflight.Qualification,er
 // Run is invoked only by the host CLI and never by the monitoring web service.
 // It does not provide apply/recover or any Docker mutation capability.
 func Run(args []string, stdout, stderr io.Writer, version string) int {
-	return RunWithDiagnostics(args, stdout, stderr, version, executorhost.DiagnoseLocal)
+ if len(args)>0&&args[0]=="apply"{
+  if len(args)!=2||!executorregistration.ValidID(args[1]){
+   fmt.Fprintln(stderr,"docklantern-executor: apply requires exactly one opaque proposal ID")
+   return ExitUsage
+  }
+  ctx,cancel:=context.WithTimeout(context.Background(),5*time.Minute)
+  defer cancel()
+  result,err:=executorapply.ApplyLocal(ctx,args[1])
+  if err!=nil||result.NeedsReconciliation{
+   fmt.Fprintln(stderr,"docklantern-executor: apply denied or incomplete; inspect protected journal and reconcile manually")
+   return ExitUnavailable
+  }
+  fmt.Fprintf(stdout,"Verified immutable update committed for operation %s.\\n",result.OperationID)
+  return ExitOK
+ }
+ return RunWithDiagnostics(args, stdout, stderr, version, executorhost.DiagnoseLocal)
 }
 
 // RunWithDiagnostics supports deterministic, Docker-free unit tests.
@@ -244,8 +260,8 @@ Available:
              <proposal-id> (requires pre-existing protected monitor.uid)
              No actual Docker/Compose/OCI inspection or deployment approval.
 
-Reserved (unavailable until later reviewed phases):
-  status, apply, reconcile, recover
+Host-root operation (requires separate operator approval before any VPS use):\n  apply      <proposal-id> one-time terminal-confirmed immutable update\n\nReserved (unavailable until later reviewed phases):
+  status, reconcile, recover
 
-No deployment, Docker writes, or unattended execution is available.`)
+APPLY is available only in the separately installed host-root executor with an actual controlling TTY, protected registration and proposal, fixed Docker Engine/API/Compose runtime, project lock, durable journal and fresh independent read-after-write verification. No unattended deployment or automatic recovery is available.`)
 }
