@@ -4,6 +4,7 @@ import (
  "context"
  "errors"
  "os"
+ "path/filepath"
  "time"
 
  "github.com/docklantern/docklantern/internal/executorregistration"
@@ -22,6 +23,11 @@ func StatusLocal(ctx context.Context,id string)(Snapshot,error){
  tty,err:=executorreview.OpenLocalOperatorTerminal()
  if err!=nil{return empty,ErrLocalStatusDenied}
  defer tty.Close()
+ // Do not implicitly create a new journal during an informational query.
+ info,err:=os.Lstat(filepath.Join(HostJournalDirectory,HostJournalFilename))
+ if err!=nil||!info.Mode().IsRegular()||info.Mode().Perm()!=0o600{
+  return empty,ErrLocalStatusDenied
+ }
  store,err:=OpenHost()
  if err!=nil{return empty,ErrLocalStatusDenied}
  defer store.Close()
