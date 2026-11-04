@@ -45,6 +45,9 @@ type LockedDependencies struct{
  Qualify func(context.Context,string)(executorpreflight.Qualification,error)
  Terminal Terminal
  Environment Environment
+ // PrepareEnvironment is invoked only under the protected project lock,
+ // after initial read-only qualification, before any host-local prompt.
+ PrepareEnvironment func(context.Context,executorpreflight.Qualification)(Environment,error)
  Clock func()time.Time
  Random func([]byte)(int,error)
 }
@@ -57,7 +60,7 @@ func RunLockedCandidate(ctx context.Context,op executorjournal.Operation,d Locke
  if ctx==nil||ctx.Err()!=nil||d.IsHostRoot==nil||!d.IsHostRoot()||
   d.AcquireLock==nil||d.OpenJournal==nil||d.Qualify==nil||
   d.Terminal==nil||!d.Terminal.Interactive()||
-  d.Environment==nil||d.Clock==nil||d.Random==nil||
+  (d.Environment==nil&&d.PrepareEnvironment==nil)||d.Clock==nil||d.Random==nil||
   op.Kind!="apply"||!executorregistration.ValidID(op.ProjectID)||
   !executorregistration.ValidID(op.ID)||!executorregistration.ValidID(op.ProposalID){
   return zero,ErrAuthorizationDenied
@@ -72,12 +75,19 @@ func RunLockedCandidate(ctx context.Context,op executorjournal.Operation,d Locke
  if binder,ok:=journal.(interface{BindLease(ProjectLease)error});ok{
   if binder.BindLease(lock)!=nil{return zero,ErrAuthorizationDenied}
  }
- if closer,ok:=d.Environment.(interface{Close()error});ok{
-  defer func(){if closer.Close()!=nil{result.NeedsReconciliation=true;resultErr=ErrApplyUnavailable}}()
- }
  initial,err:=d.Qualify(ctx,op.ProposalID)
  if err!=nil||!matchesOperation(initial,op,d.Clock()){
   return zero,ErrAuthorizationDenied
+ }
+ environment:=d.Environment
+ if d.PrepareEnvironment!=nil{
+  environment,err=d.PrepareEnvironment(ctx,initial)
+  if err!=nil||environment==nil{return zero,ErrAuthorizationDenied}
+ }
+ if closer,ok:=environment.(interface{Close()error});ok{
+  defer func(){
+   if closer.Close()!=nil{result.NeedsReconciliation=true;resultErr=ErrApplyUnavailable}
+  }()
  }
  if approveApply(ctx,op,initial,d.Terminal,d.Clock,d.Random)!=nil{
   return zero,ErrAuthorizationDenied
@@ -87,8 +97,8 @@ func RunLockedCandidate(ctx context.Context,op executorjournal.Operation,d Locke
  if err!=nil||!matchesOperation(fresh,op,d.Clock())||!sameEvidence(initial,fresh){
   return zero,ErrAuthorizationDenied
  }
- environment:=&alreadyAuthorizedEnvironment{inner:d.Environment,qualify:d.Qualify,clock:d.Clock,initial:fresh}
- return RunCandidate(ctx,op,fresh,journal,environment,d.Clock)
+ authorized:=&alreadyAuthorizedEnvironment{inner:environment,qualify:d.Qualify,clock:d.Clock,initial:fresh}
+ return RunCandidate(ctx,op,fresh,journal,authorized,d.Clock)
 }
 
 type alreadyAuthorizedEnvironment struct{
