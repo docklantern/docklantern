@@ -7,7 +7,6 @@ import (
  "reflect"
  "path/filepath"
  "strings"
- "sort"
  "testing"
 
  "github.com/docklantern/docklantern/internal/executorregistration"
@@ -70,28 +69,7 @@ networks:
  if err!=nil{t.Fatalf("local trusted docker unavailable: %v",err)}
  ctx:=context.Background()
  before,err:=h.NormalizedCompose(ctx,reg,"web","")
- if err!=nil{
-  args:=[]string{"--host","unix:///var/run/docker.sock","compose",
-   "--project-directory",reg.ProjectDirectory,"-p",reg.ProjectName,
-   "-f",compose,"--env-file",env,"config","--no-env-resolution","--format","json"}
-  data,e:=h.runner.run(ctx,hostReadCommand{args:args,limit:MaxConfigBytes})
-  if e!=nil {t.Fatalf("real Compose config subprocess rejected no-env-resolution: %v",err)}
-  decoded,e:=parseNormalized(data)
-  if e!=nil{t.Fatal("real Compose JSON failed parsing")}
-  keys:=func(m map[string]any)[]string{k:=make([]string,0,len(m));for x:=range m{k=append(k,x)};sort.Strings(k);return k}
-  serviceKeys:=map[string][]string{}
-  for name,raw:=range decoded["services"].(map[string]any){
-   serviceKeys[name]=keys(raw.(map[string]any))
-  }
-  t.Fatalf("read-only feature gate rejected Compose output: top=%v services=%v networks=%v",
-   keys(decoded),serviceKeys,func()map[string][]string{
-    n:=map[string][]string{}
-    if nets,ok:=decoded["networks"].(map[string]any);ok{for name,raw:=range nets{
-     if v,ok:=raw.(map[string]any);ok{n[name]=keys(v)}
-    }}
-    return n
-   }())
- }
+ if err!=nil{t.Fatalf("real Compose baseline config failed (source/env/profiles): %v",err)}
  digest:="sha256:"+strings.Repeat("a",64)
  after,err:=h.NormalizedCompose(ctx,reg,"web","docker.io/example/hello-go@"+digest)
  if err!=nil{t.Fatalf("real Compose stdin override failed: %v",err)}
