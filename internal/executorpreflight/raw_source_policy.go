@@ -59,6 +59,6 @@ func ValidateRawComposeSource(data []byte) error {
   }
   if line=="services:"{foundServices=true}
  }
- if !foundServices{return ErrUntrustedComposeSyntax}
+ if !foundServices||validateRawStructure(string(data))!=nil{return ErrUntrustedComposeSyntax}
  return nil
 }
