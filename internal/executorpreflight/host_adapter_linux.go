@@ -123,8 +123,8 @@ func (h *HostReadOnlyAdapter) InspectActual(ctx context.Context,reg executorregi
    "--filter","label=com.docker.compose.service="+service,
    "--format","{{.ID}}"},limit:256})
  if err!=nil{return empty,ErrHostEvidenceUnavailable}
- id:=strings.TrimSpace(string(names))
- if !validContainerID(id)||strings.ContainsAny(string(names),"\r\n\t "){
+ id:=strings.TrimSuffix(string(names),"\n")
+ if !validContainerID(id){
   return empty,ErrHostEvidenceUnavailable
  }
  data,err:=h.runner.run(ctx,hostReadCommand{
@@ -145,7 +145,13 @@ func (h *HostReadOnlyAdapter) InspectActual(ctx context.Context,reg executorregi
   found.Config.Labels["com.docker.compose.service"]!=service{return empty,ErrHostEvidenceUnavailable}
  // This fingerprint is a hash of the complete inspected identity/labels,
  // not the Compose config fingerprint. It is refreshed on each qualification.
- hash:=sha256.Sum256(data)
+ stable,_:=json.Marshal(struct {
+  ID string
+  Image string
+  Project string
+  Service string
+ }{found.ID,found.Image,reg.ProjectName,service})
+ hash:=sha256.Sum256(stable)
  return Actual{ContainerID:found.ID,ImageID:found.Image,
   SourceFingerprint:"sha256:"+hex.EncodeToString(hash[:]),CheckedAt:h.clock()},nil
 }
