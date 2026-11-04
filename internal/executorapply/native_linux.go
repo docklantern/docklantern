@@ -56,6 +56,8 @@ func(w *limitWriter)Write(b []byte)(int,error){
 func approvedNativeArgs(args []string)bool{
  if len(args)<4||args[0]!="--host"||args[1]!=executorhost.LocalSocket{return false}
  switch args[2]{
+ case "version":
+  return len(args)==5&&args[3]=="--format"&&args[4]=="{{json .Server}}"
  case "pull":
   return len(args)==4&&approvedDigestImage(args[3])
  case "image":
@@ -163,6 +165,26 @@ func (h *HostEffects)run(ctx context.Context,args []string,stdin []byte,limit in
  if h==nil||h.runner==nil{return nil,ErrNativeEffect}
  return h.runner.run(ctx,nativeCommand{args:append([]string{"--host",executorhost.LocalSocket},args...),stdin:stdin,limit:limit})
 }
+
+// requirePinnedHostVersion checks the exact beta.6 test-VPS Docker Engine
+// and API contract. A different runner version fails closed until a separate
+// compatibility acceptance is explicitly reviewed.
+func (h *HostEffects)requirePinnedHostVersion(ctx context.Context)error{
+ out,err:=h.run(ctx,[]string{"version","--format","{{json .Server}}"},nil,2048)
+ if err!=nil{return ErrNativeEffect}
+ var server struct{
+  Version string `json:"Version"`
+  API string `json:"ApiVersion"`
+  OS string `json:"Os"`
+  Arch string `json:"Arch"`
+ }
+ if json.Unmarshal(out,&server)!=nil||server.Version!="29.8.1"||
+  server.API!="1.56"||server.OS!="linux"||server.Arch!="amd64"{
+  return ErrNativeEffect
+ }
+ return nil
+}
+
 func(h *HostEffects)ReviewApply(_ context.Context,_ executorjournal.Operation,_ executorpreflight.Qualification)error{
  // The independent gate, not this environment, owns human approval.
  return ErrNativeEffect
@@ -176,7 +198,7 @@ func(h *HostEffects)Requalify(ctx context.Context,_ executorjournal.Operation,q 
  return nil
 }
 func(h *HostEffects)PullImmutable(ctx context.Context,_ executorjournal.Operation)error{
- if h==nil||h.pulledImageID!=""||ctx==nil||ctx.Err()!=nil{return ErrNativeEffect}
+ if h==nil||h.pulledImageID!=""||ctx==nil||ctx.Err()!=nil||h.requirePinnedHostVersion(ctx)!=nil{return ErrNativeEffect}
  image:=h.repository+"@"+h.digest
  if _,err:=h.run(ctx,[]string{"pull",image},nil,8192);err!=nil{return ErrNativeEffect}
  output,err:=h.run(ctx,[]string{"image","inspect","--format","{{.Id}}",image},nil,256)
