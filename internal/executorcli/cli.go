@@ -51,7 +51,7 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
    fmt.Fprintln(stderr,"docklantern-executor: protected journal status unavailable")
    return ExitUnavailable
   }
-  fmt.Fprintf(stdout,"Operation: %s\\nProject: %s\\nService: %s\\nPhase: %s\\nOutcome: %s\\nBlocks new work: %t\\nManual inspection required for interrupted/uncertain updates.\\n",
+  fmt.Fprintf(stdout,"Operation: %s\nProject: %s\nService: %s\nPhase: %s\nOutcome: %s\nBlocks new work: %t\nManual inspection required for interrupted/uncertain updates.\n",
    snap.Operation.ID,snap.Operation.ProjectID,snap.Operation.ServiceID,
    snap.Operation.CurrentPhase,snap.EffectiveOutcome,snap.BlocksNewWork)
   return ExitOK
@@ -68,7 +68,7 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
    fmt.Fprintln(stderr,"docklantern-executor: apply denied or incomplete; inspect protected journal and reconcile manually")
    return ExitUnavailable
   }
-  fmt.Fprintf(stdout,"Verified immutable update committed for operation %s.\\n",result.OperationID)
+  fmt.Fprintf(stdout,"Verified immutable update committed for operation %s.\n",result.OperationID)
   return ExitOK
  }
  return RunWithDiagnostics(args, stdout, stderr, version, executorhost.DiagnoseLocal)
@@ -160,7 +160,7 @@ func RunWithQualification(args []string, stdout, stderr io.Writer, version strin
    fmt.Fprintln(stderr,"docklantern-executor: read-only qualification denied")
    return ExitUnavailable
   }
-  fmt.Fprintf(stdout,"Qualified read-only evidence for proposal %s\\nRegistration: %s\\nProposal SHA-256: %s\\nRegistration SHA-256: %s\\nService: %s\\nCandidate index digest: %s\\nPlatform manifest digest: %s\\nCompose source SHA-256: %s\\nObserved container: %s\\nObserved image: %s\\nDOCKER WRITES DISABLED; NOT DEPLOYMENT APPROVAL.\\n",
+  fmt.Fprintf(stdout,"Qualified read-only evidence for proposal %s\nRegistration: %s\nProposal SHA-256: %s\nRegistration SHA-256: %s\nService: %s\nCandidate index digest: %s\nPlatform manifest digest: %s\nCompose source SHA-256: %s\nObserved container: %s\nObserved image: %s\nDOCKER WRITES DISABLED; NOT DEPLOYMENT APPROVAL.\n",
    result.ProposalID,result.RegistrationID,result.ProposalSHA256,result.RegistrationSHA256,result.Service,result.CandidateDigest,
    result.PlatformManifestDigest,result.SourceSHA256,result.ContainerID,result.ImageID)
   return ExitOK
