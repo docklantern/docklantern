@@ -146,6 +146,21 @@ jobs:
           DOCKLANTERN_INTEGRATION_TEST: "1"
         run: bash tests/integration/run-beta3-onboarding.sh
 
+  beta6-disposable-targeted-apply:
+    # Explicit beta.6 operator authorization covers mutations on isolated CI
+    # resources ONLY. This job has no credentials or VPS access.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify isolated Docker runner and target-only replacement
+        shell: bash
+        env:
+          DOCKLANTERN_DISPOSABLE_APPLY_TEST: "1"
+        run: bash tests/integration/run-beta6-targeted-apply.sh
+
   executor-host-boundary:
     runs-on: ubuntu-latest
     timeout-minutes: 5
