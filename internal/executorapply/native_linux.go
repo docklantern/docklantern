@@ -325,3 +325,50 @@ func(h *HostEffects)Close()error{
 }
 var _ Environment=(*HostEffects)(nil)
 
+
+func(h *HostEffects)VerifiedEvidence(ctx context.Context,op executorjournal.Operation)(executorjournal.VerifiedEvidence,error){
+ var empty executorjournal.VerifiedEvidence
+ if h==nil||!h.verified||h.handoff==nil||ctx==nil||ctx.Err()!=nil||
+  h.handoff.RecheckOriginal(h.reg)!=nil||
+  op.ProjectID!=h.reg.ProjectName||op.ServiceID!=h.service||
+  op.CandidateDigest!=h.digest{return empty,ErrNativeEffect}
+ actual,err:=h.captureProject(ctx)
+ if err!=nil||len(actual)!=len(h.before){return empty,ErrNativeEffect}
+ nextID:=""
+ for id,item:=range actual{
+  if item.Config.Labels["com.docker.compose.service"]==h.service{
+   if nextID!=""||id==h.baselineContainer||item.Image!=h.pulledImageID||
+    !item.State.Running{return empty,ErrNativeEffect}
+   nextID=id
+  }else{
+   prior,exists:=h.before[id]
+   if !exists||prior.Image!=item.Image||
+    prior.State.Running!=item.State.Running||
+    !sameNativeLabels(prior.Config.Labels,item.Config.Labels)||
+    !reflect.DeepEqual(prior.NetworkSettings,item.NetworkSettings)||
+    !reflect.DeepEqual(prior.Mounts,item.Mounts){
+    return empty,ErrNativeEffect
+   }
+  }
+ }
+ if nextID==""||h.handoff.RecheckOriginal(h.reg)!=nil{return empty,ErrNativeEffect}
+ target:=actual[nextID]
+ grade:="running_only"
+ if target.State.Health!=nil{
+  if target.State.Health.Status!="healthy"{return empty,ErrNativeEffect}
+  grade="healthy"
+ }else{
+  found:=false
+  for _,s:=range h.reg.Services{
+   if s.Name==h.service&&s.AllowRunningOnly{found=true}
+  }
+  if !found{return empty,ErrNativeEffect}
+ }
+ return executorjournal.VerifiedEvidence{
+  ProjectID:op.ProjectID,ServiceID:op.ServiceID,
+  SourceSHA256:h.sourceHash,CandidateDigest:h.digest,
+  BaselineContainerID:h.baselineContainer,BaselineImageID:h.baselineImage,
+  UpdatedContainerID:nextID,UpdatedImageID:h.pulledImageID,
+  HealthGrade:grade,SiblingsUnchanged:true,
+ },nil
+}
