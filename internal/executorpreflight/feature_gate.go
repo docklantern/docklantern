@@ -46,7 +46,7 @@ func ValidateNormalizedFeatureSubset(config map[string]any) error {
    network,ok:=v.(map[string]any)
    if !ok||network["external"]!=true{return ErrNotImageOnly}
    for key:=range network{
-    if key!="name"&&key!="external"{return ErrNotImageOnly}
+    if key!="name"&&key!="external"&&key!="ipam"{return ErrNotImageOnly}
    }
   }
  }
