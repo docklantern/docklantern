@@ -154,7 +154,13 @@ type HostEffects struct{
  verified bool
 }
 func newHostEffects(reg executorregistration.Registration,q executorpreflight.Qualification,repository string,runner nativeRunner)(*HostEffects,error){
- if reg.Validate()!=nil||!reg.AllowsTarget(q.Service,repository,executorregistration.Platform{OS:"linux",Architecture:"amd64"})||
+ // beta.6 never self-updates DockLantern, its socket proxy or Traefik.
+ // Those infrastructure services need an independently designed recovery path.
+ if reg.ProjectName=="docklantern"||reg.ProjectName=="traefik"||
+  reg.ProjectName=="docker-socket-proxy"||
+  q.Service=="docklantern"||q.Service=="traefik"||
+  q.Service=="docker-socket-proxy"||
+  reg.Validate()!=nil||!reg.AllowsTarget(q.Service,repository,executorregistration.Platform{OS:"linux",Architecture:"amd64"})||
   !sameDigest(q.SourceSHA256)||!sameDigest(q.CandidateDigest)||
   !validContainerHex(q.ContainerID)||!sameDigest(q.ImageID)||
   runner==nil{return nil,ErrNativeEffect}
