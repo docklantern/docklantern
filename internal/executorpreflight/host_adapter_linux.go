@@ -110,7 +110,7 @@ func (h *HostReadOnlyAdapter) normalizedComposeSources(
  if candidate!=""{args=append(args,"-f","-")}
  for _,path:=range envFiles{args=append(args,"--env-file",path)}
  for _,profile:=range reg.Profiles{args=append(args,"--profile",profile)}
- args=append(args,"config","--format","json")
+ args=append(args,"config","--no-env-resolution","--format","json")
  out,err:=h.runner.run(ctx,hostReadCommand{args:args,stdin:override,limit:MaxConfigBytes})
  if err!=nil||len(out)==0||len(out)>MaxConfigBytes{return nil,ErrHostEvidenceUnavailable}
  normalized,err:=parseNormalized(out)
@@ -118,7 +118,7 @@ func (h *HostReadOnlyAdapter) normalizedComposeSources(
  // Reject unsupported configuration constructs even in *unselected* services.
  // Checking only the target could allow Compose to affect a sibling.
  services,ok:=normalized["services"].(map[string]any)
- if !ok||len(services)==0||len(services)>executorregistration.MaxServices{
+ if !ok||len(services)==0||len(services)>executorregistration.MaxServices||ValidateNormalizedFeatureSubset(normalized)!=nil{
   return nil,ErrHostEvidenceUnavailable
  }
  for _,s:=range services {
@@ -225,12 +225,12 @@ func approvedHostRead(args []string)bool{
  case "inspect":
   return len(args)==6&&args[3]=="--format"&&args[4]=="{{json .}}"&&validContainerID(args[5])
  case "compose":
-  if len(args)<11||args[3]!="--project-directory"||args[5]!="-p"||
-   !executorregistration.ValidID(args[6])||args[len(args)-3]!="config"||
+  if len(args)<12||args[3]!="--project-directory"||args[5]!="-p"||
+   !executorregistration.ValidID(args[6])||args[len(args)-4]!="config"||args[len(args)-3]!="--no-env-resolution"||
    args[len(args)-2]!="--format"||args[len(args)-1]!="json"{return false}
   // Caller validates registration source paths and fixed file ordering.
   // Disallow dangerous tokens anywhere inside the constructed command.
-  for _,arg:=range args[7:len(args)-3] {
+  for _,arg:=range args[7:len(args)-4] {
    if arg=="up"||arg=="pull"||arg=="down"||arg=="exec"||arg=="run"||
     arg=="build"||arg=="rm"||arg=="create"{return false}
   }
