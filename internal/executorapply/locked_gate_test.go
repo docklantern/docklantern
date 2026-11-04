@@ -164,3 +164,44 @@ func TestLockedApplyGateRejectsFutureOrExpiredEvidence(t *testing.T){
   }
  }
 }
+
+func TestLockedApplyGateBindsProtectedProposalAndRegistrationHashes(t *testing.T){
+ op,q:=sampleCandidate()
+ for _,tc:=range []struct{
+  name string
+  modify func(*executorpreflight.Qualification)
+ }{
+  {"proposal_modified",func(q *executorpreflight.Qualification){
+   q.ProposalSHA256="sha256:"+strings.Repeat("7",64)
+  }},
+  {"registration_modified",func(q *executorpreflight.Qualification){
+   q.RegistrationSHA256="sha256:"+strings.Repeat("8",64)
+  }},
+ }{
+  t.Run(tc.name,func(t *testing.T){
+   d,journal,lock,tty,calls:=testLockedDeps(op,q)
+   first:=d.Qualify
+   d.Qualify=func(ctx context.Context,id string)(executorpreflight.Qualification,error){
+    qualified,err:=first(ctx,id)
+    if *calls==2{tc.modify(&qualified)}
+    return qualified,err
+   }
+   _,err:=RunLockedCandidate(context.Background(),op,d)
+   if !errors.Is(err,ErrAuthorizationDenied)||tty.reads!=1||lock.released!=1||
+    strings.Contains(strings.Join(journal.events,"|"),"begin"){
+    t.Fatalf("changed protected authority accepted: %v %#v",err,journal.events)
+   }
+  })
+ }
+}
+
+func TestLockedApplyGateRejectsProposalHashMismatchBeforeChallenge(t *testing.T){
+ op,q:=sampleCandidate()
+ d,journal,lock,tty,_:=testLockedDeps(op,q)
+ op.ProposalSHA256="sha256:"+strings.Repeat("6",64)
+ _,err:=RunLockedCandidate(context.Background(),op,d)
+ if !errors.Is(err,ErrAuthorizationDenied)||tty.reads!=0||lock.released!=1||
+  strings.Contains(strings.Join(journal.events,"|"),"begin"){
+  t.Fatalf("changed operation proposal admitted: %v %#v",err,journal.events)
+ }
+}
