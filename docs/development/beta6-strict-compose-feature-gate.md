@@ -12,7 +12,7 @@ The feature gate rejects project-level include/configs/secrets, undeclared exten
 
 `HostReadOnlyAdapter.NormalizedCompose` now calls `docker compose config --no-env-resolution --format json`. The `--no-env-resolution` flag preserves a service's `env_file` reference for the independent feature gate, rather than silently merging contents into `environment` where its extra filesystem dependency would be invisible to a normalized-config comparison.
 
-Both GitHub Actions real Compose v2 and pinned official v5.5.1 fixtures exercise this behavior: after successful source staging/image-only comparison, an unregistered `env_file` is injected into the disposable project and **must** be rejected.
+The pinned official **Compose v5.5.1** fixture verifies that an injected service `env_file` is rejected after successful source staging and image-only comparison. The default CI Compose **v2.38.2** plugin behaves differently and does not preserve that evidence consistently; it is retained only as a read-only compatibility reference. The new `RequireSupportedCompose` gate makes `QualifyLocal` fail closed for anything except the exact tested v5.5.1 plugin. This does **not** establish an Engine/API write compatibility row.
 
 ## Critical remaining gates
 
