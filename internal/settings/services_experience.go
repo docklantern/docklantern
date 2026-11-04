@@ -235,7 +235,22 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 {{if .Service.ImageID}}<p><a class="text-action" href="{{imageURL .Service.ImageID}}">View image details</a></p>{{end}}
 <p class="helper">Docker-observed image is the reference recorded when a container was created. Pulling a newer tag or restarting the same container does not change it. The monitored registry reference can differ, especially for legacy manual policies. The application build is shown in the sidebar.</p>
 <p class="helper">A different remote digest does not prove a newer release.</p>
-<p class="helper"><strong>Deployment eligibility: not verified in the monitoring GUI.</strong> A separate trusted executor registration, exact candidate qualification, and host-local APPLY confirmation are required. <a href="/deployments">View read-only deployment activity</a>. Monitoring enrollment alone never authorizes an update.</p>
+</section>
+<section class="section panel workspace-detail" id="deployment-review" aria-labelledby="deployment-review-title">
+<h2 id="deployment-review-title">Deployment review · read-only</h2>
+<p class="helper">This is a monitoring observation, not an executable proposal. A watched tag or remote digest change is not proof of a newer, safer or deployable version.</p>
+<dl class="digest-list">
+<div><dt>Monitoring enrollment</dt><dd><span class="pill {{tone .Service.Monitoring}}">{{status .Service.Monitoring}}</span> · {{.Service.Enrollment}}<small class="subtext">Monitoring controls are independent of executor registration.</small></dd></div>
+<div><dt>Host executor registration</dt><dd>Not verified by this GUI<small class="subtext">Only a separately protected host registration can authorize an eligible project, service, platform and repository.</small></dd></div>
+<div><dt>Deployment eligibility</dt><dd><span class="pill muted">Unknown · requires host qualification</span><small class="subtext">Host preflight must validate trusted Compose sources, the exact current container and image, approved service, and immutable OCI identity.</small></dd></div>
+<div><dt>Monitored reference</dt><dd class="mono">{{if .Service.HasPolicy}}{{.Service.Image}}{{else}}No watched reference{{end}}</dd></div>
+<div><dt>Observed remote digest</dt><dd class="mono">{{if .RemoteDigest}}{{.RemoteDigest}}{{else}}Not observed{{end}}<small class="subtext">Registry evidence only. This is not a host-qualified, approved candidate.</small></dd></div>
+<div><dt>Observed deployed digest</dt><dd class="mono">{{if .DeployedDigest}}{{.DeployedDigest}}{{else}}Not verified{{end}}</dd></div>
+<div><dt>Proposed image-only change</dt><dd>Not available without independent executor qualification<small class="subtext">No Compose diff, immutable platform manifest, proposal identifier or authorization is inferred from monitoring data.</small></dd></div>
+<div><dt>Approval and execution</dt><dd>Host-local only<small class="subtext">An operator must independently review and confirm the precise candidate in the root-only executor with a controlling terminal. This page never runs Docker or approves a deployment.</small></dd></div>
+</dl>
+<p class="helper">After an authorized host operation, <a href="/deployments">review sanitized deployment Activity</a>. Missing or stale receipts mean current state is unknown; historical success is not a live Docker attestation.</p>
+
 </section>
 <section class="section panel workspace-detail" id="monitoring-controls" aria-labelledby="service-monitoring-title"><h2 id="service-monitoring-title">Monitoring configuration</h2>
 <dl class="digest-list">
