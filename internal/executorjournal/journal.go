@@ -30,6 +30,7 @@ var phases = []string{"PREPARE", "AUTHORIZE", "PREFLIGHT", "PULL", "STAGE", "APP
 // cannot complete a side-effect phase started before that restart.
 type Store struct {
 	db *sql.DB
+	maintenance *MaintenanceLease // held for the entire OpenHost Store lifetime
 	mu sync.Mutex
 	inFlight map[string]string
 }
@@ -103,9 +104,16 @@ func (s *Store) Close() error {
 	defer s.mu.Unlock()
 	if s.db == nil { return ErrUnavailable }
 	db:=s.db
+	lease:=s.maintenance
 	s.db=nil
+	s.maintenance=nil
 	s.inFlight=nil
-	if err := db.Close(); err != nil { return ErrUnavailable }
+	// Keep the shared maintenance lease until after SQLite closes, including
+	// when Close returns an error. Never leave a stale lease on the Store.
+	dbErr:=db.Close()
+	var leaseErr error
+	if lease!=nil { leaseErr=lease.Release() }
+	if dbErr!=nil || leaseErr!=nil { return ErrUnavailable }
 	return nil
 }
 
