@@ -226,7 +226,7 @@ jobs:
           set -euo pipefail
           sudo env -i HOME=/root PATH=/usr/bin:/bin \
             DOCKLANTERN_PREFLIGHT_COMPOSE_FIXTURE=1 \
-            /usr/local/go/bin/go test ./internal/executorpreflight \
+            "$(command -v go)" test ./internal/executorpreflight \
             -run TestRealComposeConfigReadOnlyRootFixture -count=1 -v
 
   secure-proposal-fixture:
