@@ -276,9 +276,14 @@ Available:
              <proposal-id>; no apply authorization or Docker writes.
   preview    Host-root + controlling-TTY informational candidate preview
              <proposal-id> (requires pre-existing protected monitor.uid)
-             No actual Docker/Compose/OCI inspection or deployment approval.\n             No deployment may be approved from a preview.
+             No actual Docker/Compose/OCI inspection or deployment approval.
+             No deployment may be approved from a preview.
 
-Host-root operations (require separate operator approval before any VPS use):\n  status     <operation-id> read-only protected journal inspection\n  apply      <proposal-id> one-time terminal-confirmed immutable update\n\nReserved (unavailable until later reviewed phases):
+Host-root operations (require separate operator approval before any VPS use):
+  status     <operation-id> read-only protected journal inspection
+  apply      <proposal-id> one-time terminal-confirmed immutable update
+
+Reserved (unavailable until later reviewed phases):
   reconcile, recover
 
 APPLY is available only in the separately installed host-root executor with an actual controlling TTY, protected registration and proposal, fixed Docker Engine/API/Compose runtime, project lock, durable journal and fresh independent read-after-write verification. No unattended deployment or automatic recovery is available.`)
