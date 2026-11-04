@@ -103,4 +103,21 @@ networks:
  if _,err=h.NormalizedComposeFromHandoff(ctx,reg,handoff,"web","");err==nil{
   t.Fatal("staged Compose accepted a changed original source")
  }
+ // A service env_file is an implicit Compose input that would not be
+ // pinned by the registered top-level source snapshot. --no-env-resolution
+ // must retain this field so that the strict feature policy rejects it.
+ implicit:=filepath.Join(project,"unregistered.env")
+ if err=os.WriteFile(implicit,[]byte("SECRET=unregistered\\n"),0o600);err!=nil{t.Fatal(err)}
+ edited:=strings.Replace(input,"    pull_policy: always",
+  "    pull_policy: always\\n    env_file:\\n      - ./unregistered.env",1)
+ if err=os.WriteFile(compose,[]byte(edited),0o600);err!=nil{t.Fatal(err)}
+ if h.RequireSupportedCompose(ctx)==nil {
+  if _,err=h.NormalizedCompose(ctx,reg,"web","");err==nil{
+   t.Fatal("Compose v5.5.1 silently resolved an unregistered service env_file")
+  }
+ } else {
+  // v2.38.2 is retained as read-only compatibility reference only.
+  // QualifyLocal explicitly refuses this version for host qualification.
+  t.Log("Compose version is outside beta.6 host qualification allowlist")
+ }
 }

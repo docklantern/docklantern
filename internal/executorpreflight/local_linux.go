@@ -67,6 +67,6 @@ func QualifyLocal(ctx context.Context,id string)(Qualification,error) {
  uid,err:=executorpreview.LoadMonitorUID()
  if err!=nil{return zero,ErrLocalQualificationUnavailable}
  reader,err:=NewHostReadOnlyAdapter()
- if err!=nil{return zero,ErrLocalQualificationUnavailable}
+ if err!=nil||reader.RequireSupportedCompose(ctx)!=nil{return zero,ErrLocalQualificationUnavailable}
  return QualifyFromSource(ctx,id,executorpreview.ProtectedSource{MonitorUID:uid},reader,time.Now)
 }

@@ -110,7 +110,7 @@ func (h *HostReadOnlyAdapter) normalizedComposeSources(
  if candidate!=""{args=append(args,"-f","-")}
  for _,path:=range envFiles{args=append(args,"--env-file",path)}
  for _,profile:=range reg.Profiles{args=append(args,"--profile",profile)}
- args=append(args,"config","--format","json")
+ args=append(args,"config","--no-env-resolution","--format","json")
  out,err:=h.runner.run(ctx,hostReadCommand{args:args,stdin:override,limit:MaxConfigBytes})
  if err!=nil||len(out)==0||len(out)>MaxConfigBytes{return nil,ErrHostEvidenceUnavailable}
  normalized,err:=parseNormalized(out)
@@ -118,7 +118,7 @@ func (h *HostReadOnlyAdapter) normalizedComposeSources(
  // Reject unsupported configuration constructs even in *unselected* services.
  // Checking only the target could allow Compose to affect a sibling.
  services,ok:=normalized["services"].(map[string]any)
- if !ok||len(services)==0||len(services)>executorregistration.MaxServices{
+ if !ok||len(services)==0||len(services)>executorregistration.MaxServices||ValidateNormalizedFeatureSubset(normalized)!=nil{
   return nil,ErrHostEvidenceUnavailable
  }
  for _,s:=range services {
@@ -126,6 +126,20 @@ func (h *HostReadOnlyAdapter) normalizedComposeSources(
   if !ok||unsupportedService(item){return nil,ErrHostEvidenceUnavailable}
  }
  return out,nil
+}
+
+// RequireSupportedCompose checks the exact observed plugin behavior approved
+// for this beta.6 read-only host qualification. The v2 CI fixture is useful
+// for baseline parity but does not preserve service env_file provenance.
+func (h *HostReadOnlyAdapter) RequireSupportedCompose(ctx context.Context) error {
+ if h==nil||h.runner==nil||ctx==nil||ctx.Err()!=nil{return ErrHostEvidenceUnavailable}
+ out,err:=h.runner.run(ctx,hostReadCommand{args:[]string{
+  "--host",executorhost.LocalSocket,"compose","version","--short",
+ },limit:64})
+ if err!=nil||strings.TrimSuffix(string(out),"\n")!="5.5.1"{
+  return ErrHostEvidenceUnavailable
+ }
+ return nil
 }
 
 // InspectActual discovers exactly one container with trusted Compose identity
@@ -225,12 +239,13 @@ func approvedHostRead(args []string)bool{
  case "inspect":
   return len(args)==6&&args[3]=="--format"&&args[4]=="{{json .}}"&&validContainerID(args[5])
  case "compose":
-  if len(args)<11||args[3]!="--project-directory"||args[5]!="-p"||
-   !executorregistration.ValidID(args[6])||args[len(args)-3]!="config"||
+  if len(args)==5 && args[3]=="version" && args[4]=="--short"{return true}
+  if len(args)<12||args[3]!="--project-directory"||args[5]!="-p"||
+   !executorregistration.ValidID(args[6])||args[len(args)-4]!="config"||args[len(args)-3]!="--no-env-resolution"||
    args[len(args)-2]!="--format"||args[len(args)-1]!="json"{return false}
   // Caller validates registration source paths and fixed file ordering.
   // Disallow dangerous tokens anywhere inside the constructed command.
-  for _,arg:=range args[7:len(args)-3] {
+  for _,arg:=range args[7:len(args)-4] {
    if arg=="up"||arg=="pull"||arg=="down"||arg=="exec"||arg=="run"||
     arg=="build"||arg=="rm"||arg=="create"{return false}
   }
