@@ -158,8 +158,12 @@ func (c publicOCIClient) token(ctx context.Context,challenge,repo string)(string
  if json.Unmarshal(data,&payload)!=nil{return "",ErrPublicOCIUnavailable}
  token:=payload.Token
  if token==""{token=payload.AccessToken}
- if len(token)==0||len(token)>maxPublicTokenLength||
-  strings.ContainsAny(token,"\x00\r\n \t"){return "",ErrPublicOCIUnavailable}
+ if len(token)==0||len(token)>maxPublicTokenLength{return "",ErrPublicOCIUnavailable}
+ for _,ch:=range token {
+  if !((ch>='a'&&ch<='z')||(ch>='A'&&ch<='Z')||
+   (ch>='0'&&ch<='9')||ch=='.'||ch=='_'||ch=='-'||
+   ch=='+'||ch=='/'||ch=='='){return "",ErrPublicOCIUnavailable}
+ }
  return token,nil
 }
 
