@@ -126,8 +126,8 @@ func RunWithQualification(args []string, stdout, stderr io.Writer, version strin
    fmt.Fprintln(stderr,"docklantern-executor: read-only qualification denied")
    return ExitUnavailable
   }
-  fmt.Fprintf(stdout,"Qualified read-only evidence for proposal %s\\nRegistration: %s\\nService: %s\\nCandidate index digest: %s\\nPlatform manifest digest: %s\\nCompose source SHA-256: %s\\nObserved container: %s\\nObserved image: %s\\nDOCKER WRITES DISABLED; NOT DEPLOYMENT APPROVAL.\\n",
-   result.ProposalID,result.RegistrationID,result.Service,result.CandidateDigest,
+  fmt.Fprintf(stdout,"Qualified read-only evidence for proposal %s\\nRegistration: %s\\nProposal SHA-256: %s\\nRegistration SHA-256: %s\\nService: %s\\nCandidate index digest: %s\\nPlatform manifest digest: %s\\nCompose source SHA-256: %s\\nObserved container: %s\\nObserved image: %s\\nDOCKER WRITES DISABLED; NOT DEPLOYMENT APPROVAL.\\n",
+   result.ProposalID,result.RegistrationID,result.ProposalSHA256,result.RegistrationSHA256,result.Service,result.CandidateDigest,
    result.PlatformManifestDigest,result.SourceSHA256,result.ContainerID,result.ImageID)
   return ExitOK
  }

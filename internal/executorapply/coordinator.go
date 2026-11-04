@@ -62,6 +62,7 @@ func RunCandidate(ctx context.Context,op executorjournal.Operation,q executorpre
   !executorregistration.ValidID(op.ProjectID)||
   !q.ReadOnly||q.ProposalID!=op.ProposalID||q.RegistrationID!=op.RegistrationID||
   q.Service!=op.ServiceID||q.CandidateDigest!=op.CandidateDigest||
+  q.ProposalSHA256!=op.ProposalSHA256||!sameDigest(q.RegistrationSHA256)||
   !sameDigest(q.SourceSHA256)||!sameDigest(q.PlatformManifestDigest)||
   !sameDigest(op.ProposalSHA256)||!sameDigest(op.CandidateDigest)||
   q.ContainerID==""||!sameDigest(q.ImageID){

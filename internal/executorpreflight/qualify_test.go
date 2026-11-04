@@ -89,7 +89,9 @@ func TestQualifyReadOnlyFullEvidence(t *testing.T){
  f:=makeQualificationFixture()
  result,err:=f.run()
  if err!=nil||!result.ReadOnly||result.CandidateDigest!=f.proposal.Proposal.Candidate.Digest||
-  result.SourceSHA256!=f.reader.source.SHA256||f.reader.sourceCalls!=2||
+  result.SourceSHA256!=f.reader.source.SHA256||
+  result.ProposalSHA256!=f.proposal.SHA256||result.RegistrationSHA256!=f.reg.SHA256||
+  f.reader.sourceCalls!=2||
   f.reader.actualCalls!=2||f.reader.composeCalls!=4 {
   t.Fatalf("complete evidence not qualified: %#v %v",result,err)
  }
