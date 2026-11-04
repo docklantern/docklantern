@@ -12,6 +12,7 @@ import (
  "time"
 
  "github.com/docklantern/docklantern/internal/executorhost"
+ "github.com/docklantern/docklantern/internal/executorjournal"
  "github.com/docklantern/docklantern/internal/executorpreflight"
  "github.com/docklantern/docklantern/internal/executorregistration"
 )
@@ -78,7 +79,7 @@ func approvedDigestImage(s string)bool{
 }
 func validContainerHex(s string)bool{
  if len(s)!=64{return false}
- for _,c:=range s{if (c<'0'||c>'9')&&(c<'a'||c<='f'){return false}}
+ for _,c:=range s{if (c<'0'||c>'9')&&(c<'a'||c>'f'){return false}}
  return true
 }
 func approvedNativeCompose(args []string)bool{
@@ -159,4 +160,161 @@ func (h *HostEffects)run(ctx context.Context,args []string,stdin []byte,limit in
  if h==nil||h.runner==nil{return nil,ErrNativeEffect}
  return h.runner.run(ctx,nativeCommand{args:append([]string{"--host",executorhost.LocalSocket},args...),stdin:stdin,limit:limit})
 }
-func(h *HostEffects)ReviewApply(_ context.Context,_ any,_ executorpreflight.Qualification)error{return ErrNativeEffect}
+func(h *HostEffects)ReviewApply(_ context.Context,_ executorjournal.Operation,_ executorpreflight.Qualification)error{
+ // The independent gate, not this environment, owns human approval.
+ return ErrNativeEffect
+}
+func(h *HostEffects)Requalify(ctx context.Context,_ executorjournal.Operation,q executorpreflight.Qualification)error{
+ if ctx==nil||ctx.Err()!=nil||h==nil||q.Service!=h.service||
+  q.CandidateDigest!=h.digest||q.SourceSHA256!=h.sourceHash||
+  q.ContainerID!=h.baselineContainer||q.ImageID!=h.baselineImage{
+  return ErrNativeEffect
+ }
+ return nil
+}
+func(h *HostEffects)PullImmutable(ctx context.Context,_ executorjournal.Operation)error{
+ if h==nil||h.pulledImageID!=""||ctx==nil||ctx.Err()!=nil{return ErrNativeEffect}
+ image:=h.repository+"@"+h.digest
+ if _,err:=h.run(ctx,[]string{"pull",image},nil,8192);err!=nil{return ErrNativeEffect}
+ output,err:=h.run(ctx,[]string{"image","inspect","--format","{{.Id}}",image},nil,256)
+ if err!=nil{return ErrNativeEffect}
+ id:=strings.TrimSpace(string(output))
+ if !sameDigest(id){return ErrNativeEffect}
+ h.pulledImageID=id
+ return nil
+}
+
+func(h *HostEffects)captureProject(ctx context.Context)(map[string]nativeObserved,error){
+ if h==nil||ctx==nil||ctx.Err()!=nil{return nil,ErrNativeEffect}
+ data,err:=h.run(ctx,[]string{"ps","--all","--no-trunc","--filter",
+  "label=com.docker.compose.project="+h.reg.ProjectName,"--format","{{.ID}}"},nil,4096)
+ if err!=nil{return nil,ErrNativeEffect}
+ result:=map[string]nativeObserved{}
+ foundTarget:=false
+ for _,id:=range strings.Fields(string(data)){
+  if !validContainerHex(id)||len(result)>=32{return nil,ErrNativeEffect}
+  raw,e:=h.run(ctx,[]string{"inspect","--format","{{json .}}","--",id},nil,65536)
+  if e!=nil{return nil,ErrNativeEffect}
+  found,e:=decodeNativeObserved(raw)
+  if e!=nil||found.ID!=id||
+   found.Config.Labels["com.docker.compose.project"]!=h.reg.ProjectName{
+   return nil,ErrNativeEffect
+  }
+  service:=found.Config.Labels["com.docker.compose.service"]
+  if !executorregistration.ValidID(service){return nil,ErrNativeEffect}
+  if service==h.service{
+   if foundTarget{return nil,ErrNativeEffect}
+   foundTarget=true
+  }
+  result[id]=found
+ }
+ if !foundTarget{return nil,ErrNativeEffect}
+ return result,nil
+}
+func(h *HostEffects)StageOverride(ctx context.Context,_ executorjournal.Operation)error{
+ if h==nil||h.handoff!=nil||h.pulledImageID==""||ctx==nil||ctx.Err()!=nil{
+  return ErrNativeEffect
+ }
+ stage,err:=executorpreflight.StageTrustedSources(h.reg)
+ if err!=nil{return ErrNativeEffect}
+ h.handoff=stage // always retain and clean this handle on later errors
+ if stage.SourceSHA256()!=h.sourceHash||stage.RecheckOriginal(h.reg)!=nil{
+  return ErrNativeEffect
+ }
+ before,err:=h.captureProject(ctx)
+ if err!=nil{return ErrNativeEffect}
+ base,ok:=before[h.baselineContainer]
+ if !ok||base.Image!=h.baselineImage||!base.State.Running||
+  base.Config.Labels["com.docker.compose.service"]!=h.service{
+  return ErrNativeEffect
+ }
+ h.before=before
+ return nil
+}
+func(h *HostEffects)ApplyTargetOnly(ctx context.Context,_ executorjournal.Operation)error{
+ if h==nil||h.handoff==nil||h.before==nil||h.pulledImageID==""||
+  ctx==nil||ctx.Err()!=nil||h.handoff.RecheckOriginal(h.reg)!=nil{
+  return ErrNativeEffect
+ }
+ current,err:=h.captureProject(ctx)
+ if err!=nil||!sameNativeProject(h.before,current){
+  return ErrNativeEffect
+ }
+ sources,envs,err:=h.handoff.FilesForReadOnlyCompose(h.reg)
+ if err!=nil{return ErrNativeEffect}
+ image:=h.repository+"@"+h.digest
+ // JSON is YAML. No interpolation, shell or untrusted text can become keys.
+ override,err:=json.Marshal(map[string]any{
+  "services":map[string]any{h.service:map[string]string{"image":image}},
+ })
+ if err!=nil{return ErrNativeEffect}
+ args:=[]string{"compose","--project-directory",h.reg.ProjectDirectory,"-p",h.reg.ProjectName}
+ for _,path:=range sources{args=append(args,"-f",path)}
+ args=append(args,"-f","-")
+ for _,path:=range envs{args=append(args,"--env-file",path)}
+ for _,profile:=range h.reg.Profiles{args=append(args,"--profile",profile)}
+ args=append(args,"up","--no-deps","--no-build","--pull","never","--force-recreate","-d",h.service)
+ if _,err=h.run(ctx,args,override,8192);err!=nil{return ErrNativeEffect}
+ return nil
+}
+func sameNativeProject(a,b map[string]nativeObserved)bool{
+ if len(a)!=len(b){return false}
+ for id,previous:=range a{
+  current,ok:=b[id]
+  if !ok||current.ID!=previous.ID||current.Image!=previous.Image||
+   current.State.Running!=previous.State.Running||
+   !sameNativeLabels(current.Config.Labels,previous.Config.Labels){
+   return false
+  }
+ }
+ return true
+}
+func sameNativeLabels(a,b map[string]string)bool{
+ if len(a)!=len(b){return false}
+ for k,v:=range a{if b[k]!=v{return false}}
+ return true
+}
+func(h *HostEffects)VerifyTargetAndSiblings(ctx context.Context,_ executorjournal.Operation)error{
+ if h==nil||h.handoff==nil||h.before==nil||h.verified||
+  ctx==nil||ctx.Err()!=nil||h.handoff.RecheckOriginal(h.reg)!=nil{
+  return ErrNativeEffect
+ }
+ actual,err:=h.captureProject(ctx)
+ if err!=nil{return ErrNativeEffect}
+ if _,still:=actual[h.baselineContainer];still{return ErrNativeEffect}
+ newCount:=0
+ for id,item:=range actual{
+  if item.Config.Labels["com.docker.compose.service"]==h.service{
+   newCount++
+   if id==h.baselineContainer||item.Image!=h.pulledImageID||
+    !item.State.Running{return ErrNativeEffect}
+   allowRunningOnly:=false
+   for _,service:=range h.reg.Services{
+    if service.Name==h.service{allowRunningOnly=service.AllowRunningOnly}
+   }
+   if item.State.Health!=nil{
+    if item.State.Health.Status!="healthy"{return ErrNativeEffect}
+   }else if !allowRunningOnly{return ErrNativeEffect}
+  }else{
+   previous,exists:=h.before[id]
+   if !exists||previous.Image!=item.Image||!previous.State.Running||
+    !item.State.Running||
+    !sameNativeLabels(previous.Config.Labels,item.Config.Labels){
+    return ErrNativeEffect
+   }
+  }
+ }
+ if newCount!=1||len(actual)!=len(h.before){return ErrNativeEffect}
+ h.verified=true
+ return nil
+}
+func(h *HostEffects)Close()error{
+ if h==nil{return ErrNativeEffect}
+ if h.handoff==nil{return nil}
+ err:=h.handoff.Close()
+ h.handoff=nil
+ if err!=nil{return ErrNativeEffect}
+ return nil
+}
+var _ Environment=(*HostEffects)(nil)
+
