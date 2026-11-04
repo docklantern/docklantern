@@ -94,6 +94,17 @@ networks:
  if !reflect.DeepEqual(originalConfig,stagedConfig){
   t.Fatal("staged Compose baseline differs from original normalization")
  }
+ // A raw Compose include is rejected *before* Compose can resolve an
+ // unregistered child file and erase its provenance in normalized JSON.
+ injected:="include:\\n  - ./extra-compose.yaml\\n"+input
+ if err=os.WriteFile(compose,[]byte(injected),0o600);err!=nil{t.Fatal(err)}
+ if _,err=CaptureTrustedSources(reg);err==nil{
+  t.Fatal("unregistered raw include accepted by trusted source capture")
+ }
+ if _,err=h.NormalizedComposeFromHandoff(ctx,reg,handoff,"web","");err==nil{
+  t.Fatal("raw include source change bypassed staged validation")
+ }
+ if err=os.WriteFile(compose,[]byte(input),0o600);err!=nil{t.Fatal(err)}
  // Real Compose source changes are detected, not treated as permission to
  // execute a stale plan. Never print raw configuration or environment.
  if err=os.WriteFile(env,[]byte("SAMPLE_VALUE=changed-value\n"),0o600);err!=nil{t.Fatal(err)}
