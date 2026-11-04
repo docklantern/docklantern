@@ -36,6 +36,30 @@ cleanup(){
 }
 trap cleanup EXIT
 
+# The application's background scanner and this fixture's separate inventory
+# process can briefly contend for the same disposable SQLite schema lock.
+# Retry ONLY this read-only inventory command on SQLite's transient busy error;
+# preserve other failures and cap attempts so persistent contention fails CI.
+inventory_read() {
+ local mode="$1" output="$2" attempt
+ local errfile="$scratch/inventory-error.txt"
+ for attempt in 1 2 3 4 5; do
+  if docker exec "$lantern" docklantern-inventory -mode "$mode" -db /data/docklantern.db > "$output" 2> "$errfile"; then
+   return 0
+  fi
+  if ! grep -Eq 'database is locked.*SQLITE_BUSY|SQLITE_BUSY.*database is locked' "$errfile"; then
+   cat "$errfile" >&2
+   return 1
+  fi
+  if [[ "$attempt" == 5 ]]; then
+   cat "$errfile" >&2
+   echo "Disposable inventory read remained locked after five attempts" >&2
+   return 1
+  fi
+  sleep 1
+ done
+}
+
 cat > "$compose" <<'YAML'
 services:
   web:
@@ -87,9 +111,9 @@ done
 docker exec "$lantern" wget -q -O - http://127.0.0.1:8787/readyz | grep -q '"status":"ready"'
 lanternID="$(docker inspect "$lantern" --format '{{.Id}}')"
 lanternStarted="$(docker inspect "$lantern" --format '{{.State.StartedAt}}')"
-docker exec "$lantern" docklantern-inventory -mode projects -db /data/docklantern.db > "$scratch/projects.json"
+inventory_read projects "$scratch/projects.json"
 jq -e 'length==0' "$scratch/projects.json" >/dev/null
-docker exec "$lantern" docklantern-inventory -mode policies -db /data/docklantern.db > "$scratch/policies.json"
+inventory_read policies "$scratch/policies.json"
 jq -e 'length==0' "$scratch/policies.json" >/dev/null
 
 # Redeploy ONLY the monitored application after DockLantern is already healthy.
@@ -103,7 +127,7 @@ labeledImageID="$(docker inspect "$labeledID" --format '{{.Image}}')"
 # A successful next PERIODIC SCAN (not a manual -mode scan) must enroll it.
 found=0
 for i in $(seq 1 95); do
- docker exec "$lantern" docklantern-inventory -mode policies -db /data/docklantern.db > "$scratch/policies.json"
+ inventory_read policies "$scratch/policies.json"
  if jq -e --arg project "$project" '
    length==1 and .[0].project==$project and .[0].service=="web"
    and .[0].interval_seconds==600
@@ -116,7 +140,7 @@ done
 if [[ "$found" != "1" ]];then echo "Timed out waiting for automatic label enrollment" >&2;exit 1;fi
 
 # Monitoring is enrollment, not Compose registration or Docker mutation.
-docker exec "$lantern" docklantern-inventory -mode projects -db /data/docklantern.db > "$scratch/projects.json"
+inventory_read projects "$scratch/projects.json"
 jq -e 'length==0' "$scratch/projects.json" >/dev/null
 [[ "$(docker inspect "$lantern" --format '{{.Id}}')" == "$lanternID" ]]
 [[ "$(docker inspect "$lantern" --format '{{.State.StartedAt}}')" == "$lanternStarted" ]]
