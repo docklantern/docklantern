@@ -64,6 +64,27 @@ func (h *HostReadOnlyAdapter) CaptureSources(_ context.Context, reg executorregi
 // This is a *read-only diagnostic*, NOT a stable-source write authorization:
 // production apply must pin the exact bytes across the future Compose up.
 func (h *HostReadOnlyAdapter) NormalizedCompose(ctx context.Context,reg executorregistration.Registration,service,candidate string)([]byte,error){
+ return h.normalizedComposeSources(ctx,reg,service,candidate,reg.ComposeFiles,reg.EnvFiles)
+}
+
+// NormalizedComposeFromHandoff runs the same *read-only* Compose validation
+// against root-private copies of trusted source files. The --project-directory
+// remains the approved original project to preserve explicitly supported
+// relative-path semantics. This does not enable Compose up or pull.
+func (h *HostReadOnlyAdapter) NormalizedComposeFromHandoff(
+ ctx context.Context,reg executorregistration.Registration,
+ handoff *SourceHandoff,service,candidate string)([]byte,error){
+ if handoff==nil||handoff.RecheckOriginal(reg)!=nil{return nil,ErrHostEvidenceUnavailable}
+ files,envs,err:=handoff.FilesForReadOnlyCompose(reg)
+ if err!=nil{return nil,ErrHostEvidenceUnavailable}
+ result,err:=h.normalizedComposeSources(ctx,reg,service,candidate,files,envs)
+ if err!=nil||handoff.RecheckOriginal(reg)!=nil{return nil,ErrHostEvidenceUnavailable}
+ return result,nil
+}
+
+func (h *HostReadOnlyAdapter) normalizedComposeSources(
+ ctx context.Context,reg executorregistration.Registration,
+ service,candidate string,composeFiles,envFiles []string)([]byte,error){
  if h==nil||h.runner==nil||ctx==nil||ctx.Err()!=nil||reg.Validate()!=nil||
   !executorregistration.ValidID(service) {return nil,ErrHostEvidenceUnavailable}
  found:=false
@@ -85,9 +106,9 @@ func (h *HostReadOnlyAdapter) NormalizedCompose(ctx context.Context,reg executor
  }
  args:=[]string{"--host",executorhost.LocalSocket,"compose",
   "--project-directory",reg.ProjectDirectory,"-p",reg.ProjectName}
- for _,path:=range reg.ComposeFiles{args=append(args,"-f",path)}
+ for _,path:=range composeFiles{args=append(args,"-f",path)}
  if candidate!=""{args=append(args,"-f","-")}
- for _,path:=range reg.EnvFiles{args=append(args,"--env-file",path)}
+ for _,path:=range envFiles{args=append(args,"--env-file",path)}
  for _,profile:=range reg.Profiles{args=append(args,"--profile",profile)}
  args=append(args,"config","--format","json")
  out,err:=h.runner.run(ctx,hostReadCommand{args:args,stdin:override,limit:MaxConfigBytes})
