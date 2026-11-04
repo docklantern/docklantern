@@ -93,8 +93,10 @@ jobs:
           set -euo pipefail
           builder="$(sed -n 's/^FROM \(golang:[^ ]*\) AS build$/\1/p' Dockerfile)"
           [[ "$builder" == golang:*@sha256:* ]] || exit 1
-          out="$(mktemp -d)"
-          trap 'rm -rf -- "$out"' EXIT
+          # Retain precisely the binary scanned in this job for review.
+          # This is a short-lived CI artifact, not an installed/released binary.
+          out="$RUNNER_TEMP/beta6-executor-artifact"
+          install -d -m 0700 "$out"
           docker run --rm \
             --mount "type=bind,source=$PWD,target=/src,readonly" \
             --mount "type=bind,source=$out,target=/out" \
@@ -108,5 +110,27 @@ jobs:
               go version -m /out/docklantern-executor
             '
           test -s "$out/docklantern-executor"
-          sha256sum "$out/docklantern-executor"
-          # Do not upload, publish, or install the ephemeral binary.
+          (
+            cd "$out"
+            sha256sum docklantern-executor > executor.sha256
+            sha256sum -c executor.sha256
+          )
+          {
+            printf 'source_commit=%s\n' "$GITHUB_SHA"
+            printf 'source_ref=%s\n' "$GITHUB_REF"
+            printf 'platform=linux/amd64\n'
+            printf 'build_container=%s\n' "$builder"
+            printf 'published=false\n'
+          } > "$out/source.txt"
+          # Inspect exactly the file that passed govulncheck -mode=binary.
+          docker run --rm --mount "type=bind,source=$out,target=/out,readonly" \
+            "$builder" go version -m /out/docklantern-executor > "$out/go-buildinfo.txt"
+          cat "$out/executor.sha256"
+      - name: Retain scanned executor and exact-source checksum for operator review (not release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: beta6-executor-linux-amd64-security-evidence
+          path: ${{ runner.temp }}/beta6-executor-artifact/
+          if-no-files-found: error
+          retention-days: 7
+
