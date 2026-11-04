@@ -145,7 +145,7 @@ func approveApply(ctx context.Context,op executorjournal.Operation,q executorpre
  challenge:=hex.EncodeToString(sum[:6])
  // Only approved identifiers/digests; never print raw Compose, env,
  // proposal JSON, registry tokens, trusted host paths or Docker logs.
- message:=fmt.Sprintf("DOCKLANTERN — HOST-LOCAL APPLY CHALLENGE\\nProject: %s\\nService: %s\\nCandidate: %s\\nSource SHA-256: %s\\nActual container: %s\\nType APPLY %s to authorize this exact candidate.\\nThis action may replace the selected service.\\n",
+ message:=fmt.Sprintf("DOCKLANTERN — HOST-LOCAL APPLY CHALLENGE\nProject: %s\nService: %s\nCandidate: %s\nSource SHA-256: %s\nActual container: %s\nType APPLY %s to authorize this exact candidate.\nThis action may replace the selected service.\n",
   op.ProjectID,q.Service,q.CandidateDigest,q.SourceSHA256,q.ContainerID,challenge)
  if tty.Print(message)!=nil{return ErrAuthorizationDenied}
  started:=now()
