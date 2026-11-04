@@ -10,6 +10,7 @@ import (
 
 	"github.com/docklantern/docklantern/internal/executorhost"
 	"github.com/docklantern/docklantern/internal/executorpreview"
+ "github.com/docklantern/docklantern/internal/executorpreflight"
 	"github.com/docklantern/docklantern/internal/executorregistration"
 )
 
@@ -29,6 +30,9 @@ type RegisterFunc func(path, previousSHA256 string) (executorregistration.Record
 // PreviewFunc displays only registered candidate metadata; it has no Docker
 // baseline inspection and cannot return any deployment authorization.
 type PreviewFunc func(proposalID string) (executorpreview.View, error)
+
+// QualifyFunc permits dependency-injected, read-only qualification tests.
+type QualifyFunc func(context.Context,string)(executorpreflight.Qualification,error)
 
 // Run is invoked only by the host CLI and never by the monitoring web service.
 // It does not provide apply/recover or any Docker mutation capability.
@@ -50,6 +54,12 @@ func RunWithActions(args []string, stdout, stderr io.Writer, version string, dia
 // RunWithPreview permits no-filesystem unit tests and keeps preview segregated
 // from registration writes and the unavailable deployment/recovery commands.
 func RunWithPreview(args []string, stdout, stderr io.Writer, version string, diagnose DiagnoseFunc, register RegisterFunc, preview PreviewFunc) int {
+ return RunWithQualification(args,stdout,stderr,version,diagnose,register,preview,executorpreflight.QualifyLocal)
+}
+
+// RunWithQualification adds an explicit read-only host qualification command.
+// It is not a deployment action or TTY confirmation of a Docker write.
+func RunWithQualification(args []string, stdout, stderr io.Writer, version string, diagnose DiagnoseFunc, register RegisterFunc, preview PreviewFunc, qualify QualifyFunc) int {
 	if len(args) == 0 {
 		usage(stderr)
 		return ExitUsage
@@ -104,6 +114,23 @@ func RunWithPreview(args []string, stdout, stderr io.Writer, version string, dia
 		fmt.Fprint(stdout, view.Render())
 		return ExitOK
 	}
+ if args[0]=="qualify" {
+  if len(args)!=2 || !executorregistration.ValidID(args[1])||qualify==nil {
+   fmt.Fprintln(stderr,"docklantern-executor: invalid read-only qualification arguments")
+   return ExitUsage
+  }
+  ctx,cancel:=context.WithTimeout(context.Background(),60*time.Second)
+  defer cancel()
+  result,err:=qualify(ctx,args[1])
+  if err!=nil||!result.ReadOnly||result.ProposalID!=args[1]{
+   fmt.Fprintln(stderr,"docklantern-executor: read-only qualification denied")
+   return ExitUnavailable
+  }
+  fmt.Fprintf(stdout,"Qualified read-only evidence for proposal %s\\nRegistration: %s\\nService: %s\\nCandidate index digest: %s\\nPlatform manifest digest: %s\\nCompose source SHA-256: %s\\nObserved container: %s\\nObserved image: %s\\nDOCKER WRITES DISABLED; NOT DEPLOYMENT APPROVAL.\\n",
+   result.ProposalID,result.RegistrationID,result.Service,result.CandidateDigest,
+   result.PlatformManifestDigest,result.SourceSHA256,result.ContainerID,result.ImageID)
+  return ExitOK
+ }
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "docklantern-executor: unexpected arguments")
 		return ExitUsage
@@ -211,6 +238,8 @@ Available:
              --file ABSOLUTE_ROOT_OWNED_JSON [--expect-sha256 sha256:OLD_HASH]
              Creates a new registration when --expect-sha256 is omitted;
              a change to an existing record requires its exact previous hash.
+  qualify    Host-root + controlling-TTY verified READ-ONLY OCI/Compose/Docker preflight
+             <proposal-id>; no apply authorization or Docker writes.
   preview    Host-root + controlling-TTY informational candidate preview
              <proposal-id> (requires pre-existing protected monitor.uid)
              No actual Docker/Compose/OCI inspection or deployment approval.
