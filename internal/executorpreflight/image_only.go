@@ -42,6 +42,17 @@ func CheckImageOnly(before,after []byte,reg executorregistration.Registration,se
  if !ok{return ErrNotImageOnly}
  afterServices,ok:=b["services"].(map[string]any)
  if !ok||len(beforeServices)!=len(afterServices){return ErrNotImageOnly}
+ // Every sibling is in the Compose project, not merely the selected service.
+ // A host-sensitive construct in an untouched service makes execution unsafe.
+ for name,serviceConfig:=range beforeServices {
+  candidateConfig,exists:=afterServices[name]
+  oldService,oldOK:=serviceConfig.(map[string]any)
+  nextService,newOK:=candidateConfig.(map[string]any)
+  if !exists||!oldOK||!newOK||
+   unsupportedService(oldService)||unsupportedService(nextService){
+   return ErrNotImageOnly
+  }
+ }
  old,ok:=beforeServices[service].(map[string]any)
  if !ok{return ErrNotImageOnly}
  newer,ok:=afterServices[service].(map[string]any)
