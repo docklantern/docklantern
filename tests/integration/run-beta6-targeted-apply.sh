@@ -35,7 +35,9 @@ for i in {1..30}; do
   sleep 1
 done
 curl --fail --silent "http://${REG}/v2/" >/dev/null
-# BuildKit may not retain the FROM image in the local image store.\ndocker pull busybox:1.36 >/dev/null\ncat >"$ROOT/first/Dockerfile" <<'DOCKERFILE'
+# BuildKit may not retain the FROM image in the local image store.
+docker pull busybox:1.36 >/dev/null
+cat >"$ROOT/first/Dockerfile" <<'DOCKERFILE'
 FROM busybox:1.36
 LABEL docklantern.fixture=old
 CMD ["sh","-c","sleep 600"]
