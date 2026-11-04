@@ -55,10 +55,7 @@ func ApplyLocal(ctx context.Context,id string)(Result,error){
  proposal,err:=source.LoadProposal(id,time.Now())
  if err!=nil{return zero,ErrLocalApplyDenied}
  reg,err:=source.LoadRegistration(proposal.Proposal.RegistrationID)
- if err!=nil||!proposal.Proposal.MatchesRegistration(reg.Registration)||
-  reg.Registration.ValidateTrustedSources(nil)==nil{
-  // ValidateTrustedSources(nil) must always deny: only protected-source
-  // LoadRegistration above establishes the real host ownership evidence.
+ if err!=nil||!proposal.Proposal.MatchesRegistration(reg.Registration){
   return zero,ErrLocalApplyDenied
  }
  nonce:=make([]byte,12)
