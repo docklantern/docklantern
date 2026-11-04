@@ -11,7 +11,6 @@ import (
  "github.com/docklantern/docklantern/internal/executorjournal"
  "github.com/docklantern/docklantern/internal/executorpreflight"
  "github.com/docklantern/docklantern/internal/executorpreview"
- "github.com/docklantern/docklantern/internal/executorproposal"
  "github.com/docklantern/docklantern/internal/executorregistration"
  "github.com/docklantern/docklantern/internal/executorreview"
 )
