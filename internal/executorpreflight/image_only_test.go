@@ -64,6 +64,14 @@ func TestImageOnlyRejectsAnyOtherChange(t *testing.T){
   {"privileged",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["privileged"]=true}},
   {"depends_on",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["depends_on"]=[]any{"worker"}}},
   {"socket_mount",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["volumes"]=[]any{"/var/run/docker.sock:/var/run/docker.sock"}}},
+  {"host_network",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["network_mode"]="host"}},
+  {"host_pid",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["pid"]="host"}},
+  {"cap_add",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["cap_add"]=[]any{"SYS_ADMIN"}}},
+  {"device",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["devices"]=[]any{"/dev/kvm:/dev/kvm"}}},
+  {"host_proc_mount",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["volumes"]=[]any{"/proc:/host-proc:ro"}}},
+  {"host_run_mount",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["volumes"]=[]any{map[string]any{"type":"bind","source":"/run/secrets","target":"/run/secrets"}}}},
+  {"sibling_host_privilege",func(b map[string]any){b["services"].(map[string]any)["worker"].(map[string]any)["network_mode"]="host"}},
+
   {"wrong_image",func(b map[string]any){b["services"].(map[string]any)["web"].(map[string]any)["image"]="docker.io/example/hello-go:latest"}},
  }
  for _,tc:=range cases{t.Run(tc.name,func(t *testing.T){
