@@ -286,5 +286,5 @@ Host-root operations (require separate operator approval before any VPS use):
 Reserved (unavailable until later reviewed phases):
   reconcile, recover
 
-APPLY is available only in the separately installed host-root executor with an actual controlling TTY, protected registration and proposal, fixed Docker Engine/API/Compose runtime, project lock, durable journal and fresh independent read-after-write verification. No unattended deployment or automatic recovery is available.`)
+The monitoring GUI has no Docker write capability.\nAPPLY is available only in the separately installed host-root executor with an actual controlling TTY, protected registration and proposal, fixed Docker Engine/API/Compose runtime, project lock, durable journal and fresh independent read-after-write verification. No unattended deployment or automatic recovery is available.`)
 }
