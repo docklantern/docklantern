@@ -80,6 +80,18 @@ SIBLING_BEFORE="$(dc ps -q sibling)"
 [[ -n "$TARGET_BEFORE" && -n "$SIBLING_BEFORE" ]]
 SIBLING_INVARIANT="$(docker inspect "$SIBLING_BEFORE" --format '{{.Id}}|{{.Image}}|{{json .Config.Labels}}|{{json .NetworkSettings.Networks}}|{{json .Mounts}}')"
 TARGET_IMAGE_BEFORE="$(docker inspect "$TARGET_BEFORE" --format '{{.Image}}')"
+# A missing immutable image with --pull never is a pre-apply denial and
+# must not disturb the previously running service or its sibling.
+MISSING="sha256:$(printf '0%.0s' {1..64})"
+if printf 'services:\\n  target:\\n    image: %s/fixture/target@%s\\n' "$REG" "$MISSING" |
+  docker compose --project-directory "$ROOT" -p "$PROJECT" \
+    -f "$ROOT/compose.yaml" -f - up --no-deps --no-build --pull never \
+    --force-recreate -d target >"$ROOT/expected-denial.log" 2>&1; then
+  echo "FAIL: nonexistent immutable candidate unexpectedly applied" >&2
+  exit 1
+fi
+[[ "$(dc ps -q target)" == "$TARGET_BEFORE" ]]
+[[ "$(dc ps -q sibling)" == "$SIBLING_BEFORE" ]]
 # Immutable candidate override via stdin, never changes user's Compose YAML.
 # --no-deps excludes Compose dependencies; --no-build prohibits builds;
 # --pull never relies only on the separately pre-pulled immutable reference.
