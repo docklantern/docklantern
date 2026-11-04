@@ -26,6 +26,7 @@ func validateRawStructure(source string) error {
  canNest:=false
  seenServices:=false
  serviceChildren:=false
+ currentRoot:=""
  for _,raw:=range strings.Split(source,"\n"){
   if strings.TrimSpace(raw)==""{continue}
   spaces:=len(raw)-len(strings.TrimLeft(raw," "))
@@ -67,8 +68,8 @@ func validateRawStructure(source string) error {
   key:=m[1]
   if frame.keys[key]{return ErrUntrustedComposeSyntax}
   frame.keys[key]=true
-  if spaces==0&&key=="services" {seenServices=true}
-  if spaces==2&&seenServices&&len(stack)>1&&stack[0].keys["services"]{
+  if spaces==0{currentRoot=key;if key=="services"{seenServices=true}}
+  if spaces==2&&currentRoot=="services"{
    // A root service name is not a recognized credential or command.
    // Effective-config checks independently validate all service fields.
    serviceChildren=true
