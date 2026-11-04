@@ -83,7 +83,7 @@ TARGET_IMAGE_BEFORE="$(docker inspect "$TARGET_BEFORE" --format '{{.Image}}')"
 # A missing immutable image with --pull never is a pre-apply denial and
 # must not disturb the previously running service or its sibling.
 MISSING="sha256:$(printf '0%.0s' {1..64})"
-if printf 'services:\\n  target:\\n    image: %s/fixture/target@%s\\n' "$REG" "$MISSING" |
+if printf 'services:\n  target:\n    image: %s/fixture/target@%s\n' "$REG" "$MISSING" |
   docker compose --project-directory "$ROOT" -p "$PROJECT" \
     -f "$ROOT/compose.yaml" -f - up --no-deps --no-build --pull never \
     --force-recreate -d target >"$ROOT/expected-denial.log" 2>&1; then
