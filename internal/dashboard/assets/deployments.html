@@ -23,7 +23,7 @@
  {{else if .Invalid}}
  <p role="alert">The executor activity feed could not be verified. Status is <strong>unknown</strong>; no receipt contents are shown.</p>
  {{else}}
- <p role="status">Showing verified, sanitized journal-derived receipt snapshots. Pending or incomplete records require host-local inspection.</p>
+ <p role="status">Showing sanitized, journal-derived historical receipts. A committed receipt records an earlier verified update, not proof that the current container still matches. Stale or incomplete evidence requires host-local inspection.</p>
  {{end}}
  <p class="helper">The monitoring GUI cannot authorize, execute or recover a Compose update. A separate host-local operator confirmation is required.</p>
  </div>
@@ -36,7 +36,7 @@
  {{range .Rows}}<tr>
  <td><strong class="mono">{{.OperationID}}</strong><small class="subtext">Candidate {{.CandidateDigest}}</small></td>
  <td class="mono">{{.Service}}</td><td>{{.Phase}}</td>
- <td><span class="pill {{if eq .Outcome "needs_reconciliation"}}warn{{else if eq .Outcome "succeeded"}}ok{{else}}muted{{end}}">{{if .Stale}}Stale · {{end}}{{if eq .Outcome "needs_reconciliation"}}Needs manual reconciliation{{else if eq .Outcome "succeeded"}}Verified update committed{{else}}Pending · not verified successful{{end}}</span></td>
+ <td><span class="pill {{if .Stale}}warn{{else if eq .Outcome "needs_reconciliation"}}warn{{else if eq .Outcome "succeeded"}}ok{{else}}muted{{end}}">{{if .Stale}}Stale receipt · current deployment state unknown{{else if eq .Outcome "needs_reconciliation"}}Needs manual reconciliation{{else if eq .Outcome "succeeded"}}Verified update committed at receipt time{{else}}Pending · not verified successful{{end}}</span></td>
  <td><time>{{.UpdatedAt}}</time></td>
  </tr>
  {{else}}<tr><td colspan="5" class="table-empty">No verified deployment receipts are available. This does not mean an update was completed or attempted.</td></tr>{{end}}
