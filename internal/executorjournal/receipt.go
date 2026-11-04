@@ -69,11 +69,23 @@ func receiptFromSnapshot(snap Snapshot) (Receipt,error) {
 		if len(snap.Events)>0 && snap.Events[len(snap.Events)-1].Kind==EventIntent {
 			code="interrupted"
 		}
-	} else if op.Outcome!=OutcomePending {
-		// No Phase 3 operation-success verification gate has been accepted.
-		// An external SQL "succeeded" claim must NOT reach the public GUI.
-		return zero,ErrReceiptUnavailable
-	}
+	} else if op.Outcome=="succeeded" {
+        // The host-native executor is the only verified success writer.
+        // A status-only SQL edit or Compose exit status is not evidence.
+        if len(snap.Events)!=16{return zero,ErrReceiptUnavailable}
+        for i,e:=range snap.Events{
+            if e.Sequence!=i+1{return zero,ErrReceiptUnavailable}
+            if i%2==0&&e.Kind!=EventIntent{return zero,ErrReceiptUnavailable}
+            if i%2==1&&e.Kind!=EventCompleted{return zero,ErrReceiptUnavailable}
+        }
+        if snap.Events[15].Phase!="COMMIT"{
+            return zero,ErrReceiptUnavailable
+        }
+        outcome="succeeded"
+        code="verified_update"
+    } else if op.Outcome!=OutcomePending {
+        return zero,ErrReceiptUnavailable
+    }
 	r:=Receipt{
 		SchemaVersion:ReceiptSchemaVersion, OperationID:op.ID,
 		ProposalID:op.ProposalID,RegistrationID:op.RegistrationID,
@@ -93,14 +105,16 @@ func (r Receipt) canonical() ([]byte,error) {
 		!executorregistration.ValidID(r.RegistrationID) ||
 		!executorregistration.ValidID(r.Service) ||
 		(r.Phase!="NONE" && phaseIndex(r.Phase)<0) ||
-		(r.Outcome!="pending" && r.Outcome!=OutcomeNeedsReconciliation) ||
+		(r.Outcome!="pending" && r.Outcome!=OutcomeNeedsReconciliation && r.Outcome!="succeeded") ||
 		!validHash(r.CandidateDigest) ||
 		(r.MessageCode!="operation_pending" && r.MessageCode!="interrupted" &&
-			r.MessageCode!="verification_incomplete") {
+			r.MessageCode!="verification_incomplete" && r.MessageCode!="verified_update") {
 		return nil,ErrReceiptUnavailable
 	}
 	if r.Outcome=="pending" && r.MessageCode!="operation_pending" ||
-		r.Outcome==OutcomeNeedsReconciliation && r.MessageCode=="operation_pending" {
+		r.Outcome==OutcomeNeedsReconciliation && r.MessageCode=="operation_pending" ||
+		r.Outcome=="succeeded" && r.MessageCode!="verified_update" ||
+		r.Outcome!="succeeded" && r.MessageCode=="verified_update" {
 		return nil,ErrReceiptUnavailable
 	}
 	ts,err:=time.Parse(time.RFC3339Nano,r.UpdatedAt)

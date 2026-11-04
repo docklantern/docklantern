@@ -160,3 +160,13 @@ func (h *SourceHandoff) Close()error{
  if err:=os.RemoveAll(h.directory);err!=nil{return ErrSourceHandoff}
  return nil
 }
+
+// SourceSHA256 is the exact verified registration source fingerprint.
+// It is read-only evidence, not permission to execute or promote a write.
+func (h *SourceHandoff) SourceSHA256() string {
+ if h==nil{return ""}
+ h.mu.Lock()
+ defer h.mu.Unlock()
+ if h.closed{return ""}
+ return h.original.SHA256
+}

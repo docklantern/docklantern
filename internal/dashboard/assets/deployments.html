@@ -36,7 +36,7 @@
  {{range .Rows}}<tr>
  <td><strong class="mono">{{.OperationID}}</strong><small class="subtext">Candidate {{.CandidateDigest}}</small></td>
  <td class="mono">{{.Service}}</td><td>{{.Phase}}</td>
- <td><span class="pill {{if eq .Outcome "needs_reconciliation"}}warn{{else}}muted{{end}}">{{if .Stale}}Stale · {{end}}{{if eq .Outcome "needs_reconciliation"}}Needs manual reconciliation{{else}}Pending · not verified successful{{end}}</span></td>
+ <td><span class="pill {{if eq .Outcome "needs_reconciliation"}}warn{{else if eq .Outcome "succeeded"}}ok{{else}}muted{{end}}">{{if .Stale}}Stale · {{end}}{{if eq .Outcome "needs_reconciliation"}}Needs manual reconciliation{{else if eq .Outcome "succeeded"}}Verified update committed{{else}}Pending · not verified successful{{end}}</span></td>
  <td><time>{{.UpdatedAt}}</time></td>
  </tr>
  {{else}}<tr><td colspan="5" class="table-empty">No verified deployment receipts are available. This does not mean an update was completed or attempted.</td></tr>{{end}}

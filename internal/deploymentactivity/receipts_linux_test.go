@@ -22,6 +22,7 @@ func writeFixture(t *testing.T,dir,id,outcome string,at time.Time){
   MessageCode:"operation_pending",
  }
  if outcome=="needs_reconciliation"{record.MessageCode="verification_incomplete"}
+ if outcome=="succeeded"{record.Phase="COMMIT";record.MessageCode="verified_update"}
  b,e:=json.Marshal(record)
  if e!=nil{t.Fatal(e)}
  if e=os.WriteFile(filepath.Join(dir,id+"-v1.json"),b,0o644);e!=nil{t.Fatal(e)}
@@ -72,4 +73,14 @@ func TestReceiptMirrorRejectsForgedOrUnsafeEntries(t *testing.T){
    t.Fatalf("unsafe receipt mirror accepted: %#v %v",v,e)
   }
  })}
+}
+
+func TestCanonicalVerifiedReceiptIsDistinguishedFromPending(t *testing.T){
+ dir:=t.TempDir()
+ now:=time.Now().UTC()
+ writeFixture(t,dir,"operation-success","succeeded",now)
+ rows,err:=readAt(dir,now,uint32(os.Geteuid()))
+ if err!=nil||len(rows.Rows)!=1||rows.Rows[0].Outcome!="succeeded"||rows.Rows[0].Stale{
+  t.Fatalf("verified success receipt was not classified correctly: %#v %v",rows,err)
+ }
 }

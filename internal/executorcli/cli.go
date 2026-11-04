@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/docklantern/docklantern/internal/executorhost"
+ "github.com/docklantern/docklantern/internal/executorapply"
+ "github.com/docklantern/docklantern/internal/executorjournal"
 	"github.com/docklantern/docklantern/internal/executorpreview"
  "github.com/docklantern/docklantern/internal/executorpreflight"
 	"github.com/docklantern/docklantern/internal/executorregistration"
@@ -37,7 +39,39 @@ type QualifyFunc func(context.Context,string)(executorpreflight.Qualification,er
 // Run is invoked only by the host CLI and never by the monitoring web service.
 // It does not provide apply/recover or any Docker mutation capability.
 func Run(args []string, stdout, stderr io.Writer, version string) int {
-	return RunWithDiagnostics(args, stdout, stderr, version, executorhost.DiagnoseLocal)
+ if len(args)>0&&args[0]=="status"{
+  if len(args)!=2||!executorregistration.ValidID(args[1]){
+   fmt.Fprintln(stderr,"docklantern-executor: status requires one operation ID")
+   return ExitUsage
+  }
+  ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second)
+  defer cancel()
+  snap,err:=executorjournal.StatusLocal(ctx,args[1])
+  if err!=nil{
+   fmt.Fprintln(stderr,"docklantern-executor: protected journal status unavailable")
+   return ExitUnavailable
+  }
+  fmt.Fprintf(stdout,"Operation: %s\nProject: %s\nService: %s\nPhase: %s\nOutcome: %s\nBlocks new work: %t\nManual inspection required for interrupted/uncertain updates.\n",
+   snap.Operation.ID,snap.Operation.ProjectID,snap.Operation.ServiceID,
+   snap.Operation.CurrentPhase,snap.EffectiveOutcome,snap.BlocksNewWork)
+  return ExitOK
+ }
+ if len(args)>0&&args[0]=="apply"{
+  if len(args)!=2||!executorregistration.ValidID(args[1]){
+   fmt.Fprintln(stderr,"docklantern-executor: apply requires exactly one opaque proposal ID")
+   return ExitUsage
+  }
+  ctx,cancel:=context.WithTimeout(context.Background(),5*time.Minute)
+  defer cancel()
+  result,err:=executorapply.ApplyLocal(ctx,args[1])
+  if err!=nil||result.NeedsReconciliation{
+   fmt.Fprintln(stderr,"docklantern-executor: apply denied or incomplete; inspect protected journal and reconcile manually")
+   return ExitUnavailable
+  }
+  fmt.Fprintf(stdout,"Verified immutable update committed for operation %s.\n",result.OperationID)
+  return ExitOK
+ }
+ return RunWithDiagnostics(args, stdout, stderr, version, executorhost.DiagnoseLocal)
 }
 
 // RunWithDiagnostics supports deterministic, Docker-free unit tests.
@@ -126,7 +160,7 @@ func RunWithQualification(args []string, stdout, stderr io.Writer, version strin
    fmt.Fprintln(stderr,"docklantern-executor: read-only qualification denied")
    return ExitUnavailable
   }
-  fmt.Fprintf(stdout,"Qualified read-only evidence for proposal %s\\nRegistration: %s\\nProposal SHA-256: %s\\nRegistration SHA-256: %s\\nService: %s\\nCandidate index digest: %s\\nPlatform manifest digest: %s\\nCompose source SHA-256: %s\\nObserved container: %s\\nObserved image: %s\\nDOCKER WRITES DISABLED; NOT DEPLOYMENT APPROVAL.\\n",
+  fmt.Fprintf(stdout,"Qualified read-only evidence for proposal %s\nRegistration: %s\nProposal SHA-256: %s\nRegistration SHA-256: %s\nService: %s\nCandidate index digest: %s\nPlatform manifest digest: %s\nCompose source SHA-256: %s\nObserved container: %s\nObserved image: %s\nDOCKER WRITES DISABLED; NOT DEPLOYMENT APPROVAL.\n",
    result.ProposalID,result.RegistrationID,result.ProposalSHA256,result.RegistrationSHA256,result.Service,result.CandidateDigest,
    result.PlatformManifestDigest,result.SourceSHA256,result.ContainerID,result.ImageID)
   return ExitOK
@@ -225,7 +259,7 @@ func parseDiagnosticArgs(args []string) (executorhost.DiagnosticConfig, bool) {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprintln(w, `DockLantern Executor (Phase 2 read-only preview, no Docker write capability)
+	fmt.Fprintln(w, `DockLantern Executor (beta.6 host-native single-service updates; monitoring GUI remains read-only)
 Usage: docklantern-executor <command>
 
 Available:
@@ -243,9 +277,14 @@ Available:
   preview    Host-root + controlling-TTY informational candidate preview
              <proposal-id> (requires pre-existing protected monitor.uid)
              No actual Docker/Compose/OCI inspection or deployment approval.
+             No deployment may be approved from a preview.
+
+Host-root operations (require separate operator approval before any VPS use):
+  status     <operation-id> read-only protected journal inspection
+  apply      <proposal-id> one-time terminal-confirmed immutable update
 
 Reserved (unavailable until later reviewed phases):
-  status, apply, reconcile, recover
+  reconcile, recover
 
-No deployment, Docker writes, or unattended execution is available.`)
+The monitoring GUI has no Docker write capability.\nAPPLY is available only in the separately installed host-root executor with an actual controlling TTY, protected registration and proposal, fixed Docker Engine/API/Compose runtime, project lock, durable journal and fresh independent read-after-write verification. No unattended deployment or automatic recovery is available.`)
 }

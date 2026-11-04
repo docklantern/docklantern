@@ -100,11 +100,30 @@ func RunCandidate(ctx context.Context,op executorjournal.Operation,q executorpre
    return result,ErrApplyUnavailable
   }
  }
- // No COMMIT or success status: absence of the final promotion contract
- // must leave the operation unresolved, including after successful Docker
- // replacement in a disposable fixture.
- result.LastPhase="VERIFY"
- return result,ErrApplyUnavailable
+ // Only a trusted host read-after-write witness and the protected journal
+ // can promote a verified operation. A fixture or partial adapter lacking
+ // either interface retains the conservative unresolved behavior.
+ witness,hasWitness:=env.(interface{
+  VerifiedEvidence(context.Context,executorjournal.Operation)(executorjournal.VerifiedEvidence,error)
+ })
+ committer,hasCommitter:=ledger.(interface{
+  FinalizeVerified(context.Context,string,executorjournal.VerifiedEvidence,time.Time)error
+ })
+ if !hasWitness||!hasCommitter{
+  result.LastPhase="VERIFY"
+  return result,ErrApplyUnavailable
+ }
+ result.LastPhase="COMMIT"
+ if ctx.Err()!=nil||ledger.Intent(ctx,op.ID,"COMMIT",clock())!=nil{
+  return result,ErrApplyUnavailable
+ }
+ proof,err:=witness.VerifiedEvidence(ctx,op)
+ if err!=nil||ctx.Err()!=nil||committer.FinalizeVerified(ctx,op.ID,proof,clock())!=nil{
+  _=ledger.MarkUncertain(context.Background(),op.ID,"COMMIT","state_ambiguous",clock())
+  return result,ErrApplyUnavailable
+ }
+ result.NeedsReconciliation=false
+ return result,nil
 }
 func sameDigest(s string)bool{
  if len(s)!=71||s[:7]!="sha256:"{return false}

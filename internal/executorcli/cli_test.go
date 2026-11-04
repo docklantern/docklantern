@@ -23,7 +23,7 @@ func TestHelpCommands(t *testing.T) {
 		t.Run(command, func(t *testing.T) {
 			var out, errOut bytes.Buffer
 			code := Run([]string{command}, &out, &errOut, "dev")
-			if code != ExitOK || !strings.Contains(out.String(), "no Docker write capability") || errOut.Len() != 0 {
+			if code != ExitOK || !strings.Contains(out.String(), "monitoring GUI remains read-only") || errOut.Len() != 0 {
 				t.Fatalf("code=%d, stdout=%q, stderr=%q", code, out.String(), errOut.String())
 			}
 		})
@@ -31,7 +31,7 @@ func TestHelpCommands(t *testing.T) {
 }
 
 func TestUnavailableCommandsFailClosed(t *testing.T) {
-	for _, command := range []string{"status", "apply", "reconcile", "recover"} {
+	for _, command := range []string{"reconcile", "recover"} {
 		t.Run(command, func(t *testing.T) {
 			var out, errOut bytes.Buffer
 			code := Run([]string{command}, &out, &errOut, "dev")
@@ -42,6 +42,14 @@ func TestUnavailableCommandsFailClosed(t *testing.T) {
 	}
 }
 
+func TestHostOnlyCommandsRejectMissingArguments(t *testing.T) {
+ for _,args:=range [][]string{{"status"},{"apply"},{"apply","--yes"},{"status","../escape"}}{
+  var out,errOut bytes.Buffer
+  if code:=Run(args,&out,&errOut,"dev");code!=ExitUsage||out.Len()!=0{
+   t.Fatalf("unsafe or missing host arguments accepted: %q %d",args,code)
+  }
+ }
+}
 func TestUnexpectedInputsNeverExecute(t *testing.T) {
 	cases := [][]string{
 		nil,
