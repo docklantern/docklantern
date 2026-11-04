@@ -208,6 +208,27 @@ jobs:
             "$(command -v go)" test ./internal/executorpreflight \
             -run '^TestTrustedSourceSnapshot' -count=1 -v
 
+  executor-compose-readonly-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Check Docker Compose CLI availability
+        run: docker compose version
+      - name: Test disposable read-only Compose source/config contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo env -i HOME=/root PATH=/usr/bin:/bin \
+            DOCKLANTERN_PREFLIGHT_COMPOSE_FIXTURE=1 \
+            "$(command -v go)" test ./internal/executorpreflight \
+            -run TestRealComposeConfigReadOnlyRootFixture -count=1 -v
+
   secure-proposal-fixture:
     runs-on: ubuntu-latest
     timeout-minutes: 10
