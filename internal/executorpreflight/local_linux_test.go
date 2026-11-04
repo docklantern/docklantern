@@ -35,7 +35,8 @@ func TestLocalQualificationOrchestratesAndReopensTrustedInputs(t *testing.T){
  source:=&protectedQualificationFixture{proposal:f.proposal,registration:f.reg}
  q,e:=QualifyFromSource(context.Background(),f.proposal.Proposal.ProposalID,source,
   f.reader,func()time.Time{return f.now})
- if e!=nil||!q.ReadOnly||source.proposalReads!=2||source.registrationReads!=2{
+ if e!=nil||!q.ReadOnly||q.ProposalSHA256!=f.proposal.SHA256||
+  q.RegistrationSHA256!=f.reg.SHA256||source.proposalReads!=2||source.registrationReads!=2{
   t.Fatalf("read-only host qualification failed: %#v %v, source=%#v",q,e,source)
  }
 }
