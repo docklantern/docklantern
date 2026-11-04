@@ -40,7 +40,9 @@ type ReadOnlyEvidence interface {
 // NO host-local approval and cannot be presented as an executable token.
 type Qualification struct {
  ProposalID string
+ ProposalSHA256 string
  RegistrationID string
+ RegistrationSHA256 string
  Service string
  CandidateDigest string
  PlatformManifestDigest string
@@ -112,7 +114,8 @@ func Qualify(
  if err!=nil||!sameBytes(afterAgain,after){return zero,ErrQualificationDenied}
  if ctx.Err()!=nil||proposal.Proposal.Validate(now())!=nil{return zero,ErrQualificationDenied}
  return Qualification{
-  ProposalID:plan.ProposalID,RegistrationID:reg.RegistrationID,Service:plan.Service,
+  ProposalID:plan.ProposalID,ProposalSHA256:proposal.SHA256,
+  RegistrationID:reg.RegistrationID,RegistrationSHA256:registration.SHA256,Service:plan.Service,
   CandidateDigest:plan.Candidate.Digest,
   PlatformManifestDigest:proof.PlatformManifestDigest,
   SourceSHA256:second.SHA256,ContainerID:afterActual.ContainerID,
