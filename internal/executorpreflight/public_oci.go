@@ -54,7 +54,7 @@ func (c publicOCIClient) fetch(ctx context.Context,repository,indexDigest string
   return nil,nil,ErrPublicOCIUnavailable
  }
  repo:=strings.TrimPrefix(repository,"docker.io/")
- index,typ,err:=c.manifest(ctx,repo,indexDigest,indexAccept,"")
+ index,typ,err:=c.manifest(ctx,repo,indexDigest,indexAccept)
  if err!=nil||!(typ==ociIndexMediaType||typ==dockerIndexMediaType){
   return nil,nil,ErrPublicOCIUnavailable
  }
@@ -77,7 +77,7 @@ func (c publicOCIClient) fetch(ctx context.Context,repository,indexDigest string
   (selected.MediaType!=ociManifestMediaType&&selected.MediaType!=dockerManifestMediaType){
   return nil,nil,ErrPublicOCIUnavailable
  }
- manifest,manifestType,err:=c.manifest(ctx,repo,selected.Digest,manifestAccept,"")
+ manifest,manifestType,err:=c.manifest(ctx,repo,selected.Digest,manifestAccept)
  if err!=nil||manifestType!=selected.MediaType||
   int64(len(manifest))!=selected.Size{return nil,nil,ErrPublicOCIUnavailable}
  if _,err=VerifyOCIPlatformProof(index,manifest,indexDigest);err!=nil{
@@ -88,7 +88,7 @@ func (c publicOCIClient) fetch(ctx context.Context,repository,indexDigest string
 
 // GET is limited to two Docker Hub manifest endpoints. Every response is
 // bounded and hashed, including child descriptor reads; 3xx is rejected.
-func (c publicOCIClient) manifest(ctx context.Context,repo,reference,accept,unused string)([]byte,string,error){
+func (c publicOCIClient) manifest(ctx context.Context,repo,reference,accept string)([]byte,string,error){
  if !validDigest(reference)||!validRepositoryPath(repo){return nil,"",ErrPublicOCIUnavailable}
  endpoint:=dockerRegistryURL+"/v2/"+repo+"/manifests/"+reference
  request:=func(token string)(*http.Response,error){
