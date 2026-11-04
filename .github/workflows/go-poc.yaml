@@ -229,6 +229,63 @@ jobs:
             "$(command -v go)" test ./internal/executorpreflight \
             -run TestRealComposeConfigReadOnlyRootFixture -count=1 -v
 
+  executor-compose-v5-readonly-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install exact verified Compose v5.5.1 into isolated root-only Docker config
+        shell: bash
+        run: |
+          set -euo pipefail
+          plugin=/tmp/docklantern-compose-v5.5.1
+          curl --fail --location --silent --show-error --retry 2 \
+            --max-time 120 \
+            https://github.com/docker/compose/releases/download/v5.5.1/docker-compose-linux-x86_64 \
+            --output "$plugin"
+          echo "db1889184726840f75c4f9c001048430d4f25b3be3cb084d3ddd762bc0aed576  $plugin" \
+            | sha256sum --check --status
+          sudo install -d -m 0700 /var/lib/docklantern/executor/docker-config/cli-plugins
+          sudo install -m 0755 "$plugin" \
+            /var/lib/docklantern/executor/docker-config/cli-plugins/docker-compose
+          sudo env -i HOME=/var/lib/docklantern/executor \
+            DOCKER_CONFIG=/var/lib/docklantern/executor/docker-config \
+            PATH=/usr/bin:/bin \
+            docker compose version --short | grep -Fx '5.5.1'
+          rm -f "$plugin"
+      - name: Verify actual Compose v5.5.1 read-only normalized image diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo env -i HOME=/root PATH=/usr/bin:/bin \
+            DOCKLANTERN_PREFLIGHT_COMPOSE_FIXTURE=1 \
+            "$(command -v go)" test ./internal/executorpreflight \
+            -run '^TestRealComposeConfigReadOnlyRootFixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Exercise untrusted proposal inbox on disposable root-owned fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No real DockLantern paths, Docker writes, credentials, or VPS.
+          sudo env -i HOME=/root PATH=/usr/bin:/bin \
+            DOCKLANTERN_PROPOSAL_ROOT_FIXTURE=1 \
+            "$(command -v go)" test ./internal/executorproposal \
+            -run '^(TestReadInboxRootFixture|TestProposalPublicationRootFixture|TestProposalQuotaAndConcurrentPublicationRootFixture|TestProposalUnsafeFilesAndFailClosedRetentionRootFixture|TestProposalTemporaryFilesAreBoundedAndOnlyCleanedWhenOld|TestActualUnprivilegedMonitorPublisherRootFixture)$' -count=1 -v
+ -count=1 -v
+
   secure-proposal-fixture:
     runs-on: ubuntu-latest
     timeout-minutes: 10
