@@ -235,6 +235,7 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 {{if .Service.ImageID}}<p><a class="text-action" href="{{imageURL .Service.ImageID}}">View image details</a></p>{{end}}
 <p class="helper">Docker-observed image is the reference recorded when a container was created. Pulling a newer tag or restarting the same container does not change it. The monitored registry reference can differ, especially for legacy manual policies. The application build is shown in the sidebar.</p>
 <p class="helper">A different remote digest does not prove a newer release.</p>
+<p class="helper"><strong>Deployment eligibility: not verified in the monitoring GUI.</strong> A separate trusted executor registration, exact candidate qualification, and host-local APPLY confirmation are required. <a href="/deployments">View read-only deployment activity</a>. Monitoring enrollment alone never authorizes an update.</p>
 </section>
 <section class="section panel workspace-detail" id="monitoring-controls" aria-labelledby="service-monitoring-title"><h2 id="service-monitoring-title">Monitoring configuration</h2>
 <dl class="digest-list">
