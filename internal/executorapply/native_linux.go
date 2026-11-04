@@ -8,6 +8,7 @@ import (
  "io"
  "os"
  "os/exec"
+ "reflect"
  "strings"
  "time"
 
@@ -119,6 +120,8 @@ type nativeObserved struct{
  ID string `json:"Id"`
  Image string `json:"Image"`
  Config struct{Labels map[string]string `json:"Labels"`} `json:"Config"`
+ NetworkSettings json.RawMessage `json:"NetworkSettings"`
+ Mounts json.RawMessage `json:"Mounts"`
  State struct{
   Running bool `json:"Running"`
   Health *struct{Status string `json:"Status"`} `json:"Health"`
@@ -263,7 +266,9 @@ func sameNativeProject(a,b map[string]nativeObserved)bool{
   current,ok:=b[id]
   if !ok||current.ID!=previous.ID||current.Image!=previous.Image||
    current.State.Running!=previous.State.Running||
-   !sameNativeLabels(current.Config.Labels,previous.Config.Labels){
+   !sameNativeLabels(current.Config.Labels,previous.Config.Labels)||
+   !reflect.DeepEqual(current.NetworkSettings,previous.NetworkSettings)||
+   !reflect.DeepEqual(current.Mounts,previous.Mounts){
    return false
   }
  }
@@ -299,7 +304,9 @@ func(h *HostEffects)VerifyTargetAndSiblings(ctx context.Context,_ executorjourna
    previous,exists:=h.before[id]
    if !exists||previous.Image!=item.Image||!previous.State.Running||
     !item.State.Running||
-    !sameNativeLabels(previous.Config.Labels,item.Config.Labels){
+    !sameNativeLabels(previous.Config.Labels,item.Config.Labels)||
+    !reflect.DeepEqual(previous.NetworkSettings,item.NetworkSettings)||
+    !reflect.DeepEqual(previous.Mounts,item.Mounts){
     return ErrNativeEffect
    }
   }
