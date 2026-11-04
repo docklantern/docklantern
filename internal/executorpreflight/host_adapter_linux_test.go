@@ -9,7 +9,6 @@ import (
  "time"
 
  "github.com/docklantern/docklantern/internal/executorhost"
- "github.com/docklantern/docklantern/internal/executorregistration"
 )
 
 type hostFixtureRunner struct {
