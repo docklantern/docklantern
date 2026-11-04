@@ -68,7 +68,8 @@ func sampleCandidate()(executorjournal.Operation,executorpreflight.Qualification
   CandidateDigest:digest("b"),CreatedAt:at,
  }
  q:=executorpreflight.Qualification{
-  ProposalID:op.ProposalID,RegistrationID:op.RegistrationID,
+  ProposalID:op.ProposalID,ProposalSHA256:op.ProposalSHA256,
+  RegistrationID:op.RegistrationID,RegistrationSHA256:digest("9"),
   Service:op.ServiceID,CandidateDigest:op.CandidateDigest,
   SourceSHA256:digest("c"),PlatformManifestDigest:digest("d"),
   ImageID:digest("e"),ContainerID:strings.Repeat("f",64),
@@ -127,6 +128,8 @@ func TestJournaledCoordinatorRequiresQualificationBeforeBegin(t *testing.T){
   func(o *executorjournal.Operation,q *executorpreflight.Qualification){q.Service="sibling"},
   func(o *executorjournal.Operation,q *executorpreflight.Qualification){o.Kind="recover"},
   func(o *executorjournal.Operation,q *executorpreflight.Qualification){o.ProposalSHA256="short"},
+  func(o *executorjournal.Operation,q *executorpreflight.Qualification){q.ProposalSHA256="sha256:"+strings.Repeat("8",64)},
+  func(o *executorjournal.Operation,q *executorpreflight.Qualification){q.RegistrationSHA256="sha256:"+strings.Repeat("Z",64)},
   func(o *executorjournal.Operation,q *executorpreflight.Qualification){o.ProjectID="../escape"},
  }
  for i,f:=range cases{
