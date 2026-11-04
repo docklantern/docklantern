@@ -34,9 +34,9 @@ type hostReadRunner interface {
  run(context.Context,hostReadCommand)([]byte,error)
 }
 
-// HostReadOnlyAdapter implements only source, config and Docker actual reads.
-// The OCI FetchOCI method deliberately fails closed until public-registry
-// identity retrieval is independently implemented and reviewed.
+// HostReadOnlyAdapter implements source, config, Docker actual and
+// restricted anonymous Docker Hub OCI evidence reads. It cannot authorize
+// updates or mutate Docker resources.
 type HostReadOnlyAdapter struct {
  runner hostReadRunner
  clock func()time.Time
