@@ -139,7 +139,7 @@ func Handler(s Reader)http.Handler{
  mux.HandleFunc("GET /deployments",func(w http.ResponseWriter,r *http.Request){
   now:=time.Now().UTC()
   snapshot,err:=deploymentactivity.Read(now)
-  v:=deploymentView{ActivePage:"deployments",Unavailable:!snapshot.Available,Invalid:err!=nil}
+  v:=deploymentView{ActivePage:"deployments",Unavailable:err==nil&&!snapshot.Available,Invalid:err!=nil}
   if err==nil{v.Rows=snapshot.Rows}
   w.Header().Set("Content-Type","text/html; charset=utf-8")
   w.Header().Set("Cache-Control","no-store")
