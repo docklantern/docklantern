@@ -93,14 +93,14 @@ func (r Receipt) canonical() ([]byte,error) {
 		!executorregistration.ValidID(r.RegistrationID) ||
 		!executorregistration.ValidID(r.Service) ||
 		(r.Phase!="NONE" && phaseIndex(r.Phase)<0) ||
-		(r.Outcome!="pending" && r.Outcome!=OutcomeNeedsReconciliation) ||
+		(r.Outcome!="pending" && r.Outcome!=OutcomeNeedsReconciliation && r.Outcome!="succeeded") ||
 		!validHash(r.CandidateDigest) ||
 		(r.MessageCode!="operation_pending" && r.MessageCode!="interrupted" &&
-			r.MessageCode!="verification_incomplete") {
+			r.MessageCode!="verification_incomplete" && r.MessageCode!="verified_update") {
 		return nil,ErrReceiptUnavailable
 	}
 	if r.Outcome=="pending" && r.MessageCode!="operation_pending" ||
-		r.Outcome==OutcomeNeedsReconciliation && r.MessageCode=="operation_pending" {
+		r.Outcome==OutcomeNeedsReconciliation && r.MessageCode=="operation_pending" ||\n  r.Outcome=="succeeded" && r.MessageCode!="verified_update" ||\n  r.Outcome!="succeeded" && r.MessageCode=="verified_update" {
 		return nil,ErrReceiptUnavailable
 	}
 	ts,err:=time.Parse(time.RFC3339Nano,r.UpdatedAt)
