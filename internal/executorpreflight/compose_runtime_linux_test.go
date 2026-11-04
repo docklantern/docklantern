@@ -4,6 +4,7 @@ import (
  "context"
  "os"
  "os/exec"
+ "reflect"
  "path/filepath"
  "strings"
  "testing"
@@ -76,10 +77,30 @@ networks:
   t.Fatalf("real Compose config differs beyond selected image: %v",err)
  }
  if err=RecheckTrustedSources(reg,start);err!=nil{t.Fatalf("no-change source drift: %v",err)}
+ // Consume immutable private Compose/env copies while explicitly retaining
+ // the original approved project directory and image-only semantics.
+ handoff,err:=stageTrustedSourcesAt(reg,"/root")
+ if err!=nil{t.Fatalf("root-private handoff failed: %v",err)}
+ defer handoff.Close()
+ stagedBefore,err:=h.NormalizedComposeFromHandoff(ctx,reg,handoff,"web","")
+ if err!=nil{t.Fatalf("real Compose staged baseline failed: %v",err)}
+ stagedAfter,err:=h.NormalizedComposeFromHandoff(ctx,reg,handoff,"web","docker.io/example/hello-go@"+digest)
+ if err!=nil{t.Fatalf("real Compose staged candidate failed: %v",err)}
+ if err=CheckImageOnly(stagedBefore,stagedAfter,reg,"web","docker.io/example/hello-go",digest);err!=nil{
+  t.Fatalf("staged Compose changed non-image configuration: %v",err)
+ }
+ originalConfig,_:=parseNormalized(before)
+ stagedConfig,_:=parseNormalized(stagedBefore)
+ if !reflect.DeepEqual(originalConfig,stagedConfig){
+  t.Fatal("staged Compose baseline differs from original normalization")
+ }
  // Real Compose source changes are detected, not treated as permission to
  // execute a stale plan. Never print raw configuration or environment.
  if err=os.WriteFile(env,[]byte("SAMPLE_VALUE=changed-value\n"),0o600);err!=nil{t.Fatal(err)}
  if err=RecheckTrustedSources(reg,start);err==nil{
   t.Fatal("changed Compose interpolation source accepted")
+ }
+ if _,err=h.NormalizedComposeFromHandoff(ctx,reg,handoff,"web","");err==nil{
+  t.Fatal("staged Compose accepted a changed original source")
  }
 }
