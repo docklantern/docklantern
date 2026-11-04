@@ -44,7 +44,8 @@ func TestHostComposeConfigReadOnlyAndControlled(t *testing.T){
   if call.args[0]!="--host"||call.args[1]!=executorhost.LocalSocket||
    call.args[2]!="compose"||call.args[3]!="--project-directory"||
    call.args[4]!=reg.ProjectDirectory||call.args[6]!=reg.ProjectName||
-   call.args[len(call.args)-3]!="config" {t.Fatalf("unsafe Compose invocation: %#v",call.args)}
+   call.args[len(call.args)-4]!="config"||
+   call.args[len(call.args)-3]!="--no-env-resolution" {t.Fatalf("unsafe Compose invocation: %#v",call.args)}
  }
 }
 
