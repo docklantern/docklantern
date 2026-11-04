@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Read-only DockLantern deployment receipt activity">
+<title>Deployment Activity · DockLantern</title>
+<link rel="stylesheet" href="/assets/dashboard.css">
+</head>
+<body>
+{{template "shell-start" .}}
+<header class="topbar">
+ <div><p class="eyebrow">BETA.6 / ACTIVITY</p><h1>Deployment Activity</h1>
+ <p class="muted">Sanitized executor receipts only. Registry observations and Compose exit codes are never proof of successful deployment.</p></div>
+ <div class="top-actions"><span class="readonly">NO WEB EXECUTION</span></div>
+</header>
+<section class="section" aria-labelledby="deploy-status">
+ <div class="panel">
+ <h2 id="deploy-status">Host executor status</h2>
+ {{if .Unavailable}}
+ <p role="status">No verified, read-only executor receipt feed is mounted. Deployment status is <strong>unknown</strong>, not successful or failed. Monitoring remains available.</p>
+ {{else if .Invalid}}
+ <p role="alert">The executor activity feed could not be verified. Status is <strong>unknown</strong>; no receipt contents are shown.</p>
+ {{else}}
+ <p role="status">Showing verified, sanitized journal-derived receipt snapshots. Pending or incomplete records require host-local inspection.</p>
+ {{end}}
+ <p class="helper">The monitoring GUI cannot authorize, execute or recover a Compose update. A separate host-local operator confirmation is required.</p>
+ </div>
+</section>
+<section class="section" aria-labelledby="receipt-title">
+ <div class="section-head"><div><p class="eyebrow">READ-ONLY RECEIPTS</p><h2 id="receipt-title">Recent operations</h2></div></div>
+ <div class="panel table-scroll"><table class="overview-table">
+ <thead><tr><th scope="col">Operation</th><th scope="col">Service</th><th scope="col">Phase</th><th scope="col">Evidence status</th><th scope="col">Updated (UTC)</th></tr></thead>
+ <tbody>
+ {{range .Rows}}<tr>
+ <td><strong class="mono">{{.OperationID}}</strong><small class="subtext">Candidate {{.CandidateDigest}}</small></td>
+ <td class="mono">{{.Service}}</td><td>{{.Phase}}</td>
+ <td><span class="pill {{if eq .Outcome "needs_reconciliation"}}warn{{else}}muted{{end}}">{{if .Stale}}Stale · {{end}}{{if eq .Outcome "needs_reconciliation"}}Needs manual reconciliation{{else}}Pending · not verified successful{{end}}</span></td>
+ <td><time>{{.UpdatedAt}}</time></td>
+ </tr>
+ {{else}}<tr><td colspan="5" class="table-empty">No verified deployment receipts are available. This does not mean an update was completed or attempted.</td></tr>{{end}}
+ </tbody></table></div>
+</section>
+<footer><span>DockLantern · beta.6 deployment evidence preview</span><span>Host-local CLI required · no automatic deploy or rollback</span></footer>
+{{template "shell-end" .}}
+</body>
+</html>

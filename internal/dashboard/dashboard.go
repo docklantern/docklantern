@@ -11,12 +11,13 @@ import (
  "time"
 
  "github.com/docklantern/docklantern/internal/layout"
+ "github.com/docklantern/docklantern/internal/deploymentactivity"
  "github.com/docklantern/docklantern/internal/presentation"
  "github.com/docklantern/docklantern/internal/store"
  "github.com/docklantern/docklantern/internal/updates"
 )
 
-//go:embed assets/dashboard.html assets/dashboard.css
+//go:embed assets/dashboard.html assets/dashboard.css assets/deployments.html
 var assets embed.FS
 
 var page = template.Must(layout.WithShell(template.Must(template.New("dashboard.html").Funcs(template.FuncMap{
@@ -37,6 +38,16 @@ var page = template.Must(layout.WithShell(template.Must(template.New("dashboard.
  "eventKind":presentation.EventKind,
  "eventScope":presentation.EventScope,
 }).ParseFS(assets,"assets/dashboard.html"))))
+
+var deploymentPage = template.Must(layout.WithShell(template.Must(template.New("deployments.html").ParseFS(assets,"assets/deployments.html"))))
+
+type deploymentView struct {
+ ActivePage string
+ MainClass string
+ Rows []deploymentactivity.Row
+ Unavailable bool
+ Invalid bool
+}
 
 // Reader intentionally retains the existing API-facing interface. Additional
 // methods are optional for test doubles and older API readers, while Store
@@ -124,6 +135,20 @@ func Handler(s Reader)http.Handler{
   w.Header().Set("Cache-Control","public, max-age=3600")
   w.Header().Set("X-Content-Type-Options","nosniff")
   _,_=w.Write(css)
+ })
+ mux.HandleFunc("GET /deployments",func(w http.ResponseWriter,r *http.Request){
+  now:=time.Now().UTC()
+  snapshot,err:=deploymentactivity.Read(now)
+  v:=deploymentView{ActivePage:"deployments",Unavailable:err==nil&&!snapshot.Available,Invalid:err!=nil}
+  if err==nil{v.Rows=snapshot.Rows}
+  w.Header().Set("Content-Type","text/html; charset=utf-8")
+  w.Header().Set("Cache-Control","no-store")
+  w.Header().Set("X-Content-Type-Options","nosniff")
+  w.Header().Set("Referrer-Policy","no-referrer")
+  w.Header().Set("Content-Security-Policy","default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+  if err:=deploymentPage.ExecuteTemplate(w,"deployments.html",v);err!=nil{
+   return
+  }
  })
  mux.HandleFunc("GET /",func(w http.ResponseWriter,r *http.Request){
   if r.URL.Path!="/"{http.NotFound(w,r);return}
