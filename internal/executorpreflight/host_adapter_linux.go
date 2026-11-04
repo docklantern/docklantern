@@ -128,6 +128,20 @@ func (h *HostReadOnlyAdapter) normalizedComposeSources(
  return out,nil
 }
 
+// RequireSupportedCompose checks the exact observed plugin behavior approved
+// for this beta.6 read-only host qualification. The v2 CI fixture is useful
+// for baseline parity but does not preserve service env_file provenance.
+func (h *HostReadOnlyAdapter) RequireSupportedCompose(ctx context.Context) error {
+ if h==nil||h.runner==nil||ctx==nil||ctx.Err()!=nil{return ErrHostEvidenceUnavailable}
+ out,err:=h.runner.run(ctx,hostReadCommand{args:[]string{
+  "--host",executorhost.LocalSocket,"compose","version","--short",
+ },limit:64})
+ if err!=nil||strings.TrimSuffix(string(out),"\\n")!="5.5.1"{
+  return ErrHostEvidenceUnavailable
+ }
+ return nil
+}
+
 // InspectActual discovers exactly one container with trusted Compose identity
 // labels, then inspects its immutable image ID. No monitor-provided container
 // identifier is passed as a command argument; it is compared later by Qualify.
@@ -225,6 +239,7 @@ func approvedHostRead(args []string)bool{
  case "inspect":
   return len(args)==6&&args[3]=="--format"&&args[4]=="{{json .}}"&&validContainerID(args[5])
  case "compose":
+  if len(args)==5 && args[3]=="version" && args[4]=="--short"{return true}
   if len(args)<12||args[3]!="--project-directory"||args[5]!="-p"||
    !executorregistration.ValidID(args[6])||args[len(args)-4]!="config"||args[len(args)-3]!="--no-env-resolution"||
    args[len(args)-2]!="--format"||args[len(args)-1]!="json"{return false}
