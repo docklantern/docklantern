@@ -18,7 +18,24 @@ const (
 // created or modified by Phase 3a. Neither CLI nor web calls this function.
 func OpenHost() (*Store, error) {
 	if os.Geteuid() != 0 { return nil, ErrUnavailable }
-	return openProtectedJournal(HostJournalDirectory)
+	return openProtectedJournalWithMaintenanceAt(HostJournalDirectory,HostMaintenanceLockDirectory)
+}
+
+// openProtectedJournalWithMaintenanceAt is the *only* production host Store
+// opening path. Acquire a shared lease BEFORE SQLite opens/migrates and retain
+// it through Store.Close. An exclusive maintenance holder excludes every
+// cooperating OpenHost session, including subsequent receipt/override writes.
+// The fixture-directory argument is private and never monitor/CLI controlled.
+func openProtectedJournalWithMaintenanceAt(journalDir, lockDir string) (*Store,error) {
+	lease,err:=acquireMaintenanceLeaseAt(lockDir,false)
+	if err!=nil { return nil,ErrUnavailable }
+	s,err:=openProtectedJournal(journalDir)
+	if err!=nil {
+		_ = lease.Release()
+		return nil,err
+	}
+	s.maintenance=lease
+	return s,nil
 }
 
 func openProtectedJournal(directory string) (*Store, error) {
