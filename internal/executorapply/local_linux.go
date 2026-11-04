@@ -31,7 +31,12 @@ func (s *HostJournalSession)BindLease(lease ProjectLease)error{
 func (s *HostJournalSession)FinalizeVerified(ctx context.Context,id string,
  proof executorjournal.VerifiedEvidence,at time.Time)error{
  if s==nil||s.Store==nil||s.lock==nil{return ErrApplyUnavailable}
- return s.Store.CommitVerified(ctx,s.lock,id,proof,at)
+ if err:=s.Store.CommitVerified(ctx,s.lock,id,proof,at);err!=nil{return err}
+ // The already-durable committed outcome must never be rolled back because
+ // the separately mounted, nonauthoritative UI outbox is absent/unavailable.
+ // Operators can inspect the protected journal if publication fails.
+ _,_=s.Store.PublishReceipt(ctx,s.lock,id,at.Add(time.Nanosecond))
+ return nil
 }
 
 var ErrLocalApplyDenied=errors.New("host-native APPLY denied or requires reconciliation")
