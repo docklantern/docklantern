@@ -136,7 +136,7 @@ func (h *HostReadOnlyAdapter) RequireSupportedCompose(ctx context.Context) error
  out,err:=h.runner.run(ctx,hostReadCommand{args:[]string{
   "--host",executorhost.LocalSocket,"compose","version","--short",
  },limit:64})
- if err!=nil||strings.TrimSuffix(string(out),"\\n")!="5.5.1"{
+ if err!=nil||strings.TrimSuffix(string(out),"\n")!="5.5.1"{
   return ErrHostEvidenceUnavailable
  }
  return nil
