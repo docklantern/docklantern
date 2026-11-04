@@ -7,6 +7,7 @@ import (
  "testing"
 
  "github.com/docklantern/docklantern/internal/executorhost"
+ "github.com/docklantern/docklantern/internal/executorjournal"
  "github.com/docklantern/docklantern/internal/executorpreflight"
  "github.com/docklantern/docklantern/internal/executorregistration"
 )
