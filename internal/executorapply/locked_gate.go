@@ -113,13 +113,15 @@ func (a *alreadyAuthorizedEnvironment)VerifyTargetAndSiblings(ctx context.Contex
 func matchesOperation(q executorpreflight.Qualification,op executorjournal.Operation,now time.Time)bool{
  return q.ReadOnly&&q.ProposalID==op.ProposalID&&q.RegistrationID==op.RegistrationID&&
   q.Service==op.ServiceID&&q.CandidateDigest==op.CandidateDigest&&
+  q.ProposalSHA256==op.ProposalSHA256&&sameDigest(q.ProposalSHA256)&&sameDigest(q.RegistrationSHA256)&&
   sameDigest(q.CandidateDigest)&&sameDigest(q.SourceSHA256)&&
   sameDigest(q.ImageID)&&sameDigest(q.PlatformManifestDigest)&&
   q.ContainerID!=""&&!q.CheckedAt.IsZero()&&!now.Before(q.CheckedAt)&&
   now.Sub(q.CheckedAt)<=MaxApplyEvidenceAge
 }
 func sameEvidence(a,b executorpreflight.Qualification)bool{
- return a.ProposalID==b.ProposalID&&a.RegistrationID==b.RegistrationID&&
+ return a.ProposalID==b.ProposalID&&a.ProposalSHA256==b.ProposalSHA256&&
+  a.RegistrationID==b.RegistrationID&&a.RegistrationSHA256==b.RegistrationSHA256&&
   a.Service==b.Service&&a.CandidateDigest==b.CandidateDigest&&
   a.SourceSHA256==b.SourceSHA256&&
   a.PlatformManifestDigest==b.PlatformManifestDigest&&
@@ -134,9 +136,9 @@ func approveApply(ctx context.Context,op executorjournal.Operation,q executorpre
  n,err:=random(nonce)
  if err!=nil||n!=len(nonce){return ErrAuthorizationDenied}
  payload,err:=json.Marshal(struct{
-  Operation,Project,Registration,Proposal,Service,Candidate,Source,Container,Image,Manifest,Nonce string
+  Operation,Project,Registration,RegistrationHash,Proposal,ProposalHash,Service,Candidate,Source,Container,Image,Manifest,Nonce string
  }{
-  op.ID,op.ProjectID,q.RegistrationID,q.ProposalID,q.Service,
+  op.ID,op.ProjectID,q.RegistrationID,q.RegistrationSHA256,q.ProposalID,q.ProposalSHA256,q.Service,
   q.CandidateDigest,q.SourceSHA256,q.ContainerID,q.ImageID,
   q.PlatformManifestDigest,hex.EncodeToString(nonce),
  })
@@ -145,8 +147,8 @@ func approveApply(ctx context.Context,op executorjournal.Operation,q executorpre
  challenge:=hex.EncodeToString(sum[:6])
  // Only approved identifiers/digests; never print raw Compose, env,
  // proposal JSON, registry tokens, trusted host paths or Docker logs.
- message:=fmt.Sprintf("DOCKLANTERN — HOST-LOCAL APPLY CHALLENGE\nProject: %s\nService: %s\nCandidate: %s\nSource SHA-256: %s\nActual container: %s\nType APPLY %s to authorize this exact candidate.\nThis action may replace the selected service.\n",
-  op.ProjectID,q.Service,q.CandidateDigest,q.SourceSHA256,q.ContainerID,challenge)
+ message:=fmt.Sprintf("DOCKLANTERN — HOST-LOCAL APPLY CHALLENGE\nProject: %s\nService: %s\nCandidate: %s\nSource SHA-256: %s\nRegistration SHA-256: %s\nProposal SHA-256: %s\nActual container: %s\nType APPLY %s to authorize this exact candidate.\nThis action may replace the selected service.\n",
+  op.ProjectID,q.Service,q.CandidateDigest,q.SourceSHA256,q.RegistrationSHA256,q.ProposalSHA256,q.ContainerID,challenge)
  if tty.Print(message)!=nil{return ErrAuthorizationDenied}
  started:=now()
  promptCtx,cancel:=context.WithTimeout(ctx,MaxApplyApproval)
