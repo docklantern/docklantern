@@ -52,7 +52,7 @@ type LockedDependencies struct{
 // RunLockedCandidate holds the project lock across approval, repeated fresh
 // qualification, durable journal writes and every injected effect. It does
 // not expose a production CLI path, and cannot report success/commit.
-func RunLockedCandidate(ctx context.Context,op executorjournal.Operation,d LockedDependencies)(Result,error){
+func RunLockedCandidate(ctx context.Context,op executorjournal.Operation,d LockedDependencies)(result Result,resultErr error){
  var zero Result
  if ctx==nil||ctx.Err()!=nil||d.IsHostRoot==nil||!d.IsHostRoot()||
   d.AcquireLock==nil||d.OpenJournal==nil||d.Qualify==nil||
@@ -68,7 +68,13 @@ func RunLockedCandidate(ctx context.Context,op executorjournal.Operation,d Locke
  defer lock.Release()
  journal,err:=d.OpenJournal()
  if err!=nil||journal==nil{return zero,ErrAuthorizationDenied}
- defer journal.Close()
+ defer func(){if journal.Close()!=nil{result.NeedsReconciliation=true;resultErr=ErrApplyUnavailable}}()
+ if binder,ok:=journal.(interface{BindLease(ProjectLease)error});ok{
+  if binder.BindLease(lock)!=nil{return zero,ErrAuthorizationDenied}
+ }
+ if closer,ok:=d.Environment.(interface{Close()error});ok{
+  defer func(){if closer.Close()!=nil{result.NeedsReconciliation=true;resultErr=ErrApplyUnavailable}}()
+ }
  initial,err:=d.Qualify(ctx,op.ProposalID)
  if err!=nil||!matchesOperation(initial,op,d.Clock()){
   return zero,ErrAuthorizationDenied
@@ -109,6 +115,14 @@ func (a *alreadyAuthorizedEnvironment)PullImmutable(ctx context.Context,op execu
 func (a *alreadyAuthorizedEnvironment)StageOverride(ctx context.Context,op executorjournal.Operation)error{return a.inner.StageOverride(ctx,op)}
 func (a *alreadyAuthorizedEnvironment)ApplyTargetOnly(ctx context.Context,op executorjournal.Operation)error{return a.inner.ApplyTargetOnly(ctx,op)}
 func (a *alreadyAuthorizedEnvironment)VerifyTargetAndSiblings(ctx context.Context,op executorjournal.Operation)error{return a.inner.VerifyTargetAndSiblings(ctx,op)}
+func(a *alreadyAuthorizedEnvironment)VerifiedEvidence(ctx context.Context,op executorjournal.Operation)(executorjournal.VerifiedEvidence,error){
+ witness,ok:=a.inner.(interface{
+  VerifiedEvidence(context.Context,executorjournal.Operation)(executorjournal.VerifiedEvidence,error)
+ })
+ if !ok{return executorjournal.VerifiedEvidence{},ErrApplyUnavailable}
+ return witness.VerifiedEvidence(ctx,op)
+}
+
 
 func matchesOperation(q executorpreflight.Qualification,op executorjournal.Operation,now time.Time)bool{
  return q.ReadOnly&&q.ProposalID==op.ProposalID&&q.RegistrationID==op.RegistrationID&&
