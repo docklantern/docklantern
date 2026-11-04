@@ -49,6 +49,9 @@ func CaptureTrustedSources(reg executorregistration.Registration) (SourceSnapsho
   if err!=nil{return zero,ErrSourceChanged}
   total+=len(data)
   if total>maxSourceTotalBytes{return zero,ErrSourceChanged}
+  if i<len(reg.ComposeFiles)&&ValidateRawComposeSource(data)!=nil{
+   return zero,ErrSourceChanged
+  }
   // Length-prefixed content and index distinguish file order/boundaries.
   // The registration itself separately pins exact trusted path identities.
   var prefix [16]byte
