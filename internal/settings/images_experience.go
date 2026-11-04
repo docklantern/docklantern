@@ -284,7 +284,8 @@ var imageExperienceDetailTemplate=workspaceTemplate("image-detail-v2",`<!doctype
 {{else}}<p class="muted">No successful remote registry observation has been saved yet.</p>{{end}}
 {{if .Image.FailedServices}}<p class="helper status-explanation">{{.Image.FailedServices}} service check(s) currently report an error. Last successful evidence remains displayed above.</p>{{end}}
 </section>
-<section class="section" aria-labelledby="image-services-title"><div class="section-head"><div><h2 id="image-services-title">Associated services</h2><p class="helper">Service-specific monitoring and immutable deployed-image evidence.</p></div></div>
+<section class="section panel workspace-detail" aria-labelledby="image-deployment-title"><h2 id="image-deployment-title">Deployment candidates · informational only</h2><p class="helper">The image and platform shown above are registry evidence. This monitoring UI cannot verify host executor registration, reproduce trusted Compose input or approve an immutable candidate. Even a changed digest does not prove a newer or safer release. Each related service must be independently qualified and approved at the host terminal; no GUI action runs Docker.</p><p><a class="text-action" href="/deployments">View sanitized deployment Activity</a></p></section>
+<section class="section" aria-labelledby="image-services-title"><div class="section-head"><div><h2 id="image-services-title">Associated services</h2><p class="helper">Service-specific monitoring and deployed-image evidence. A registry digest difference is not an authorized deployment proposal. Use each Service Details review for the host-local qualification requirements; no service is marked deployment-eligible by this page.</p></div></div>
 <div class="panel table-scroll"><table><thead><tr><th>Compose service</th><th>Monitoring</th><th>Deployed assessment</th><th>Deployed digest evidence</th><th>Details</th></tr></thead><tbody>
 {{range .Evidence}}<tr><td><strong>{{.Service.Project}} / {{.Service.Service}}</strong></td>
 <td>{{status .Service.Monitoring}}
@@ -294,7 +295,7 @@ var imageExperienceDetailTemplate=workspaceTemplate("image-detail-v2",`<!doctype
 </td>
 <td><span class="pill {{tone .Service.Assessment}}">{{status .Service.Assessment}}</span>{{if .Reason}}<small class="subtext">{{.Reason}}</small>{{end}}</td>
 <td>{{if .DeployedDigest}}<span class="mono" title="{{.DeployedDigest}}">{{shortDigest .DeployedDigest}}</span>{{else}}<span class="muted">Not verified</span>{{end}}</td>
-<td><a class="text-action" href="{{serviceURL .Service.Project .Service.Service}}">View service</a></td></tr>
+<td><a class="text-action" href="{{serviceURL .Service.Project .Service.Service}}#deployment-review">Review deployment requirements</a><small class="subtext">Host registration and immutable proposal not verified here</small></td></tr>
 {{else}}<tr><td colspan="5" class="table-empty">No associated discovered service details are available.</td></tr>{{end}}</tbody></table></div></section>
 <section class="section" aria-labelledby="image-history-title"><div class="section-head"><div><h2 id="image-history-title">Registry history</h2><p class="helper">Retained events scoped to this exact image and platform; newest first. Event history may be pruned.</p></div></div>
 <div class="panel table-scroll"><table><thead><tr><th>Recorded (UTC)</th><th>Observation</th><th>Digest evidence</th></tr></thead><tbody>
