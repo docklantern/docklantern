@@ -69,7 +69,10 @@ func validDigest(d string)bool {
 }
 
 func unsupportedService(s map[string]any)bool{
- for _,key:=range []string{"build","privileged","develop","deploy","hooks","lifecycle","extends","profiles"}{
+ for _,key:=range []string{"build","privileged","develop","deploy","hooks","lifecycle","extends","profiles",
+  "network_mode","pid","ipc","cgroup","cgroup_parent","userns_mode",
+  "devices","device_cgroup_rules","cap_add","security_opt","sysctls",
+  "volumes_from","links","external_links","uts","isolation","runtime"}{
   if _,exists:=s[key];exists{return true}
  }
  if _,ok:=s["image"].(string);!ok{return true}
@@ -78,12 +81,29 @@ func unsupportedService(s map[string]any)bool{
  // Linux docker socket bind/mount cannot be allowed in beta.6 executor.
  if mounts,ok:=s["volumes"].([]any);ok {
   for _,value:=range mounts {
-   if str,ok:=value.(string);ok&&strings.Contains(str,"docker.sock"){return true}
+   if str,ok:=value.(string);ok&&unsafeHostMount(str){return true}
    if m,ok:=value.(map[string]any);ok {
     source,_:=m["source"].(string)
     target,_:=m["target"].(string)
-    if strings.Contains(source,"docker.sock")||strings.Contains(target,"docker.sock"){return true}
+    if unsafeHostMount(source)||unsafeHostMount(target){return true}
    }
+  }
+ }
+ return false
+}
+
+func unsafeHostMount(s string)bool{
+ // Docker socket and host operating-system control surfaces cannot appear
+ // in a single-service image update. Reject both short- and long-form binds.
+ for _,part:=range strings.Split(s,":"){
+  clean:=strings.TrimSuffix(part,"/")
+  if strings.Contains(clean,"docker.sock")||
+   clean=="/proc"||strings.HasPrefix(clean,"/proc/")||
+   clean=="/sys"||strings.HasPrefix(clean,"/sys/")||
+   clean=="/run"||strings.HasPrefix(clean,"/run/")||
+   clean=="/var/run"||strings.HasPrefix(clean,"/var/run/")||
+   clean=="/dev"||strings.HasPrefix(clean,"/dev/"){
+   return true
   }
  }
  return false
