@@ -37,7 +37,7 @@ func CheckImageOnly(before,after []byte,reg executorregistration.Registration,se
  a,err:=parseNormalized(before)
  if err!=nil{return ErrNotImageOnly}
  b,err:=parseNormalized(after)
- if err!=nil{return ErrNotImageOnly}
+ if err!=nil||ValidateNormalizedFeatureSubset(a)!=nil||ValidateNormalizedFeatureSubset(b)!=nil{return ErrNotImageOnly}
  beforeServices,ok:=a["services"].(map[string]any)
  if !ok{return ErrNotImageOnly}
  afterServices,ok:=b["services"].(map[string]any)
@@ -81,6 +81,7 @@ func validDigest(d string)bool {
 
 func unsupportedService(s map[string]any)bool{
  for _,key:=range []string{"build","privileged","develop","deploy","hooks","lifecycle","extends","profiles",
+  "env_file","configs","secrets","credential_spec", "provider", "post_start","pre_stop",
   "network_mode","pid","ipc","cgroup","cgroup_parent","userns_mode",
   "devices","device_cgroup_rules","cap_add","security_opt","sysctls",
   "volumes_from","links","external_links","uts","isolation","runtime"}{
