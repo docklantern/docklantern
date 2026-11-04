@@ -161,10 +161,6 @@ func validContainerID(s string)bool{
  return true
 }
 
-func (h *HostReadOnlyAdapter) FetchOCI(context.Context,string,string)([]byte,[]byte,error){
- return nil,nil,ErrHostEvidenceUnavailable
-}
-
 // hostDockerRunner is not exported and accepts only narrowly allowlisted
 // read-only calls constructed by the adapter. No shell, inherited Docker
 // env/config, inherited stdin or unbounded child output is permitted.
