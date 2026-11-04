@@ -206,7 +206,7 @@ jobs:
           sudo env -i HOME=/root PATH=/usr/bin:/bin \
             DOCKLANTERN_JOURNAL_ROOT_FIXTURE=1 \
             "$(command -v go)" test ./internal/executorpreflight \
-            -run 'TestTrustedSourceSnapshot|TestSourceHandoff' -count=1 -v
+            -run 'TestTrustedSourceSnapshot|TestSourceHandoff|TestStagedReadOnlyEvidence' -count=1 -v
 
   executor-compose-readonly-contract:
     runs-on: ubuntu-latest
