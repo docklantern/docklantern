@@ -259,7 +259,7 @@ func parseDiagnosticArgs(args []string) (executorhost.DiagnosticConfig, bool) {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprintln(w, `DockLantern Executor (Phase 2 read-only preview, no Docker write capability)
+	fmt.Fprintln(w, `DockLantern Executor (beta.6 host-native single-service updates; monitoring GUI remains read-only)
 Usage: docklantern-executor <command>
 
 Available:
@@ -276,7 +276,7 @@ Available:
              <proposal-id>; no apply authorization or Docker writes.
   preview    Host-root + controlling-TTY informational candidate preview
              <proposal-id> (requires pre-existing protected monitor.uid)
-             No actual Docker/Compose/OCI inspection or deployment approval.
+             No actual Docker/Compose/OCI inspection or deployment approval.\n             No deployment may be approved from a preview.
 
 Host-root operations (require separate operator approval before any VPS use):\n  status     <operation-id> read-only protected journal inspection\n  apply      <proposal-id> one-time terminal-confirmed immutable update\n\nReserved (unavailable until later reviewed phases):
   reconcile, recover
