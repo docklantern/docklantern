@@ -76,7 +76,7 @@ func TestHostAdapterRejectsCommandsAndConfigChanges(t *testing.T){
  if _,e:=h.NormalizedCompose(context.Background(),reg,"web","");e==nil{
   t.Fatal("unsupported sibling build allowed")
  }
- if _,_,e:=h.FetchOCI(context.Background(),"docker.io/example/hello-go","sha256:"+strings.Repeat("a",64));!errors.Is(e,ErrHostEvidenceUnavailable){
+ if _,_,e:=h.FetchOCI(context.Background(),"invalid/unapproved-registry","sha256:"+strings.Repeat("a",64));!errors.Is(e,ErrPublicOCIUnavailable){
   t.Fatalf("unverified registry proof accepted: %v",e)
  }
 }
