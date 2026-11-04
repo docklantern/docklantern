@@ -64,6 +64,7 @@ func auditRestoredArtifactReferencesAt(ctx context.Context, candidatePath, overr
  var dirfd int = -1
  defer func(){if dirfd>=0{syscall.Close(dirfd)}}()
  count=0
+ states:=make(map[string]uint8)
  for receipts.Next(){
   count++
   if count>maxRestoreComparisonRows{receipts.Close();return blocked,ErrUnavailable}
@@ -88,21 +89,15 @@ func auditRestoredArtifactReferencesAt(ctx context.Context, candidatePath, overr
    blocked.ReasonCode="receipt_artifact_missing_or_untrusted"
    return blocked,nil
   }
-  // For a pending-only operation, this check may see a file published after
-  // an interrupted rename. That remains unresolved; a later published row
-  // may follow, but only DB rows can establish journal publication state.
-  if state=="pending" {
-   var published int
-   e=tx.QueryRowContext(ctx,`SELECT count(*) FROM receipt_publications
-    WHERE operation_id=? AND content_sha256=? AND publication_state='published'`,operationID,hash).Scan(&published)
-   if e!=nil||published!=1 {
-    receipts.Close();blocked.ReasonCode="receipt_state_unresolved";return blocked,nil
-   }
-  }
+  key:=operationID+"|"+hash
+  if state=="pending"{states[key]|=1}else{states[key]|=2}
  }
  err=receipts.Err()
  receipts.Close()
  if err!=nil{return blocked,ErrUnavailable}
+ for _,bits:=range states {
+  if bits!=3 {blocked.ReasonCode="receipt_state_unresolved";return blocked,nil}
+ }
  if ctx.Err()!=nil{return blocked,ErrUnavailable}
  return RestoreComparison{Status:RestoreRowsMatchUnqualified,
   ReasonCode:"referenced_artifacts_verified_only",BlocksNewWork:true},nil
