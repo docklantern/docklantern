@@ -53,8 +53,8 @@ func TestTrustedSourceSnapshotAndRecheckRootFixture(t *testing.T){
  // a commutative set and must bind exact Compose/env file precedence.
  reg.ComposeFiles=[]string{env}
  reg.EnvFiles=[]string{compose}
- swapped,e:=CaptureTrustedSources(reg)
- if e!=nil||swapped.SHA256==first.SHA256{t.Fatal("registered file order not bound",e)}
+ _,e=CaptureTrustedSources(reg)
+ if !errors.Is(e,ErrSourceChanged){t.Fatal("environment bytes incorrectly accepted as Compose YAML",e)}
 }
 
 func TestTrustedSourceSnapshotRejectsUnsafeObjectsRootFixture(t *testing.T){
