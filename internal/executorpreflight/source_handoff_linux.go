@@ -61,6 +61,9 @@ func stageTrustedSourcesAt(reg executorregistration.Registration,base string)(*S
   if err!=nil{return nil,ErrSourceHandoff}
   total+=len(bytes)
   if total>maxSourceTotalBytes{return nil,ErrSourceHandoff}
+  if i<len(reg.ComposeFiles)&&ValidateRawComposeSource(bytes)!=nil{
+   return nil,ErrSourceHandoff
+  }
   // Deterministic root-private names preserve ordered -f and --env-file
   // precedence. No untrusted original basenames are interpolated into a path.
   ext:=".yaml"
@@ -125,6 +128,9 @@ func (h *SourceHandoff) verifyLocked(reg executorregistration.Registration)error
  for i,path:=range all{
   b,err:=readTrustedSource(path,0)
   if err!=nil||sha256.Sum256(b)!=h.contentHashes[i]{
+   return ErrSourceHandoff
+  }
+  if i<len(h.composeFiles)&&ValidateRawComposeSource(b)!=nil{
    return ErrSourceHandoff
   }
  }
