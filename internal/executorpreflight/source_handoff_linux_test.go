@@ -46,8 +46,8 @@ func TestSourceHandoffRejectsPrivateCopyTamperRootFixture(t *testing.T){
 
 func TestSourceHandoffRejectsSymlinkAndUntrustedStagingRootFixture(t *testing.T){
  reg,compose,_:=sourceFixture(t)
- if err=os.Remove(compose);err!=nil{t.Fatal(err)}
- if err=os.Symlink("/etc/passwd",compose);err!=nil{t.Fatal(err)}
+ if err:=os.Remove(compose);err!=nil{t.Fatal(err)}
+ if err:=os.Symlink("/etc/passwd",compose);err!=nil{t.Fatal(err)}
  if h,err:=stageTrustedSourcesAt(reg,"/root");err==nil{
   _=h.Close();t.Fatal("untrusted input accepted")
  }
