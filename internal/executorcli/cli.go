@@ -10,6 +10,7 @@ import (
 
 	"github.com/docklantern/docklantern/internal/executorhost"
  "github.com/docklantern/docklantern/internal/executorapply"
+ "github.com/docklantern/docklantern/internal/executorjournal"
 	"github.com/docklantern/docklantern/internal/executorpreview"
  "github.com/docklantern/docklantern/internal/executorpreflight"
 	"github.com/docklantern/docklantern/internal/executorregistration"
@@ -38,6 +39,23 @@ type QualifyFunc func(context.Context,string)(executorpreflight.Qualification,er
 // Run is invoked only by the host CLI and never by the monitoring web service.
 // It does not provide apply/recover or any Docker mutation capability.
 func Run(args []string, stdout, stderr io.Writer, version string) int {
+ if len(args)>0&&args[0]=="status"{
+  if len(args)!=2||!executorregistration.ValidID(args[1]){
+   fmt.Fprintln(stderr,"docklantern-executor: status requires one operation ID")
+   return ExitUsage
+  }
+  ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second)
+  defer cancel()
+  snap,err:=executorjournal.StatusLocal(ctx,args[1])
+  if err!=nil{
+   fmt.Fprintln(stderr,"docklantern-executor: protected journal status unavailable")
+   return ExitUnavailable
+  }
+  fmt.Fprintf(stdout,"Operation: %s\\nProject: %s\\nService: %s\\nPhase: %s\\nOutcome: %s\\nBlocks new work: %t\\nManual inspection required for interrupted/uncertain updates.\\n",
+   snap.Operation.ID,snap.Operation.ProjectID,snap.Operation.ServiceID,
+   snap.Operation.CurrentPhase,snap.EffectiveOutcome,snap.BlocksNewWork)
+  return ExitOK
+ }
  if len(args)>0&&args[0]=="apply"{
   if len(args)!=2||!executorregistration.ValidID(args[1]){
    fmt.Fprintln(stderr,"docklantern-executor: apply requires exactly one opaque proposal ID")
@@ -260,8 +278,8 @@ Available:
              <proposal-id> (requires pre-existing protected monitor.uid)
              No actual Docker/Compose/OCI inspection or deployment approval.
 
-Host-root operation (requires separate operator approval before any VPS use):\n  apply      <proposal-id> one-time terminal-confirmed immutable update\n\nReserved (unavailable until later reviewed phases):
-  status, reconcile, recover
+Host-root operations (require separate operator approval before any VPS use):\n  status     <operation-id> read-only protected journal inspection\n  apply      <proposal-id> one-time terminal-confirmed immutable update\n\nReserved (unavailable until later reviewed phases):
+  reconcile, recover
 
 APPLY is available only in the separately installed host-root executor with an actual controlling TTY, protected registration and proposal, fixed Docker Engine/API/Compose runtime, project lock, durable journal and fresh independent read-after-write verification. No unattended deployment or automatic recovery is available.`)
 }
