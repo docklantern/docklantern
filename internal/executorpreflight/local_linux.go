@@ -52,7 +52,7 @@ func QualifyFromSource(ctx context.Context,id string,source QualificationSource,
 // QualifyLocal is a host-root, controlling-TTY-only *read-only* command.
 // No monitoring web process can call it, and no Docker operation is written.
 // A positive report remains explicitly non-authorizing.
-func QualifyLocal(ctx context.Context,id string)(Qualification,error) {
+func QualifyLocal(ctx context.Context,id string)(result Qualification, resultErr error) {
  var zero Qualification
  if os.Geteuid()!=0||ctx==nil||ctx.Err()!=nil{
   return zero,ErrLocalQualificationUnavailable
@@ -68,5 +68,15 @@ func QualifyLocal(ctx context.Context,id string)(Qualification,error) {
  if err!=nil{return zero,ErrLocalQualificationUnavailable}
  reader,err:=NewHostReadOnlyAdapter()
  if err!=nil||reader.RequireSupportedCompose(ctx)!=nil{return zero,ErrLocalQualificationUnavailable}
- return QualifyFromSource(ctx,id,executorpreview.ProtectedSource{MonitorUID:uid},reader,time.Now)
+ // Use one trusted staged copy for every Compose read in the entire
+ // qualification. The stage is unconditionally destroyed before success
+ // can be reported; a cleanup failure itself denies qualification.
+ staged:=newStagedReadOnlyEvidence(reader,StageTrustedSources)
+ defer func(){
+  if staged.Close()!=nil{
+   result=Qualification{}
+   resultErr=ErrLocalQualificationUnavailable
+  }
+ }()
+ return QualifyFromSource(ctx,id,executorpreview.ProtectedSource{MonitorUID:uid},staged,time.Now)
 }
