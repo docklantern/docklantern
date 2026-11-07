@@ -2,7 +2,7 @@
 
 **Status (2026-11-07): disposable-VPS G5/G6 execution and monitoring-RC validation complete; G7 tag/publication remains UNAUTHORIZED.** Issue [#88](https://github.com/docklantern/docklantern/issues/88). The operator waived off-host backup custody and restore testing **only for this disposable test host**. This evidence does not close untested production-readiness or issue #88 acceptance criteria.
 
-This runbook covers the existing IPv6-only Linux/amd64 GCP test VPS, currently running beta.5 monitoring with separate `hello-py`, `hello-js` and `hello-go` Compose projects. The only contemplated beta.6 execution target is a **separately approved, disposable/test `hello-go/web` image**, not DockLantern, Traefik, the socket proxy or application data. The monitor remains GET-only.
+This runbook covers the IPv6-only Linux/amd64 GCP test VPS. At baseline it ran beta.5 monitoring, plus separate `hello-py`, `hello-js` and `hello-go` Compose projects. On 2026-11-07 the operator approved **one** executor-controlled update of a separate disposable `hello-go-beta6/web` project, then **separately** approved the beta.6 monitoring RC replacement. The VPS now runs that locally built beta.6 monitoring candidate; the monitor's Docker access remains GET-only through its socket proxy. These recorded one-time approvals do not authorize further host executor applies or other service changes. The procedural sections below remain as safety instructions, **not** fresh authorizations.
 
 ## Operator decision gates
 
