@@ -35,7 +35,7 @@ The entries below identify *test locations*, not blanket PASS claims. Review the
 | SEC-12 | Proposal quotas and bounded output/time tests | Confirm available disk/retention limits on host |
 | SEC-13 | Protected journal restore/quarantine and source-generation fixtures | **Blocking:** off-host backup custody and a completed actual restore drill |
 | SEC-14 | GET-only proxy and disposable packaging/onboarding integration | Verify production mount isolation and no published proxy ports |
-| SEC-15 | Native verify, running-only/health and journal commit tests | **Blocking:** real-host verified outcome, including no-HEALTHCHECK semantics |
+| SEC-15 | Native verify, running-only/health and journal commit tests | **Witnessed on disposable VPS 2026-11-07:** target replacement, running-only acceptance, journal COMMIT/succeeded and sibling IDs; not a substitute for healthchecked or production-specific tests |
 | SEC-16 | Trusted source snapshot/recheck and handoff fixtures | Review source owners and replacement protections on target |
 
 ## Remaining beta.6 limitations / blockers
@@ -44,7 +44,17 @@ The entries below identify *test locations*, not blanket PASS claims. Review the
 2. **Host-local `recover` is not implemented.** Interrupted operations remain blocked for independent manual reconciliation/repair; there is no automatic rollback promise. See [B6-05 acceptance](../development/beta6-host-apply-acceptance.md).
 3. The executor records desired image generations in its protected SQLite journal, not a durable change to user-authored Compose YAML. A later unmanaged `docker compose up` can restore an old image.
 4. The monitor-side proposal publisher remains unwired to the GUI; GUI evidence and Activity are read-only, not permission to update.
-5. Before any real-host executor installation or Compose mutation, separately approve the VPS baseline, **off-host backups and successful restoration drill**, exact binary digest, and exact target candidate/service. Test each step only after authorization.
-6. **Release remains NO-GO** pending review of all SEC-01–SEC-16 outcomes, CI evidence at the final commit, and B6-08 operator acceptance. A tag can automatically publish images and must never be pushed merely because this audit passed.
+5. The operator separately authorized and witnessed the **specific disposable-VPS** executable installation and one immutable hello-service apply on 2026-11-07. The operator explicitly waived off-host backup custody and restore testing **for that disposable test only**. The waiver does not satisfy the off-host/restore criterion for production or authorize another target, apply, or VPS mutation.
+6. **G7 tag/publication remains NOT AUTHORIZED.** The audited source/CI commit was `f26d2c9`; the release-preparation documentation merge will create a **different exact release head**. Recheck its CI/security evidence and release eligibility, review unfulfilled SEC/B6-08 criteria and accepted beta-only deferrals, and obtain separate explicit authorization before a tag triggers publication.
 
-No tag, release, install, shared-host mutation or merge is authorized by this document.
+## Dated disposable-VPS acceptance evidence (2026-11-07)
+
+- **Source and test CI:** `f26d2c9aaf62494700433a77e74e02a64c1a4621` (PR #133); [Go POC 17/17 jobs](https://github.com/docklantern/docklantern/actions/runs/41907889810) and [security audit 4/4 jobs](https://github.com/docklantern/docklantern/actions/runs/41907889788) succeeded at that source commit. CI jobs do **not** independently certify every SEC-01–SEC-16 host acceptance scenario.
+- **Executor artifact and runtime:** the operator reported installed `/usr/local/libexec/docklantern-executor`, SHA-256 `1bd2a8afa155e87306af3849a346fd4d6b4bf1fd864ba7e5413b3e2cd81657bb`; Linux/amd64 VPS, Engine 29.8.1/API 1.56/Compose 5.5.1. Protected registration, private proposal writer and source snapshots were provisioned.
+- **Positive executor verification:** independently qualified candidate OCI index `sha256:2784c9e97340a33997905ad651c034fe11dba9f3a1ab8a2218ccffc093c1a603`, explicit host-local `APPLY`, new running disposable `hello-go-beta6/web` container, and `status apply-be7c0588e024e4648dee3885` reporting `COMMIT / succeeded / Blocks new work: false`. Six original siblings remained unchanged. The fixture had no HEALTHCHECK; the operator expressly accepted running-only verification.
+- **Monitoring candidate acceptance:** local build from the same source, not the CI/published image, ran `v0.1.0-beta.6-rc.f26d2c9` healthy on the VPS with unchanged sibling container IDs. Seven browser GUI checks passed, including `/deployments` showing **unknown/unavailable** without a read-only receipt mount. The positive receipt-outbox-to-Activity path was **not** tested.
+- **Recovery limitation:** monitoring SQLite backup existed locally and passed schema-v5 integrity and SHA-256 verification, but it was **not copied off-host or restored**. No executor journal/override independent restore drill, interrupted live apply, or manual recovery was exercised. SEC-13 and broader production recovery qualification remain open.
+
+See the exact digests, container IDs, timestamps, and checksums in the [B6-08 witnessed acceptance record](../deployment/beta6-test-vps-acceptance.md). This update records partial acceptance, not unconditional closure of issue #88, production readiness, or independent G7 authorization.
+
+No new tag, release, PR merge, unrelated install, update attempt or deployment is authorized by this record.
