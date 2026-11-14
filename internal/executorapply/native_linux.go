@@ -13,6 +13,7 @@ import (
  "time"
 
  "github.com/docklantern/docklantern/internal/executorhost"
+ "github.com/docklantern/docklantern/internal/executoroverride"
  "github.com/docklantern/docklantern/internal/executorjournal"
  "github.com/docklantern/docklantern/internal/executorpreflight"
  "github.com/docklantern/docklantern/internal/executorregistration"
@@ -274,10 +275,10 @@ func(h *HostEffects)ApplyTargetOnly(ctx context.Context,_ executorjournal.Operat
  sources,envs,err:=h.handoff.FilesForReadOnlyCompose(h.reg)
  if err!=nil{return ErrNativeEffect}
  image:=h.repository+"@"+h.digest
- // JSON is YAML. No interpolation, shell or untrusted text can become keys.
- override,err:=json.Marshal(map[string]any{
-  "services":map[string]any{h.service:map[string]string{"image":image}},
- })
+ // The typed renderer is shared with the persistent-override verifier;
+ // neither a monitor-supplied YAML document nor arbitrary Compose flags
+ // can become a deployment effect.
+ override,err:=executoroverride.Render(h.reg,h.service,h.repository,h.digest)
  if err!=nil{return ErrNativeEffect}
  args:=[]string{"compose","--project-directory",h.reg.ProjectDirectory,"-p",h.reg.ProjectName}
  for _,path:=range sources{args=append(args,"-f",path)}
