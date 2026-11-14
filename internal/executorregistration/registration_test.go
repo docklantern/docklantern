@@ -132,6 +132,21 @@ func TestRegistrationSourceTrustChecks(t *testing.T) {
 	}
 }
 
+func TestPersistentOverrideRequiresExplicitRootControlledSingleService(t *testing.T) {
+ r:=fixture()
+ r.PersistentOverride=true
+ if r.Validate()==nil{t.Fatal("accepted nonroot persistent source")}
+ root:=uint32(0)
+ r.TrustedSourceUID=&root
+ if r.Validate()==nil{t.Fatal("accepted unsupported legacy Compose filename")}
+ r.ComposeFiles=[]string{"/srv/deployments/hello-go/compose.yaml"}
+ if err:=r.Validate();err!=nil{t.Fatalf("valid opt-in persistent source rejected: %v",err)}
+ r.Services=append(r.Services,Service{Name:"worker",DeploymentEnabled:false,
+  ApprovedRepository:"docker.io/example/hello-go",
+  Platform:Platform{OS:"linux",Architecture:"amd64"}})
+ if r.Validate()==nil{t.Fatal("accepted multi-service persistent project")}
+}
+
 func TestRegistrationLimits(t *testing.T) {
 	r := fixture()
 	r.Services[0].AllowRunningOnly = true
