@@ -274,7 +274,6 @@ func(h *HostEffects)ApplyTargetOnly(ctx context.Context,_ executorjournal.Operat
  }
  sources,envs,err:=h.handoff.FilesForReadOnlyCompose(h.reg)
  if err!=nil{return ErrNativeEffect}
- image:=h.repository+"@"+h.digest
  // The typed renderer is shared with the persistent-override verifier;
  // neither a monitor-supplied YAML document nor arbitrary Compose flags
  // can become a deployment effect.
