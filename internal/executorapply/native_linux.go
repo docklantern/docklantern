@@ -204,6 +204,9 @@ func(h *HostEffects)ReviewApply(_ context.Context,_ executorjournal.Operation,_ 
 func(h *HostEffects)checkPersistent()error{
  if h==nil{return ErrNativeEffect}
  if !h.reg.PersistentOverride{return nil}
+ // A moving tag resolving to the already committed digest must not cause a
+ // redundant target recreation; a new operation requires a new candidate.
+ if h.hasPrevious && h.digest==h.previousDigest{return ErrNativeEffect}
  if executoroverride.VerifyCurrent(h.reg,h.previousDigest,h.hasPrevious)!=nil{
   return ErrNativeEffect
  }
