@@ -193,6 +193,24 @@ jobs:
             "$(command -v go)" test ./internal/executorpreview \
             -run '^TestProtectedMonitorUIDRootFixture$' -count=1 -v
 
+  executor-persistent-override-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify root-owned persistent Compose file boundary (no Docker writes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo env -i HOME=/root PATH=/usr/bin:/bin \
+            "$(command -v go)" test ./internal/executoroverride \
+            -run '^TestPersistentMirror' -count=1 -v
+
   protected-journal-fixture:
     runs-on: ubuntu-latest
     timeout-minutes: 10
