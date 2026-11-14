@@ -122,7 +122,10 @@ func approvedNativeCompose(args []string)bool{
 type nativeObserved struct{
  ID string `json:"Id"`
  Image string `json:"Image"`
- Config struct{Labels map[string]string `json:"Labels"`} `json:"Config"`
+ Config struct{
+  Labels map[string]string `json:"Labels"`
+  ImageReference string `json:"Image"`
+ } `json:"Config"`
  NetworkSettings json.RawMessage `json:"NetworkSettings"`
  Mounts json.RawMessage `json:"Mounts"`
  State struct{
@@ -148,6 +151,8 @@ type HostEffects struct{
  reg executorregistration.Registration
  service,repository,digest string
  sourceHash,baselineContainer,baselineImage string
+ previousDigest string
+ hasPrevious bool
  runner nativeRunner
  handoff *executorpreflight.SourceHandoff
  pulledImageID string
@@ -196,10 +201,19 @@ func(h *HostEffects)ReviewApply(_ context.Context,_ executorjournal.Operation,_ 
  // The independent gate, not this environment, owns human approval.
  return ErrNativeEffect
 }
+func(h *HostEffects)checkPersistent()error{
+ if h==nil{return ErrNativeEffect}
+ if !h.reg.PersistentOverride{return nil}
+ if executoroverride.VerifyCurrent(h.reg,h.previousDigest,h.hasPrevious)!=nil{
+  return ErrNativeEffect
+ }
+ return nil
+}
 func(h *HostEffects)Requalify(ctx context.Context,_ executorjournal.Operation,q executorpreflight.Qualification)error{
  if ctx==nil||ctx.Err()!=nil||h==nil||q.Service!=h.service||
   q.CandidateDigest!=h.digest||q.SourceSHA256!=h.sourceHash||
-  q.ContainerID!=h.baselineContainer||q.ImageID!=h.baselineImage{
+  q.ContainerID!=h.baselineContainer||q.ImageID!=h.baselineImage||
+  h.checkPersistent()!=nil{
   return ErrNativeEffect
  }
  return nil
@@ -257,7 +271,12 @@ func(h *HostEffects)StageOverride(ctx context.Context,_ executorjournal.Operatio
  if err!=nil{return ErrNativeEffect}
  base,ok:=before[h.baselineContainer]
  if !ok||base.Image!=h.baselineImage||!base.State.Running||
-  base.Config.Labels["com.docker.compose.service"]!=h.service{
+  base.Config.Labels["com.docker.compose.service"]!=h.service||
+  h.checkPersistent()!=nil{
+  return ErrNativeEffect
+ }
+ if h.reg.PersistentOverride && h.hasPrevious &&
+  base.Config.ImageReference!=h.repository+"@"+h.previousDigest{
   return ErrNativeEffect
  }
  h.before=before
@@ -265,7 +284,8 @@ func(h *HostEffects)StageOverride(ctx context.Context,_ executorjournal.Operatio
 }
 func(h *HostEffects)ApplyTargetOnly(ctx context.Context,_ executorjournal.Operation)error{
  if h==nil||h.handoff==nil||h.before==nil||h.pulledImageID==""||
-  ctx==nil||ctx.Err()!=nil||h.handoff.RecheckOriginal(h.reg)!=nil{
+  ctx==nil||ctx.Err()!=nil||h.handoff.RecheckOriginal(h.reg)!=nil||
+  h.checkPersistent()!=nil{
   return ErrNativeEffect
  }
  current,err:=h.captureProject(ctx)
@@ -309,7 +329,8 @@ func sameNativeLabels(a,b map[string]string)bool{
 }
 func(h *HostEffects)VerifyTargetAndSiblings(ctx context.Context,_ executorjournal.Operation)error{
  if h==nil||h.handoff==nil||h.before==nil||h.verified||
-  ctx==nil||ctx.Err()!=nil||h.handoff.RecheckOriginal(h.reg)!=nil{
+  ctx==nil||ctx.Err()!=nil||h.handoff.RecheckOriginal(h.reg)!=nil||
+  h.checkPersistent()!=nil{
   return ErrNativeEffect
  }
  actual,err:=h.captureProject(ctx)
@@ -357,7 +378,7 @@ var _ Environment=(*HostEffects)(nil)
 func(h *HostEffects)VerifiedEvidence(ctx context.Context,op executorjournal.Operation)(executorjournal.VerifiedEvidence,error){
  var empty executorjournal.VerifiedEvidence
  if h==nil||!h.verified||h.handoff==nil||ctx==nil||ctx.Err()!=nil||
-  h.handoff.RecheckOriginal(h.reg)!=nil||
+  h.handoff.RecheckOriginal(h.reg)!=nil||h.checkPersistent()!=nil||
   op.ProjectID!=h.reg.ProjectName||op.ServiceID!=h.service||
   op.CandidateDigest!=h.digest{return empty,ErrNativeEffect}
  actual,err:=h.captureProject(ctx)
