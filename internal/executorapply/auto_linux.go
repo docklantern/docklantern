@@ -118,6 +118,7 @@ func AutoOnce(ctx context.Context, registrationID string) (Result,error) {
     if container.Config.Labels["com.docker.compose.service"]==service.Name{
      found++
      if !container.State.Running ||
+      container.ID!=actual.ContainerID || container.Image!=actual.ImageID ||
       container.Config.ImageReference!=service.ApprovedRepository+"@"+digest{
       return false,ErrAutomaticUpdate
      }
