@@ -122,6 +122,9 @@ func AutoOnce(ctx context.Context, registrationID string) (Result,error) {
       container.Config.ImageReference!=service.ApprovedRepository+"@"+digest{
       return false,ErrAutomaticUpdate
      }
+     if container.State.Health!=nil {
+      if container.State.Health.Status!="healthy"{return false,ErrAutomaticUpdate}
+     }else if !service.AllowRunningOnly{return false,ErrAutomaticUpdate}
     }
    }
    return found==1,nil
