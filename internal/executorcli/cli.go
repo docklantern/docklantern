@@ -56,6 +56,25 @@ func Run(args []string, stdout, stderr io.Writer, version string) int {
    snap.Operation.CurrentPhase,snap.EffectiveOutcome,snap.BlocksNewWork)
   return ExitOK
  }
+ if len(args)>0&&args[0]=="auto-once"{
+  if len(args)!=2||!executorregistration.ValidID(args[1]){
+   fmt.Fprintln(stderr,"docklantern-executor: auto-once requires exactly one protected registration ID")
+   return ExitUsage
+  }
+  ctx,cancel:=context.WithTimeout(context.Background(),9*time.Minute)
+  defer cancel()
+  result,err:=executorapply.AutoOnce(ctx,args[1])
+  if err!=nil||result.NeedsReconciliation{
+   fmt.Fprintln(stderr,"docklantern-executor: automatic update denied, unavailable or unresolved; host inspection required")
+   return ExitUnavailable
+  }
+  if result.LastPhase=="UNCHANGED" {
+   fmt.Fprintln(stdout,"Standing-authorized image unchanged; no Docker update performed.")
+  } else {
+   fmt.Fprintf(stdout,"Standing-authorized immutable update committed for operation %s.\n",result.OperationID)
+  }
+  return ExitOK
+ }
  if len(args)>0&&args[0]=="apply"{
   if len(args)!=2||!executorregistration.ValidID(args[1]){
    fmt.Fprintln(stderr,"docklantern-executor: apply requires exactly one opaque proposal ID")
@@ -282,9 +301,12 @@ Available:
 Host-root operations (require separate operator approval before any VPS use):
   status     <operation-id> read-only protected journal inspection
   apply      <proposal-id> one-time terminal-confirmed immutable update
+  auto-once <registration-id> root-only standing-authorized tag check/update
+            Requires explicit protected automatic_updates policy and
+            independently installed root systemd timer; no monitor write path.
 
 Reserved (unavailable until later reviewed phases):
   reconcile, recover
 
-The monitoring GUI has no Docker write capability.\nAPPLY is available only in the separately installed host-root executor with an actual controlling TTY, protected registration and proposal, fixed Docker Engine/API/Compose runtime, project lock, durable journal and fresh independent read-after-write verification. No unattended deployment or automatic recovery is available.`)
+The monitoring GUI has no Docker write capability.\nAPPLY is available only in the separately installed host-root executor with an actual controlling TTY, protected registration and proposal, fixed Docker Engine/API/Compose runtime, project lock, durable journal and fresh independent read-after-write verification. Only root host registrations that explicitly opt in may use auto-once; automatic recovery is unavailable.`)
 }
