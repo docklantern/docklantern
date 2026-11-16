@@ -104,6 +104,8 @@ func AutoOnce(ctx context.Context, registrationID string) (Result,error) {
     executoroverride.VerifyCurrent(reg.Registration,session.previousDigest,session.hasPrevious)!=nil{
     return false,ErrAutomaticUpdate
    }
+   blocked,e:=session.Store.HasUnresolvedProject(ctx,reg.Registration.ProjectName)
+   if e!=nil||blocked{return false,ErrAutomaticUpdate}
    if !session.hasPrevious||session.previousDigest!=digest{return false,nil}
    // The tag did not move, but a Compose override alone does not prove
    // that the service is still running the committed candidate.
