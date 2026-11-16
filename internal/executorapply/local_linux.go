@@ -9,6 +9,7 @@ import (
  "time"
 
  "github.com/docklantern/docklantern/internal/executorjournal"
+ "github.com/docklantern/docklantern/internal/executoroverride"
  "github.com/docklantern/docklantern/internal/executorpreflight"
  "github.com/docklantern/docklantern/internal/executorpreview"
  "github.com/docklantern/docklantern/internal/executorregistration"
@@ -20,6 +21,9 @@ import (
 type HostJournalSession struct {
  *executorjournal.Store
  lock *executorjournal.ProjectLock
+ registration executorregistration.Registration
+ previousDigest string
+ hasPrevious bool
 }
 func (s *HostJournalSession)BindLease(lease ProjectLease)error{
  if s==nil||s.Store==nil||s.lock!=nil{return ErrAuthorizationDenied}
@@ -31,6 +35,13 @@ func (s *HostJournalSession)BindLease(lease ProjectLease)error{
 func (s *HostJournalSession)FinalizeVerified(ctx context.Context,id string,
  proof executorjournal.VerifiedEvidence,at time.Time)error{
  if s==nil||s.Store==nil||s.lock==nil{return ErrApplyUnavailable}
+ if s.registration.PersistentOverride {
+  // The public override must be durable before the protected success
+  // transaction. A crash at this boundary leaves the journal's COMMIT
+  // intent unresolved and blocks subsequent operations.
+  if executoroverride.PublishVerified(s.registration,s.previousDigest,
+   s.hasPrevious,proof.CandidateDigest)!=nil{return ErrApplyUnavailable}
+ }
  if err:=s.Store.CommitVerified(ctx,s.lock,id,proof,at);err!=nil{return err}
  // The already-durable committed outcome must never be rolled back because
  // the separately mounted, nonauthoritative UI outbox is absent/unavailable.
@@ -74,6 +85,7 @@ func ApplyLocal(ctx context.Context,id string)(Result,error){
   CandidateDigest:proposal.Proposal.Candidate.Digest,
   CreatedAt:time.Now().UTC(),
  }
+ var active *HostJournalSession
  d:=LockedDependencies{
   IsHostRoot:executorreview.HostRoot,
   AcquireLock:func(project string)(ProjectLease,error){
@@ -82,7 +94,13 @@ func ApplyLocal(ctx context.Context,id string)(Result,error){
   OpenJournal:func()(JournalSession,error){
    store,e:=executorjournal.OpenHost()
    if e!=nil{return nil,e}
-   return &HostJournalSession{Store:store},nil
+   session:=&HostJournalSession{Store:store,registration:reg.Registration}
+   if reg.Registration.PersistentOverride {
+    session.previousDigest,session.hasPrevious,e=store.LatestCommittedDesired(ctx,reg.Registration.ProjectName)
+    if e!=nil{_ =store.Close();return nil,ErrLocalApplyDenied}
+   }
+   active=session
+   return session,nil
   },
   Qualify:executorpreflight.QualifyLocal,
   Terminal:tty,Clock:time.Now,Random:SecureChallengeRandom,
@@ -98,6 +116,14 @@ func ApplyLocal(ctx context.Context,id string)(Result,error){
    effects,e:=newHostEffects(latestReg.Registration,q,
     latestProposal.Proposal.Candidate.Repository,dockerNativeRunner{})
    if e!=nil{return nil,ErrNativeEffect}
+   if latestReg.Registration.PersistentOverride {
+    if active==nil||active.registration.RegistrationID!=latestReg.Registration.RegistrationID{
+     return nil,ErrNativeEffect
+    }
+    effects.previousDigest=active.previousDigest
+    effects.hasPrevious=active.hasPrevious
+    if effects.checkPersistent()!=nil{return nil,ErrNativeEffect}
+   }
    return effects,nil
   },
  }

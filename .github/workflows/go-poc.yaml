@@ -36,6 +36,18 @@ jobs:
       - run: go mod tidy
       - run: git diff --exit-code -- go.mod go.sum
       - run: go test -race ./...
+      - name: Verify receipt security fixtures with permissive and restrictive umasks
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            umask 002
+            go test -race ./internal/deploymentactivity -count=1
+          )
+          (
+            umask 077
+            go test -race ./internal/deploymentactivity -count=1
+          )
       - run: go vet ./...
 
   compose-integration:
@@ -192,6 +204,24 @@ jobs:
             DOCKLANTERN_PREVIEW_ROOT_FIXTURE=1 \
             "$(command -v go)" test ./internal/executorpreview \
             -run '^TestProtectedMonitorUIDRootFixture$' -count=1 -v
+
+  executor-persistent-override-fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Verify root-owned persistent Compose file boundary (no Docker writes)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo env -i HOME=/root PATH=/usr/bin:/bin \
+            "$(command -v go)" test ./internal/executoroverride \
+            -run '^TestPersistentMirror' -count=1 -v
 
   protected-journal-fixture:
     runs-on: ubuntu-latest

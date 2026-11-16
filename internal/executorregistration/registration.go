@@ -42,6 +42,9 @@ type Registration struct {
 	TrustedSourceUID *uint32   `json:"trusted_source_uid"`
 	Services         []Service `json:"services"`
 	FeaturePolicy    string    `json:"feature_policy"`
+	// PersistentOverride is host-root authorization for a narrowly qualified
+	// project-local compose.override.yaml. It never enables unattended apply.
+	PersistentOverride bool `json:"persistent_override,omitempty"`
 }
 
 type Service struct {
@@ -159,6 +162,14 @@ func (r Registration) Validate() error {
 		}
 	}
 	if enabled == 0 {
+		return ErrInvalidRegistration
+	}
+	// Persistent projects deliberately require root-controlled sources and
+	// exactly one service, so no independent writer or second target can
+	// replace the managed image behind the executor's journal.
+	if r.PersistentOverride && (*r.TrustedSourceUID != 0 || len(r.Services) != 1 ||
+		len(r.ComposeFiles) != 1 ||
+		r.ComposeFiles[0] != filepath.Join(r.ProjectDirectory, "compose.yaml")) {
 		return ErrInvalidRegistration
 	}
 	return nil

@@ -40,6 +40,8 @@ type serviceDetailsData struct {
  DeployedDigest string
  InventoryObservedAt string
  RegistryCheckedAt string
+ ObservedContainerID string
+ ObservedImageConfigID string
 }
 
 func parseServiceFilters(r *http.Request)(serviceFilters,error){
@@ -144,6 +146,20 @@ func(h Handler) renderServiceWorkspaceDetails(w http.ResponseWriter,r *http.Requ
    CanOverride:s.CanEditInterval && s.Monitoring!="disabled_by_label" && s.Monitoring!="invalid_discovery",
    CanReset:s.GUIOverride!=nil && s.CanEditInterval && s.Monitoring!="disabled_by_label" && s.Monitoring!="invalid_discovery",
   }
+  // A single observed container is required for precise identity display.
+  // ImageID is Docker's local image configuration hash, not an OCI digest.
+  found:=0
+  for _,c:=range data.Containers{
+   if c.Project!=project||c.Service!=service{continue}
+   found++
+   if found==1{
+    details.ObservedContainerID=c.ID
+    details.ObservedImageConfigID=c.ImageID
+   }else{
+    details.ObservedContainerID=""
+    details.ObservedImageConfigID=""
+   }
+  }
   for _,a:=range data.Assessments{
    if a.Project==project && a.Service==service && a.Image==s.Image && a.Platform==s.Platform{
     details.Reason=a.Reason
@@ -223,6 +239,8 @@ var serviceExperienceDetailTemplate=workspaceTemplate("service-detail-v2",`<!doc
 <dl class="digest-list">
 <div><dt>Docker-observed container image</dt><dd class="mono">{{if .Service.MixedDiscoveredImages}}Mixed image references across replicas{{else if .Service.DiscoveredImage}}{{.Service.DiscoveredImage}}{{else}}No recent Docker inventory{{end}}</dd></div>
 <div><dt>Last Docker inventory scan</dt><dd>{{when .Service.InventoryObservedAt}}</dd></div>
+<div><dt>Observed container ID</dt><dd class="mono">{{if .ObservedContainerID}}{{.ObservedContainerID}}{{else}}Unknown or multiple containers{{end}}</dd></div>
+<div><dt>Local Docker image configuration ID</dt><dd class="mono">{{if .ObservedImageConfigID}}{{.ObservedImageConfigID}}{{else}}Unknown or multiple containers{{end}}<small class="subtext">Local configuration digest, not the OCI manifest/index digest.</small></dd></div>
 <div><dt>Registry watch image</dt><dd class="mono">{{if .Service.HasPolicy}}{{.Service.Image}}{{else}}Not enrolled{{end}}</dd></div>
 <div><dt>Watch target source</dt><dd>{{.Service.WatchSource}}{{if .Service.WatchImageOverride}} · Explicit tag override{{end}}</dd></div>
 <div><dt>Platform</dt><dd>{{if .Service.Platform}}{{.Service.Platform}}{{else}}Unknown{{end}}</dd></div>

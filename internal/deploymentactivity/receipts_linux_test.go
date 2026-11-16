@@ -26,7 +26,22 @@ func writeFixture(t *testing.T,dir,id,outcome string,at time.Time){
  b,e:=json.Marshal(record)
  if e!=nil{t.Fatal(e)}
  if e=os.WriteFile(filepath.Join(dir,id+"-v1.json"),b,0o644);e!=nil{t.Fatal(e)}
+ // WriteFile permissions are filtered by the caller's umask (e.g. 0077).
+ // Force the receipt publisher's exact mode so this security fixture works
+ // under restrictive local umasks without weakening the production reader.
+ if e=os.Chmod(filepath.Join(dir,id+"-v1.json"),executorjournal.ReceiptFileMode);e!=nil{t.Fatal(e)}
 }
+// trustedFixtureDir sets the effective mode explicitly because testing.T.TempDir
+// creates its numbered child with os.Mkdir(..., 0777), filtered by the
+// process umask. A developer's 0002 umask would otherwise leave that child
+// group-writable (0775), which the production receipt reader must reject.
+func trustedFixtureDir(t *testing.T) string {
+ t.Helper()
+ dir := t.TempDir()
+ if err := os.Chmod(dir, 0o755); err != nil { t.Fatal(err) }
+ return dir
+}
+
 func TestMissingMirrorIsUnknownNotSuccessful(t *testing.T){
  now:=time.Now().UTC()
  out,err:=readAt(filepath.Join(t.TempDir(),"not-mounted"),now,uint32(os.Geteuid()))
@@ -35,7 +50,7 @@ func TestMissingMirrorIsUnknownNotSuccessful(t *testing.T){
  }
 }
 func TestBoundedSanitizedActivity(t *testing.T){
- dir:=t.TempDir()
+ dir:=trustedFixtureDir(t)
  now:=time.Now().UTC()
  writeFixture(t,dir,"operation-a","pending",now.Add(-time.Minute))
  writeFixture(t,dir,"operation-b","needs_reconciliation",now.Add(-48*time.Hour))
@@ -76,7 +91,7 @@ func TestReceiptMirrorRejectsForgedOrUnsafeEntries(t *testing.T){
 }
 
 func TestCanonicalVerifiedReceiptIsDistinguishedFromPending(t *testing.T){
- dir:=t.TempDir()
+ dir:=trustedFixtureDir(t)
  now:=time.Now().UTC()
  writeFixture(t,dir,"operation-success","succeeded",now)
  rows,err:=readAt(dir,now,uint32(os.Geteuid()))

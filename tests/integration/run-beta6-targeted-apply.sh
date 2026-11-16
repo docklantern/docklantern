@@ -114,5 +114,46 @@ TARGET_IMAGE_AFTER="$(docker inspect "$TARGET_AFTER" --format '{{.Image}}')"
 [[ "$(docker image inspect "$TARGET_IMAGE_AFTER" --format '{{index .Config.Labels "docklantern.fixture"}}')" == "new" ]]
 # Ordinary Compose YAML is byte-for-byte unmodified by image-only replacement.
 grep -q 'image: .*target:old' "$ROOT/compose.yaml"
+# Persistence semantics fixture: default-file Compose reads a project-local
+# compose.override.yaml. This is deliberately NOT the production root-owned
+# executor publisher (which requires a separate journal/host acceptance).
+default_dc(){ (cd "$ROOT" && docker compose -p "$PROJECT" "$@"); }
+printf '{"services":{"target":{"image":"%s"}}}' "$NEW_DIGEST" >"$ROOT/compose.override.yaml"
+[[ "$(default_dc config --format json | python3 -c 'import json,sys;print(json.load(sys.stdin)["services"]["target"]["image"])')" == "$NEW_DIGEST" ]]
+# An explicit base-only -f does not implicitly consume the managed override:
+# operators must include it last in their supported file sequence.
+BASE_ONLY_IMAGE="$(dc config --format json | python3 -c 'import json,sys;print(json.load(sys.stdin)["services"]["target"]["image"])')"
+[[ "$BASE_ONLY_IMAGE" == "${REG}/fixture/target:old" ]]
+WITH_OVERRIDE="$(docker compose -p "$PROJECT" --project-directory "$ROOT" -f "$ROOT/compose.yaml" -f "$ROOT/compose.override.yaml" config --format json |
+  python3 -c 'import json,sys;print(json.load(sys.stdin)["services"]["target"]["image"])')"
+[[ "$WITH_OVERRIDE" == "$NEW_DIGEST" ]]
+default_dc up --no-deps --no-build --pull never -d target
+[[ "$(dc ps -q sibling)" == "$SIBLING_BEFORE" ]]
+CURRENT="$(default_dc ps -q target)"
+[[ "$(docker image inspect "$(docker inspect "$CURRENT" --format '{{.Image}}')" --format '{{index .Config.Labels "docklantern.fixture"}}')" == "new" ]]
+# A second immutable digest validates repeatability, not just a one-off
+# override. The first committed value remains distinct from the new one.
+mkdir -p "$ROOT/third"
+cat >"$ROOT/third/Dockerfile" <<'DOCKERFILE'
+FROM busybox:1.36
+LABEL docklantern.fixture=third
+CMD ["sh","-c","sleep 600"]
+DOCKERFILE
+docker build -q -t "${REG}/fixture/target:third" "$ROOT/third" >/dev/null
+docker push "${REG}/fixture/target:third" >/dev/null
+THIRD_DIGEST="$(docker image inspect "${REG}/fixture/target:third" --format '{{index .RepoDigests 0}}')"
+[[ "$THIRD_DIGEST" == "${REG}/fixture/target@sha256:"* && "$THIRD_DIGEST" != "$NEW_DIGEST" ]]
+printf '{"services":{"target":{"image":"%s"}}}' "$THIRD_DIGEST" >"$ROOT/compose.override.yaml"
+default_dc up --no-deps --no-build --pull never -d target
+SECOND="$(default_dc ps -q target)"
+[[ "$SECOND" != "$CURRENT" && "$(dc ps -q sibling)" == "$SIBLING_BEFORE" ]]
+SECOND_IMAGE_ID="$(docker inspect "$SECOND" --format '{{.Image}}')"
+[[ "$(docker image inspect "$SECOND_IMAGE_ID" --format '{{index .Config.Labels "docklantern.fixture"}}')" == "third" ]]
+default_dc up --no-deps --no-build --pull never -d target
+[[ "$(default_dc ps -q target)" == "$SECOND" ]]
+[[ "$(dc ps -q sibling)" == "$SIBLING_BEFORE" ]]
+grep -q 'image: .*target:old' "$ROOT/compose.yaml"
+echo "PASS: default Compose preserved two consecutive pinned images; explicit base-only -f omits override"
+
 echo "PASS: immutable candidate replaced only target; sibling ID/image/labels/networks/mounts unchanged"
 echo "NOTE: fixture uses disposable localhost registry, not production OCI trust or approval."

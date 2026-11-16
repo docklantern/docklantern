@@ -9,6 +9,7 @@ import (
 
  "github.com/docklantern/docklantern/internal/layout"
  "github.com/docklantern/docklantern/internal/presentation"
+ "github.com/docklantern/docklantern/internal/store"
  "github.com/docklantern/docklantern/internal/updates"
 )
 
@@ -26,6 +27,7 @@ type workspaceData struct {
  Associated []presentation.ServiceSummary
  SettingsURL string
  Assessments []updates.Assessment
+ Containers []store.Container
 }
 
 type serviceGroup struct {
@@ -96,6 +98,7 @@ func(h Handler) workspaceSnapshot(ctx context.Context)(workspaceData,error){
   Images:presentation.BuildImageSummaries(policies,checks,assessments,events,now),
   Services:presentation.BuildServiceSummaries(views,containers,policies,assessments),
   Assessments:assessments,
+  Containers:containers,
  }
  for _,s:=range result.Services{
   if len(result.Groups)==0 || result.Groups[len(result.Groups)-1].Project!=s.Project{
