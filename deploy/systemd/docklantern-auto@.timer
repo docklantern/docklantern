@@ -1,0 +1,12 @@
+[Unit]
+Description=DockLantern host-local automatic image polling (%i)
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=10min
+RandomizedDelaySec=30s
+AccuracySec=30s
+Unit=docklantern-auto@%i.service
+
+[Install]
+WantedBy=timers.target

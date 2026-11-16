@@ -45,6 +45,15 @@ type Registration struct {
 	// PersistentOverride is host-root authorization for a narrowly qualified
 	// project-local compose.override.yaml. It never enables unattended apply.
 	PersistentOverride bool `json:"persistent_override,omitempty"`
+	// AutomaticUpdates is standing host authority, installed through the
+	// existing root/TTY-confirmed registration command. The web monitor cannot
+	// enable it or select a target. Nil means no automatic Docker writes.
+	AutomaticUpdates *AutomaticUpdatePolicy `json:"automatic_updates,omitempty"`
+}
+
+type AutomaticUpdatePolicy struct {
+	Enabled bool `json:"enabled"`
+	Tag string `json:"tag"`
 }
 
 type Service struct {
@@ -172,7 +181,29 @@ func (r Registration) Validate() error {
 		r.ComposeFiles[0] != filepath.Join(r.ProjectDirectory, "compose.yaml")) {
 		return ErrInvalidRegistration
 	}
+	if r.AutomaticUpdates != nil {
+		// A standing root authorization is accepted only with the existing
+		// persistent single-target source policy. Disabled policies must be
+		// absent; an explicit opt-out is a registration replacement.
+		if !r.AutomaticUpdates.Enabled || !r.PersistentOverride ||
+			!ValidImageTag(r.AutomaticUpdates.Tag) {
+			return ErrInvalidRegistration
+		}
+	}
 	return nil
+}
+
+// ValidImageTag is shared with public Docker Hub tag resolution. No slash,
+// digest, URL, or ambiguous repository qualifier may enter a registry path.
+func ValidImageTag(tag string) bool {
+	if len(tag) == 0 || len(tag) > 128 { return false }
+	for i, ch := range tag {
+		if (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') || ch == '_' ||
+			(i > 0 && (ch == '.' || ch == '-')) { continue }
+		return false
+	}
+	return true
 }
 
 // AllowsTarget checks exactly one explicit service/repository/platform match.

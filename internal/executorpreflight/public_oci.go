@@ -43,6 +43,30 @@ func defaultPublicOCIClient() publicOCIClient {
  }}
 }
 
+// ResolvePublicTag reads an explicitly host-approved Docker Hub tag and pins
+// it to an immutable OCI index. The digest is re-verified through the existing
+// platform-proof reader; a tag is never passed to the Docker mutation runner.
+func ResolvePublicTag(ctx context.Context, repository, tag string) (string, error) {
+ return defaultPublicOCIClient().resolveTag(ctx, repository, tag)
+}
+
+func (c publicOCIClient) resolveTag(ctx context.Context, repository, tag string) (string, error) {
+ if ctx == nil || ctx.Err() != nil || c.client == nil ||
+  !executorregistration.ValidRepository(repository) ||
+  !executorregistration.ValidImageTag(tag) { return "", ErrPublicOCIUnavailable }
+ repo := strings.TrimPrefix(repository,"docker.io/")
+ index, mt, err := c.manifestReference(ctx, repo, tag, indexAccept)
+ if err != nil || (mt != ociIndexMediaType && mt != dockerIndexMediaType) {
+  return "", ErrPublicOCIUnavailable
+ }
+ digest := digestFor(index)
+ verified, _, err := c.fetch(ctx, repository, digest)
+ if err != nil || digestFor(verified) != digest {
+  return "", ErrPublicOCIUnavailable
+ }
+ return digest, nil
+}
+
 func (h *HostReadOnlyAdapter) FetchOCI(ctx context.Context,repository,indexDigest string)([]byte,[]byte,error){
  if h==nil||h.clock==nil {return nil,nil,ErrPublicOCIUnavailable}
  return defaultPublicOCIClient().fetch(ctx,repository,indexDigest)
@@ -89,7 +113,16 @@ func (c publicOCIClient) fetch(ctx context.Context,repository,indexDigest string
 // GET is limited to two Docker Hub manifest endpoints. Every response is
 // bounded and hashed, including child descriptor reads; 3xx is rejected.
 func (c publicOCIClient) manifest(ctx context.Context,repo,reference,accept string)([]byte,string,error){
- if !validDigest(reference)||!validRepositoryPath(repo){return nil,"",ErrPublicOCIUnavailable}
+ if !validDigest(reference){return nil,"",ErrPublicOCIUnavailable}
+ return c.manifestReference(ctx,repo,reference,accept)
+}
+
+// manifestReference additionally accepts a strict protected-registration
+// tag, but only for a read-only tag lookup. The response must advertise the
+// exact digest of its bytes, and no Docker write command receives the tag.
+func (c publicOCIClient) manifestReference(ctx context.Context,repo,reference,accept string)([]byte,string,error){
+ if (!validDigest(reference) && !executorregistration.ValidImageTag(reference)) ||
+  !validRepositoryPath(repo){return nil,"",ErrPublicOCIUnavailable}
  endpoint:=dockerRegistryURL+"/v2/"+repo+"/manifests/"+reference
  request:=func(token string)(*http.Response,error){
   req,e:=http.NewRequestWithContext(ctx,http.MethodGet,endpoint,nil)
@@ -116,10 +149,15 @@ func (c publicOCIClient) manifest(ctx context.Context,repo,reference,accept stri
  capBytes:=MaxOCIManifestBytes
  if accept==indexAccept{capBytes=MaxOCIIndexBytes}
  data,err:=io.ReadAll(io.LimitReader(response.Body,int64(capBytes+1)))
- if err!=nil||len(data)==0||len(data)>capBytes||
-  digestFor(data)!=reference{return nil,"",ErrPublicOCIUnavailable}
+ if err!=nil||len(data)==0||len(data)>capBytes{return nil,"",ErrPublicOCIUnavailable}
+ digest := digestFor(data)
  header:=response.Header.Get("Docker-Content-Digest")
- if header!=""&&header!=reference{return nil,"",ErrPublicOCIUnavailable}
+ if validDigest(reference) {
+  if digest!=reference || (header!=""&&header!=digest){return nil,"",ErrPublicOCIUnavailable}
+ } else if header!=digest {
+  // Require a verified server-supplied digest for a mutable tag lookup.
+  return nil,"",ErrPublicOCIUnavailable
+ }
  return data,mt,nil
 }
 

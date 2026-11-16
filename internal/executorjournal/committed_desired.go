@@ -28,3 +28,21 @@ func (s *Store) LatestCommittedDesired(ctx context.Context, project string) (str
     if err != nil || !validHash(digest) { return "", false, ErrUnavailable }
     return digest, true, nil
 }
+
+// HasUnresolvedProject records the same durable block condition as Begin,
+// including operations requiring manual reconciliation. An unchanged poll
+// must not silently report a healthy state over an unresolved operation.
+func (s *Store) HasUnresolvedProject(ctx context.Context, project string) (bool,error) {
+ if s==nil||ctx==nil||ctx.Err()!=nil||!executorregistration.ValidID(project) {
+  return false,ErrUnavailable
+ }
+ s.mu.Lock()
+ defer s.mu.Unlock()
+ if s.db==nil{return false,ErrUnavailable}
+ var blocked int
+ err:=s.db.QueryRowContext(ctx,
+  "SELECT EXISTS(SELECT 1 FROM operations WHERE project_id = ? AND outcome IN ('pending','needs_reconciliation'))",
+  project).Scan(&blocked)
+ if err!=nil{return false,ErrUnavailable}
+ return blocked!=0,nil
+}

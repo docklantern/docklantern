@@ -1,0 +1,20 @@
+[Unit]
+Description=DockLantern host-local automatic digest check (%i)
+Documentation=https://github.com/docklantern/docklantern
+Wants=docker.service
+After=docker.service
+ConditionPathIsExecutable=/usr/local/libexec/docklantern-executor
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/libexec/docklantern-executor auto-once %i
+TimeoutStartSec=10min
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+
+# Only enable this unit after explicitly approving the protected registration,
+# root-owned Compose project, verified executor install, and host backup plan.
+# The monitoring container does not invoke this unit.
