@@ -36,6 +36,12 @@ jobs:
       - run: go mod tidy
       - run: git diff --exit-code -- go.mod go.sum
       - run: go test -race ./...
+      - name: Verify receipt security fixtures under restrictive local umask
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          go test -race ./internal/deploymentactivity -count=1
       - run: go vet ./...
 
   compose-integration:
