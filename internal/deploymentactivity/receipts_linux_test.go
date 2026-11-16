@@ -26,8 +26,8 @@ func writeFixture(t *testing.T,dir,id,outcome string,at time.Time){
  b,e:=json.Marshal(record)
  if e!=nil{t.Fatal(e)}
  if e=os.WriteFile(filepath.Join(dir,id+"-v1.json"),b,0o644);e!=nil{t.Fatal(e)}
- // WriteFile permissions are filtered by the caller\'s umask (e.g. 0077).
- // Force the receipt publisher\'s exact mode so this security fixture works
+ // WriteFile permissions are filtered by the caller's umask (e.g. 0077).
+ // Force the receipt publisher's exact mode so this security fixture works
  // under restrictive local umasks without weakening the production reader.
  if e=os.Chmod(filepath.Join(dir,id+"-v1.json"),executorjournal.ReceiptFileMode);e!=nil{t.Fatal(e)}
 }
