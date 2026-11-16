@@ -23,7 +23,7 @@ output="$1"
   echo "Refusing to overwrite an existing path" >&2; exit 2;
 }
 bash scripts/verify-release-inputs.sh
-builder="$(sed -n 's/^FROM \\(golang:[^ ]*\\) AS build$/\\1/p' Dockerfile)"
+builder="$(awk '$1=="FROM" && $3=="AS" && $4=="build" {print $2}' Dockerfile)"
 [[ "$builder" == golang:*@sha256:* ]] || exit 2
 
 # This local build DOES use Docker on the calling machine. Never point it
