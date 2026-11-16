@@ -54,6 +54,10 @@ func publishProtectedWithVerifier(reg Registration, expectedOldHash string, veri
 		reg.ComposeFiles, reg.EnvFiles, reg.Profiles, expectedOldHash); err != nil {
 		return empty, ErrUntrustedStore
 	}
+	if _, err := fmt.Fprintf(tty, "Persistent desired image: %t\nStanding automatic update authority: %t\n", reg.PersistentOverride, reg.AutomaticUpdates != nil); err != nil { return empty, ErrUntrustedStore }
+	if reg.AutomaticUpdates != nil {
+		if _, err := fmt.Fprintf(tty, "WARNING: unattended root Docker updates ENABLED for approved tag %s; registration replacement is required to disable.\n", reg.AutomaticUpdates.Tag); err != nil { return empty, ErrUntrustedStore }
+	}
 	for _, service := range reg.Services {
 		if _, err := fmt.Fprintf(tty,
 			"Service: %s | enabled=%t | repository=%s | platform=%s/%s | running-only=%t\n",
