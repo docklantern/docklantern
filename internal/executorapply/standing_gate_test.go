@@ -94,3 +94,42 @@ func TestStandingGateUsesJournaledCoordinator(t *testing.T){
   t.Fatalf("incorrect guarded execution path: %#v",journal.events)
  }
 }
+
+type standingVerifiedJournal struct {
+ committingLedgerFixture
+ closes int
+}
+func (j *standingVerifiedJournal) Close()error {j.closes++;return nil}
+
+func TestStandingGateCanCommitIndependentlyVerifiedCandidate(t *testing.T){
+ op,q:=sampleCandidate()
+ now:=op.CreatedAt.Add(5*time.Second)
+ q.CheckedAt=now
+ journal:=&standingVerifiedJournal{}
+ events:=&journal.ledgerFixture.events
+ lock:=&gateLock{events:events}
+ checks:=0
+ deps:=StandingDependencies{
+  IsHostRoot:func()bool{return true},
+  AcquireLock:func(id string)(ProjectLease,error){
+   if id!=op.ProjectID{return nil,errors.New("wrong lock")}
+   return lock,nil
+  },
+  OpenJournal:func()(JournalSession,error){return journal,nil},
+  Qualify:func(ctx context.Context,id string)(executorpreflight.Qualification,error){
+   if id!=op.ProposalID{return executorpreflight.Qualification{},errors.New("wrong proposal")}
+   return q,nil
+  },
+  PrepareEnvironment:func(ctx context.Context,q executorpreflight.Qualification)(Environment,error){
+   return &witnessedEnvironmentFixture{environmentFixture:environmentFixture{ledger:&journal.ledgerFixture}},nil
+  },
+  CheckStanding:func(context.Context)error{checks++;return nil},
+  NoChange:func(context.Context)(bool,error){return false,nil},
+  Clock:func()time.Time{return now},
+ }
+ result,err:=RunLockedStandingCandidate(context.Background(),op,deps)
+ if err!=nil||result.NeedsReconciliation||result.LastPhase!="COMMIT"||
+  !journal.finalized||checks!=2||lock.released!=1||journal.closes!=1{
+  t.Fatalf("standing update did not retain verified journal COMMIT: %#v %v",result,err)
+ }
+}
