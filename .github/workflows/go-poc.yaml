@@ -50,6 +50,30 @@ jobs:
           )
       - run: go vet ./...
 
+  rc-artifact-contract:
+    # Builds local-only artifacts on an isolated CI runner, not on a VPS.
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build matching monitoring image and pinned host executor
+        shell: bash
+        env:
+          DOCKLANTERN_RC_BUILD: "1"
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/docklantern-local-rc"
+          bash scripts/build-rc-bundle.sh "$output"
+          bash scripts/verify-rc-bundle.sh "$output" "$GITHUB_SHA"
+          test -s "$output/monitor-linux-amd64.tar"
+          test -x "$output/docklantern-executor"
+          # No upload, Docker Hub push, release, or VPS action.
+          echo "PASS: local-only paired RC artifacts from the checked-out commit"
+
   compose-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15
