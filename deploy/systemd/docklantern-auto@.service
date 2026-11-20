@@ -3,7 +3,7 @@ Description=DockLantern host-local automatic digest check (%i)
 Documentation=https://github.com/docklantern/docklantern
 Wants=docker.service
 After=docker.service
-ConditionPathIsExecutable=/usr/local/libexec/docklantern-executor
+ConditionFileIsExecutable=/usr/local/libexec/docklantern-executor
 
 [Service]
 Type=oneshot
