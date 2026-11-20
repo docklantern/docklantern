@@ -9,6 +9,9 @@ output and GUI confirmations, not a new independent host inspection.
 ## Tested configuration
 
 - Source: `9be9334d7e6923c1a14a5d090a66c474d32c1d8f`.
+  Exact-source [Go CI](https://github.com/docklantern/docklantern/actions/runs/43804403254)
+  and [security audit](https://github.com/docklantern/docklantern/actions/runs/43804403314)
+  completed successfully; this is not a new audit of the final release artifact.
 - Monitor: `docklantern-rc:9be9334d7e69`, local image ID
   `sha256:3c4346f151e5947b05f559ac77827b972cef43dfe6b669bbb77e88f571243418`.
 - Executor: `/usr/local/libexec/docklantern-executor`,
@@ -97,7 +100,9 @@ Preserve the entire ordered stack for future monitor recreation.
 - The installed systemd service template was corrected from the unsupported
   `ConditionPathIsExecutable` to `ConditionFileIsExecutable`; local validation
   passed. [PR #138](https://github.com/docklantern/docklantern/pull/138)
-  remains a separate source correction pending review/merge.
+  was subsequently merged at `560ee976e773ed84b285d81e9c1b8ff2b7389667`.
+  The source delta from the tested commit is only that systemd template;
+  the running artifacts have not been rebuilt or redeployed.
 - Capture a strictly post-monitor-recreation scheduled check: the recorded
   last tick overlapped recreation, proving independence but not strictly
   later execution.
