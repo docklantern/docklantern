@@ -1,6 +1,7 @@
 # First-release RC: paired artifacts and gated VPS acceptance
 
-**Status:** pre-release plan, not permission to publish or deploy. This document
+**Status:** pre-release plan, not permission to publish or deploy. The [existing VPS functional acceptance record](first-release-existing-vps-results.md)
+records evidence and remaining release gates. This document
 supersedes historical beta.6 one-shot test instructions for the FIRST automatic
 image-update RC. No release tag or Docker Hub image is created by this PR.
 
@@ -114,10 +115,19 @@ Deploy the RC monitoring image using a separately approved, reviewed Compose
 overlay/pin and backup. Do NOT edit the persistent executor target Compose
 override manually. Keep the monitoring Docker socket proxy read-only.
 
-If positive Activity evidence is required, provision the optional receipt
-mirror from `/var/lib/docklantern/handoff/receipts` to the monitor's fixed
+Before the first automatic update in an acceptance test, provision the receipt
+outbox and approved read-only mirror so positive Activity evidence is available.
+Mount the receipt outbox from `/var/lib/docklantern/handoff/receipts` to the monitor's fixed
 `/run/docklantern/executor-receipts` **read-only**, after confirming the
 directory/file ownership and modes match the protected receipt publisher.
+Require a real root-owned directory with exact mode `0755`, all ancestors
+root-owned and not group/world-writable, and root-owned single-link regular
+receipt files with exact mode `0644`. Reject symlinks. Keep all private
+executor directories protected; do not recursively chmod the handoff tree.
+A `0700` outbox prevented receipt publication despite a successful deployment
+on the existing test VPS. Correct provisioning before starting the timer;
+unchanged ticks do not backfill a previously missing receipt. See the
+[deployment provisioning checklist](https://github.com/docklantern/docklantern-deploy/blob/main/docs/rc-receipt-overlay.md).
 This mount contains only sanitized receipt JSON; never mount registrations,
 protected journal/SQLite, source snapshots, host executor binary or Docker
 socket into the monitoring container.
@@ -135,8 +145,15 @@ approved registration instance. Do not enable a wildcard/global timer.
 
 For each of TWO distinct approved image revisions:
 
-1. Record the approved repository/tag and expected registry OCI index digest
-   **before** pushing or approving the tag mutation.
+1. Record the approved repository/tag, source commit, existing target ID and
+   current registry digest **before** publication. Prefer independently recording
+   the new expected OCI index before it becomes the watched tag. If the normal
+   publishing workflow builds and promotes `latest` together, the new digest
+   cannot be known in advance: obtain explicit approval for the resulting digest
+   from that exact source/tag, document the exception, and independently compare
+   the versioned and watched tags as soon as publication completes. The active
+   timer may deploy before that comparison. Stop acceptance if the digests or
+   approved publication provenance differ.
 2. After separate image publication approval, use the normal hello app
    workflow to publish the new tag; verify Docker Hub index digest and
    `linux/amd64` platform manifest. A digest change must be real, not a
@@ -149,9 +166,14 @@ For each of TWO distinct approved image revisions:
    reference, and unchanged sibling/Traefik/proxy IDs.
 5. Verify the GUI's current deployed image and watch target agree with fresh
    observations; compare positive receipt history with its operation ID.
-6. Run an unchanged tick; **target ID must not change**. Recreate with
-   documented default-file Compose usage, then restart and verify that the
-   committed image remains pinned.
+6. Run an unchanged tick; **target ID must not change**. After both updates,
+   under separate approval stop only the enrolled timer and verify the executor
+   is idle. Recreate only the disposable target using default-file Compose,
+   `up -d --no-deps --no-build --pull never --force-recreate web`, and then
+   `restart --no-deps web`. Check that image identity, original source, managed
+   override, protected journal and siblings are preserved. Resume the existing
+   timer only on success; a subsequent unchanged tick must preserve the new
+   container ID. Verify fresh GUI inventory.
 
 Abort on incomplete journal commit or missing trusted evidence. The beta
 executor does not implement unattended recovery. Do not clear SQLite state
