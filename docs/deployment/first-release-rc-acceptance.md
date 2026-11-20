@@ -117,8 +117,7 @@ override manually. Keep the monitoring Docker socket proxy read-only.
 
 Before the first automatic update in an acceptance test, provision the receipt
 outbox and approved read-only mirror so positive Activity evidence is available.
-The optional monitor receipt
-mirror from `/var/lib/docklantern/handoff/receipts` to the monitor's fixed
+Mount the receipt outbox from `/var/lib/docklantern/handoff/receipts` to the monitor's fixed
 `/run/docklantern/executor-receipts` **read-only**, after confirming the
 directory/file ownership and modes match the protected receipt publisher.
 Require a real root-owned directory with exact mode `0755`, all ancestors
